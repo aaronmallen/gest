@@ -42,6 +42,8 @@ impl Cli {
       return Ok(());
     };
 
+    // Resolve the final level using the full precedence chain (CLI > env > config > default)
+    // and apply theme styles.  The logger was already registered by `init_early` in `run()`.
     let env_level = crate::config::env::GEST_LOG_LEVEL.value().ok();
     let level = crate::logger::resolve_level(self.verbose, env_level.as_deref(), config.log.level.as_deref());
     let theme = Theme::from_config(config);
@@ -80,6 +82,32 @@ impl Command {
   }
 }
 
+pub fn run() -> Result<()> {
+  // Pre-parse verbosity so the logger is active during config discovery.
+  let verbosity = pre_parse_verbosity();
+  let early_level = crate::logger::resolve_level(verbosity, None, None);
+  crate::logger::init_early(early_level);
+
+  let config = crate::config::load()?;
+  Cli::parse().call(&config)
+}
+
+/// Count `-v` / `--verbose` occurrences in an argument iterator.
+fn count_verbosity_flags(args: impl Iterator<Item = String>) -> u8 {
+  let mut count: u8 = 0;
+  for arg in args {
+    if arg == "--verbose" {
+      count = count.saturating_add(1);
+    } else if arg == "--" {
+      break;
+    } else if arg.starts_with('-') && !arg.starts_with("--") {
+      // Short flag cluster, e.g. `-vv` or `-v`
+      count = count.saturating_add(arg.chars().filter(|&c| c == 'v').count() as u8);
+    }
+  }
+  count
+}
+
 fn long_about() -> String {
   format!(
     "\n{}\n\n{}",
@@ -88,7 +116,61 @@ fn long_about() -> String {
   )
 }
 
-pub fn run() -> Result<()> {
-  let config = crate::config::load()?;
-  Cli::parse().call(&config)
+/// Scan `std::env::args()` for `-v` / `--verbose` flags and return the count.
+///
+/// This intentionally avoids a full clap parse so it can run before anything
+/// else.  It handles `-v`, `-vv`, `-vvv`, combined short flags like `-vvv`,
+/// and `--verbose` (each occurrence counts as 1).
+fn pre_parse_verbosity() -> u8 {
+  count_verbosity_flags(std::env::args().skip(1))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  mod count_verbosity_flags {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    fn flags(args: &[&str]) -> u8 {
+      count_verbosity_flags(args.iter().map(|s| s.to_string()))
+    }
+
+    #[test]
+    fn it_counts_single_v() {
+      assert_eq!(flags(&["-v"]), 1);
+    }
+
+    #[test]
+    fn it_counts_clustered_v() {
+      assert_eq!(flags(&["-vvv"]), 3);
+    }
+
+    #[test]
+    fn it_counts_long_verbose() {
+      assert_eq!(flags(&["--verbose", "--verbose"]), 2);
+    }
+
+    #[test]
+    fn it_counts_mixed_short_and_long() {
+      assert_eq!(flags(&["-vv", "--verbose"]), 3);
+    }
+
+    #[test]
+    fn it_returns_zero_with_no_flags() {
+      assert_eq!(flags(&["task", "show", "abc"]), 0);
+    }
+
+    #[test]
+    fn it_stops_at_double_dash() {
+      assert_eq!(flags(&["-v", "--", "-vv"]), 1);
+    }
+
+    #[test]
+    fn it_ignores_long_flags_containing_v() {
+      assert_eq!(flags(&["--version"]), 0);
+    }
+  }
 }

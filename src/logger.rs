@@ -57,9 +57,22 @@ impl From<&Theme> for LogStyles {
   }
 }
 
+/// Register the global logger and set the initial level.
+///
+/// Call this early -- before config loading -- so that discovery log calls
+/// are captured.  Styles are *not* set here because the theme depends on
+/// config which hasn't been loaded yet.
+pub fn init_early(level: log::LevelFilter) {
+  let _ = log::set_logger(&LOGGER);
+  log::set_max_level(level);
+}
+
+/// Apply theme styles and (optionally) adjust the log level.
+///
+/// Call this after config is available so log output is properly styled and
+/// the level reflects the full precedence chain (CLI > env > config > default).
 pub fn init(level: log::LevelFilter, theme: &Theme) {
   let _ = LOG_STYLES.set(LogStyles::from(theme));
-  let _ = log::set_logger(&LOGGER);
   log::set_max_level(level);
 }
 

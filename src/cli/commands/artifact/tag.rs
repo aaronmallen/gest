@@ -19,8 +19,11 @@ pub struct Command {
 
 impl Command {
   pub fn call(&self, config: &Config, _theme: &Theme) -> crate::Result<()> {
+    log::info!("tagging artifact with prefix '{}'", self.id);
     let data_dir = config::data_dir(config)?;
+    log::debug!("resolving artifact ID from prefix '{}'", self.id);
     let id = store::resolve_artifact_id(&data_dir, &self.id, true)?;
+    log::debug!("resolved artifact ID: {id}");
     let mut artifact = store::read_artifact(&data_dir, &id)?;
 
     for tag in &self.tags {
@@ -28,9 +31,11 @@ impl Command {
         artifact.tags.push(tag.clone());
       }
     }
+    log::debug!("tags to add: {:?}", self.tags);
 
     artifact.updated_at = Utc::now();
     store::write_artifact(&data_dir, &artifact)?;
+    log::trace!("artifact {id} tagged successfully");
     TagChange::new("Tagged", "artifact", &id, &self.tags).write_to(&mut std::io::stdout())?;
     Ok(())
   }

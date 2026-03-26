@@ -13,13 +13,22 @@ pub struct Command {
 
 impl Command {
   pub fn call(&self, config: &Config) -> crate::Result<()> {
+    log::info!(
+      "getting metadata '{}' from artifact with prefix '{}'",
+      self.path,
+      self.id
+    );
     let data_dir = config::data_dir(config)?;
+    log::debug!("resolving artifact ID from prefix '{}'", self.id);
     let id = store::resolve_artifact_id(&data_dir, &self.id, true)?;
+    log::debug!("resolved artifact ID: {id}");
     let artifact = store::read_artifact(&data_dir, &id)?;
 
+    log::debug!("resolving dot path '{}'", self.path);
     let value = resolve_dot_path(&yaml_serde::Value::Mapping(artifact.metadata), &self.path)
       .ok_or_else(|| crate::Error::generic(format!("Metadata key not found: '{}'", self.path)))?;
 
+    log::trace!("metadata key '{}' resolved for artifact {id}", self.path);
     print_yaml_value(&value);
     Ok(())
   }

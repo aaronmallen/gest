@@ -35,11 +35,14 @@ pub struct Command {
 
 impl Command {
   pub fn call(&self, config: &Config, theme: &Theme) -> crate::Result<()> {
+    log::info!("creating new artifact");
     let body = self.read_body()?;
 
     let title = if let Some(ref t) = self.title {
+      log::debug!("using provided title: {t}");
       t.clone()
     } else {
+      log::debug!("extracting title from body");
       extract_title(&body)
         .ok_or_else(|| crate::Error::generic("No title found: body has no `# ` heading and no --title provided"))?
     };
@@ -49,6 +52,7 @@ impl Command {
       .as_deref()
       .map(crate::cli::helpers::parse_tags)
       .unwrap_or_default();
+    log::debug!("tags: {tags:?}");
 
     let metadata = {
       let pairs = crate::cli::helpers::split_key_value_pairs(&self.metadata)?;
@@ -69,6 +73,7 @@ impl Command {
 
     let data_dir = config::data_dir(config)?;
     let artifact = store::create_artifact(&data_dir, new)?;
+    log::trace!("artifact {} created successfully", artifact.id);
     Confirmation::new("Created", "artifact", &artifact.id).write_to(&mut std::io::stdout(), theme)?;
     Ok(())
   }

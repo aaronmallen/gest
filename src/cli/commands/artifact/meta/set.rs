@@ -21,14 +21,19 @@ pub struct Command {
 
 impl Command {
   pub fn call(&self, config: &Config, theme: &Theme) -> crate::Result<()> {
+    log::info!("setting metadata '{}' on artifact with prefix '{}'", self.path, self.id);
     let data_dir = config::data_dir(config)?;
+    log::debug!("resolving artifact ID from prefix '{}'", self.id);
     let id = store::resolve_artifact_id(&data_dir, &self.id, true)?;
+    log::debug!("resolved artifact ID: {id}");
     let mut artifact = store::read_artifact(&data_dir, &id)?;
 
+    log::debug!("setting dot path '{}' to '{}'", self.path, self.value);
     set_dot_path(&mut artifact.metadata, &self.path, &self.value)?;
 
     artifact.updated_at = Utc::now();
     store::write_artifact(&data_dir, &artifact)?;
+    log::trace!("metadata '{}' set on artifact {id}", self.path);
     Confirmation::new("Updated", "artifact", &artifact.id).write_to(&mut std::io::stdout(), theme)?;
     Ok(())
   }

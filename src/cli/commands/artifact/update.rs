@@ -34,8 +34,11 @@ pub struct Command {
 
 impl Command {
   pub fn call(&self, config: &Config, theme: &Theme) -> crate::Result<()> {
+    log::info!("updating artifact with prefix '{}'", self.id);
     let data_dir = config::data_dir(config)?;
+    log::debug!("resolving artifact ID from prefix '{}'", self.id);
     let id = store::resolve_artifact_id(&data_dir, &self.id, true)?;
+    log::debug!("resolved artifact ID: {id}");
 
     if self.body.is_none() && std::io::stdin().is_terminal() && crate::cli::editor::resolve_editor().is_some() {
       let path = store::artifact_path(&data_dir, &id);
@@ -62,6 +65,7 @@ impl Command {
     };
 
     let artifact = store::update_artifact(&data_dir, &id, patch)?;
+    log::trace!("artifact {} updated successfully", artifact.id);
     Confirmation::new("Updated", "artifact", &artifact.id).write_to(&mut std::io::stdout(), theme)?;
     Ok(())
   }

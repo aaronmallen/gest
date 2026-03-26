@@ -36,15 +36,24 @@ pub struct Command {
 
 impl Command {
   pub fn call(&self, config: &Config, theme: &Theme) -> crate::Result<()> {
+    log::info!("listing artifacts");
     let filter = ArtifactFilter {
       include_archived: self.include_archived,
       only_archived: self.archived,
       kind: self.kind.clone(),
       tag: self.tag.clone(),
     };
+    log::debug!(
+      "filter: kind={:?}, tag={:?}, archived={}, include_archived={}",
+      filter.kind,
+      filter.tag,
+      self.archived,
+      self.include_archived
+    );
 
     let data_dir = config::data_dir(config)?;
     let artifacts = store::list_artifacts(&data_dir, &filter)?;
+    log::trace!("found {} artifact(s)", artifacts.len());
 
     if self.json {
       let json: Vec<serde_json::Value> = artifacts

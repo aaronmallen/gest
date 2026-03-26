@@ -19,14 +19,19 @@ pub struct Command {
 
 impl Command {
   pub fn call(&self, config: &Config, _theme: &Theme) -> crate::Result<()> {
+    log::info!("untagging artifact with prefix '{}'", self.id);
     let data_dir = config::data_dir(config)?;
+    log::debug!("resolving artifact ID from prefix '{}'", self.id);
     let id = store::resolve_artifact_id(&data_dir, &self.id, true)?;
+    log::debug!("resolved artifact ID: {id}");
     let mut artifact = store::read_artifact(&data_dir, &id)?;
 
+    log::debug!("tags to remove: {:?}", self.tags);
     artifact.tags.retain(|t| !self.tags.contains(t));
 
     artifact.updated_at = Utc::now();
     store::write_artifact(&data_dir, &artifact)?;
+    log::trace!("artifact {id} untagged successfully");
     TagChange::new("Untagged", "artifact", &id, &self.tags).write_to(&mut std::io::stdout())?;
     Ok(())
   }

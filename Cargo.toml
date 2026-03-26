@@ -17,6 +17,8 @@ pkg-url = "{repo}/releases/download/v{version}/{name}-v{version}-{target}.tar.gz
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
+clap_mangen = "0.2"
 dir_spec = "0.5"
 log = "0.4"
 rand = "0.10"

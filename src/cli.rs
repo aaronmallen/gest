@@ -19,7 +19,7 @@ use crate::{
   long_about = long_about(),
   name = "gest",
 )]
-struct Cli {
+pub(crate) struct Cli {
   #[command(subcommand)]
   command: Option<Command>,
   /// Print version information
@@ -57,6 +57,7 @@ impl Cli {
 enum Command {
   Artifact(commands::artifact::Command),
   Config(commands::config::Command),
+  Generate(commands::generate::Command),
   Init(commands::init::Command),
   Search(commands::search::Command),
   SelfUpdate(commands::self_update::Command),
@@ -69,6 +70,7 @@ impl Command {
     match self {
       Self::Artifact(cmd) => cmd.call(config, theme),
       Self::Config(cmd) => cmd.call(config, theme),
+      Self::Generate(cmd) => cmd.call(),
       Self::Init(cmd) => cmd.call(config, theme),
       Self::Search(cmd) => cmd.call(config, theme),
       Self::SelfUpdate(cmd) => cmd.call(config, theme),

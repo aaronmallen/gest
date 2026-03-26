@@ -469,38 +469,20 @@ fn serialize_artifact(artifact: &Artifact) -> crate::Result<String> {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
-
   use super::*;
   use crate::model::{link::Link, task::Status};
 
   fn make_test_artifact(id: &str, title: &str, body: &str) -> Artifact {
-    Artifact {
-      archived_at: None,
-      body: body.to_string(),
-      created_at: Utc::now(),
-      id: id.parse().unwrap(),
-      kind: None,
-      metadata: yaml_serde::Mapping::new(),
-      tags: vec![],
-      title: title.to_string(),
-      updated_at: Utc::now(),
-    }
+    let mut a = crate::test_helpers::make_test_artifact(id);
+    a.title = title.to_string();
+    a.body = body.to_string();
+    a
   }
 
   fn make_test_task(id: &str, title: &str) -> Task {
-    Task {
-      resolved_at: None,
-      created_at: Utc::now(),
-      description: String::new(),
-      id: id.parse().unwrap(),
-      links: vec![],
-      metadata: toml::Table::new(),
-      status: Status::Open,
-      tags: vec![],
-      title: title.to_string(),
-      updated_at: Utc::now(),
-    }
+    let mut t = crate::test_helpers::make_test_task(id);
+    t.title = title.to_string();
+    t
   }
 
   mod resolve_task {

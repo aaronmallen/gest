@@ -4,6 +4,8 @@ mod error;
 mod logger;
 mod model;
 mod store;
+#[cfg(test)]
+mod test_helpers;
 mod ui;
 
 pub use error::{Error, Result};

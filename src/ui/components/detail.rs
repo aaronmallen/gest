@@ -1,4 +1,4 @@
-use std::{fmt, io};
+use std::io;
 
 use crate::{
   model::{Artifact, Task},
@@ -37,14 +37,7 @@ impl<'a> ArtifactDetail<'a> {
   }
 }
 
-impl fmt::Display for ArtifactDetail<'_> {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(ArtifactDetail<'_>);
 
 /// Detail view for a task, matching the output of `task show`.
 pub struct TaskDetail<'a> {
@@ -112,14 +105,7 @@ impl<'a> TaskDetail<'a> {
   }
 }
 
-impl fmt::Display for TaskDetail<'_> {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf, &Theme::default()).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(TaskDetail<'_>, theme);
 
 #[cfg(test)]
 mod tests {

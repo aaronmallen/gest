@@ -37,13 +37,11 @@ impl Command {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
-
   use super::*;
   use crate::{
-    config::{Config, StorageConfig},
-    model::{Link, Status, Task},
+    model::{Link, RelationshipType},
     store,
+    test_helpers::{make_test_config, make_test_task},
   };
 
   mod call {
@@ -52,8 +50,15 @@ mod tests {
     #[test]
     fn it_resolves_resolved_task() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      task.description = "A test description".to_string();
+      task.tags = vec!["rust".to_string()];
+      task.links = vec![Link {
+        ref_: "https://example.com".to_string(),
+        rel: RelationshipType::RelatesTo,
+      }];
+      task.title = "Test Task".to_string();
       store::write_task(dir.path(), &task).unwrap();
       store::resolve_task(dir.path(), &task.id).unwrap();
 
@@ -68,8 +73,8 @@ mod tests {
     #[test]
     fn it_shows_task_as_json() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
@@ -83,8 +88,8 @@ mod tests {
     #[test]
     fn it_shows_task_detail() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
@@ -93,35 +98,6 @@ mod tests {
       };
 
       cmd.call(&config, &Theme::default()).unwrap();
-    }
-  }
-
-  fn make_config(dir: &std::path::Path) -> Config {
-    store::ensure_dirs(dir).unwrap();
-    Config {
-      storage: StorageConfig {
-        data_dir: Some(dir.to_path_buf()),
-      },
-      ..Config::default()
-    }
-  }
-
-  fn make_task(id: &str) -> Task {
-    let now = Utc::now();
-    Task {
-      resolved_at: None,
-      created_at: now,
-      description: "A test description".to_string(),
-      id: id.parse().unwrap(),
-      links: vec![Link {
-        ref_: "https://example.com".to_string(),
-        rel: crate::model::RelationshipType::RelatesTo,
-      }],
-      metadata: toml::Table::new(),
-      status: Status::Open,
-      tags: vec!["rust".to_string()],
-      title: "Test Task".to_string(),
-      updated_at: now,
     }
   }
 }

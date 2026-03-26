@@ -39,11 +39,8 @@ impl Command {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
-  use tempfile::TempDir;
-
   use super::*;
-  use crate::model::{Status, Task};
+  use crate::test_helpers::{make_test_config, make_test_task};
 
   mod call {
     use pretty_assertions::assert_eq;
@@ -52,9 +49,10 @@ mod tests {
 
     #[test]
     fn it_adds_tags() {
-      let (_dir, config) = setup();
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(_dir.path(), &task).unwrap();
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_test_config(dir.path());
+      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -62,16 +60,17 @@ mod tests {
       };
       cmd.call(&config, &Theme::default()).unwrap();
 
-      let loaded = store::read_task(_dir.path(), &task.id).unwrap();
+      let loaded = store::read_task(dir.path(), &task.id).unwrap();
       assert_eq!(loaded.tags, vec!["rust".to_string(), "cli".to_string()]);
     }
 
     #[test]
     fn it_deduplicates_tags() {
-      let (_dir, config) = setup();
-      let mut task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_test_config(dir.path());
+      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       task.tags = vec!["rust".to_string()];
-      store::write_task(_dir.path(), &task).unwrap();
+      store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -79,16 +78,17 @@ mod tests {
       };
       cmd.call(&config, &Theme::default()).unwrap();
 
-      let loaded = store::read_task(_dir.path(), &task.id).unwrap();
+      let loaded = store::read_task(dir.path(), &task.id).unwrap();
       assert_eq!(loaded.tags, vec!["rust".to_string(), "cli".to_string()]);
     }
 
     #[test]
     fn it_preserves_existing_tags() {
-      let (_dir, config) = setup();
-      let mut task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_test_config(dir.path());
+      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       task.tags = vec!["existing".to_string()];
-      store::write_task(_dir.path(), &task).unwrap();
+      store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -96,35 +96,8 @@ mod tests {
       };
       cmd.call(&config, &Theme::default()).unwrap();
 
-      let loaded = store::read_task(_dir.path(), &task.id).unwrap();
+      let loaded = store::read_task(dir.path(), &task.id).unwrap();
       assert_eq!(loaded.tags, vec!["existing".to_string(), "new".to_string()]);
     }
-  }
-
-  fn make_task(id: &str) -> Task {
-    Task {
-      resolved_at: None,
-      created_at: Utc::now(),
-      description: String::new(),
-      id: id.parse().unwrap(),
-      links: vec![],
-      metadata: toml::Table::new(),
-      status: Status::Open,
-      tags: vec![],
-      title: format!("Task {id}"),
-      updated_at: Utc::now(),
-    }
-  }
-
-  fn setup() -> (TempDir, crate::config::Config) {
-    let dir = TempDir::new().unwrap();
-    let config = crate::config::Config {
-      storage: crate::config::StorageConfig {
-        data_dir: Some(dir.path().to_path_buf()),
-      },
-      ..Default::default()
-    };
-    store::ensure_dirs(dir.path()).unwrap();
-    (dir, config)
   }
 }

@@ -1,4 +1,4 @@
-use std::{fmt, io};
+use std::io;
 
 use yansi::Paint;
 
@@ -16,14 +16,7 @@ impl AlreadyInitialized {
   }
 }
 
-impl fmt::Display for AlreadyInitialized {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf, &Theme::default()).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(AlreadyInitialized, theme);
 
 /// Config-set confirmation message.
 ///
@@ -56,14 +49,7 @@ impl ConfigSet {
   }
 }
 
-impl fmt::Display for ConfigSet {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf, &Theme::default()).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(ConfigSet, theme);
 
 /// Confirmation message for create/update/archive actions.
 ///
@@ -95,14 +81,7 @@ impl Confirmation {
   }
 }
 
-impl fmt::Display for Confirmation {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf, &Theme::default()).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(Confirmation, theme);
 
 /// Empty-list message for task list.
 ///
@@ -124,14 +103,7 @@ impl EmptyList {
   }
 }
 
-impl fmt::Display for EmptyList {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(EmptyList);
 
 /// Error message written to stderr.
 ///
@@ -153,14 +125,7 @@ impl ErrorMessage {
   }
 }
 
-impl fmt::Display for ErrorMessage {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf, &Theme::default()).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(ErrorMessage, theme);
 
 /// Message displayed when `init` creates directories.
 ///
@@ -185,14 +150,7 @@ impl InitCreated {
   }
 }
 
-impl fmt::Display for InitCreated {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf, &Theme::default()).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(InitCreated, theme);
 
 /// Link-added message for link actions.
 ///
@@ -224,14 +182,7 @@ impl LinkAdded {
   }
 }
 
-impl fmt::Display for LinkAdded {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(LinkAdded);
 
 /// Metadata-set message for meta set actions.
 ///
@@ -257,14 +208,7 @@ impl MetadataSet {
   }
 }
 
-impl fmt::Display for MetadataSet {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(MetadataSet);
 
 /// No-results message for search.
 ///
@@ -286,14 +230,7 @@ impl NoResults {
   }
 }
 
-impl fmt::Display for NoResults {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(NoResults);
 
 /// Tag change message for tag/untag actions.
 ///
@@ -322,14 +259,7 @@ impl TagChange {
   }
 }
 
-impl fmt::Display for TagChange {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut buf = Vec::new();
-    self.write_to(&mut buf).map_err(|_| fmt::Error)?;
-    let s = String::from_utf8(buf).map_err(|_| fmt::Error)?;
-    write!(f, "{}", s.trim_end())
-  }
-}
+crate::ui::macros::impl_display_via_write_to!(TagChange);
 
 #[cfg(test)]
 mod tests {

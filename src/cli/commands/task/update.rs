@@ -89,14 +89,31 @@ impl Command {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
-
   use super::*;
   use crate::{
-    config::{Config, StorageConfig},
-    model::{Link, Task},
+    model::{Link, RelationshipType},
     store,
+    test_helpers::{make_test_config, make_test_task},
   };
+
+  /// Build the specific "rich" task that update tests need (with description,
+  /// links, metadata, tags).
+  fn make_rich_task(id: &str) -> crate::model::Task {
+    let mut task = make_test_task(id);
+    task.description = "Original description".to_string();
+    task.links = vec![Link {
+      ref_: "https://example.com".to_string(),
+      rel: RelationshipType::RelatesTo,
+    }];
+    task.metadata = {
+      let mut table = toml::Table::new();
+      table.insert("priority".to_string(), toml::Value::String("low".to_string()));
+      table
+    };
+    task.tags = vec!["original".to_string()];
+    task.title = "Original Title".to_string();
+    task
+  }
 
   mod call {
     use pretty_assertions::assert_eq;
@@ -106,8 +123,8 @@ mod tests {
     #[test]
     fn it_adds_metadata_entries() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
@@ -129,8 +146,8 @@ mod tests {
     #[test]
     fn it_resolves_task_on_terminal_status_cancelled() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
@@ -159,8 +176,8 @@ mod tests {
     #[test]
     fn it_resolves_task_on_terminal_status_done() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
@@ -188,8 +205,8 @@ mod tests {
     #[test]
     fn it_preserves_links_and_metadata() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
@@ -212,8 +229,8 @@ mod tests {
     #[test]
     fn it_sets_updated_at() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       let original_updated = task.updated_at;
       store::write_task(dir.path(), &task).unwrap();
 
@@ -235,8 +252,8 @@ mod tests {
     #[test]
     fn it_unresolves_task_on_in_progress_status() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_task(dir.path(), &task).unwrap();
       store::resolve_task(dir.path(), &task.id).unwrap();
 
@@ -266,8 +283,8 @@ mod tests {
     #[test]
     fn it_unresolves_task_on_non_terminal_status() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_task(dir.path(), &task).unwrap();
       store::resolve_task(dir.path(), &task.id).unwrap();
 
@@ -297,8 +314,8 @@ mod tests {
     #[test]
     fn it_updates_status() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
@@ -319,8 +336,8 @@ mod tests {
     #[test]
     fn it_updates_title_only() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let config = make_test_config(dir.path());
+      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
@@ -341,39 +358,6 @@ mod tests {
       assert_eq!(updated.tags, vec!["original"]);
       assert_eq!(updated.links.len(), 1);
       assert_eq!(updated.metadata.get("priority").unwrap().as_str().unwrap(), "low");
-    }
-  }
-
-  fn make_config(dir: &std::path::Path) -> Config {
-    store::ensure_dirs(dir).unwrap();
-    Config {
-      storage: StorageConfig {
-        data_dir: Some(dir.to_path_buf()),
-      },
-      ..Config::default()
-    }
-  }
-
-  fn make_task(id: &str) -> Task {
-    let now = Utc::now();
-    Task {
-      resolved_at: None,
-      created_at: now,
-      description: "Original description".to_string(),
-      id: id.parse().unwrap(),
-      links: vec![Link {
-        ref_: "https://example.com".to_string(),
-        rel: crate::model::RelationshipType::RelatesTo,
-      }],
-      metadata: {
-        let mut table = toml::Table::new();
-        table.insert("priority".to_string(), toml::Value::String("low".to_string()));
-        table
-      },
-      status: Status::Open,
-      tags: vec!["original".to_string()],
-      title: "Original Title".to_string(),
-      updated_at: now,
     }
   }
 }

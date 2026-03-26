@@ -7,12 +7,12 @@ use yansi::Paint;
 use crate::{
   config,
   config::Config,
-  model::{Artifact, Task, task::Status},
+  model::{Artifact, Task, task::STATUS_ORDER},
   store::{self, SearchResults},
   ui::{
     components::{Group, GroupedList, NoResults},
     theme::Theme,
-    utils::{format_id, shortest_unique_prefixes},
+    utils::{format_id, format_tags, shortest_unique_prefixes},
   },
 };
 
@@ -163,9 +163,7 @@ fn build_task_groups(tasks: &[Task], theme: &Theme) -> Vec<Group> {
   let id_strings: Vec<String> = tasks.iter().map(|t| t.id.to_string()).collect();
   let prefix_lens = shortest_unique_prefixes(&id_strings);
 
-  let status_order: &[Status] = &[Status::Open, Status::InProgress, Status::Done, Status::Cancelled];
-
-  status_order
+  STATUS_ORDER
     .iter()
     .map(|status| {
       let rows: Vec<Vec<String>> = tasks
@@ -184,14 +182,6 @@ fn build_task_groups(tasks: &[Task], theme: &Theme) -> Vec<Group> {
       Group::new(status.to_string(), rows)
     })
     .collect()
-}
-
-fn format_tags(tags: &[String], theme: &Theme) -> String {
-  tags
-    .iter()
-    .map(|t| format!("@{}", t).paint(theme.tag).to_string())
-    .collect::<Vec<_>>()
-    .join(" ")
 }
 
 #[cfg(test)]

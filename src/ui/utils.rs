@@ -40,6 +40,14 @@ pub fn format_id(id: &Id, prefix_len: usize, max_display_len: Option<usize>, the
   format!("{}{}", prefix.paint(theme.id_prefix), rest.paint(theme.id_rest))
 }
 
+pub fn format_tags(tags: &[String], theme: &Theme) -> String {
+  tags
+    .iter()
+    .map(|t| format!("@{}", t).paint(theme.tag).to_string())
+    .collect::<Vec<_>>()
+    .join(" ")
+}
+
 pub fn format_status(status: &Status, theme: &Theme) -> String {
   match status {
     Status::Open => status.to_string().paint(theme.status_open).to_string(),

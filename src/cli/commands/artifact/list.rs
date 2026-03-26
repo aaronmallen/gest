@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use clap::Args;
-use yansi::Paint;
 
 use crate::{
   config,
@@ -11,7 +10,7 @@ use crate::{
   ui::{
     components::{EmptyList, Group, GroupedList},
     theme::Theme,
-    utils::{format_id, shortest_unique_prefixes},
+    utils::{format_id, format_tags, shortest_unique_prefixes},
   },
 };
 
@@ -107,17 +106,10 @@ impl Command {
 }
 
 fn build_row(artifact: &crate::model::Artifact, prefix_len: usize, theme: &Theme) -> Vec<String> {
-  let tags = artifact
-    .tags
-    .iter()
-    .map(|t| format!("@{t}").paint(theme.tag).to_string())
-    .collect::<Vec<_>>()
-    .join(" ");
-
   vec![
     format_id(&artifact.id, prefix_len, Some(8), theme),
     artifact.title.clone(),
-    tags,
+    format_tags(&artifact.tags, theme),
   ]
 }
 

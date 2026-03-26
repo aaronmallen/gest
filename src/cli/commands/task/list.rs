@@ -7,18 +7,15 @@ use crate::{
   model::{
     TaskFilter,
     link::RelationshipType,
-    task::{Status, Task},
+    task::{STATUS_ORDER, Status, Task},
   },
   store,
   ui::{
     components::{EmptyList, Group, GroupedList},
     theme::Theme,
-    utils::{format_id, shortest_unique_prefixes},
+    utils::{format_id, format_tags, shortest_unique_prefixes},
   },
 };
-
-/// Status group ordering for display.
-const STATUS_ORDER: &[Status] = &[Status::Open, Status::InProgress, Status::Done, Status::Cancelled];
 
 /// List tasks grouped by status, optionally filtered
 #[derive(Debug, Args)]
@@ -102,13 +99,7 @@ impl Command {
             };
             let title_cell = format!("{}{}", task.title, status_marker);
 
-            // Tags as @tag_name styled with tag
-            let tags_cell = task
-              .tags
-              .iter()
-              .map(|tag| format!("@{}", tag).paint(theme.tag).to_string())
-              .collect::<Vec<_>>()
-              .join(" ");
+            let tags_cell = format_tags(&task.tags, theme);
 
             // Indicators: blocked (!!), blocking (⚠ N)
             let mut indicators = Vec::new();
@@ -150,20 +141,14 @@ fn status_heading(status: &Status) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+  use chrono::Utc;
+
   use super::*;
   use crate::{
-    model::link::Link,
+    config::{Config, StorageConfig},
+    model::{Task, link::Link},
     store,
-    test_helpers::{make_test_config, make_test_task},
   };
-
-  /// Create a test task with a specific title and status, using shared helpers.
-  fn make_task_with(id: &str, title: &str, status: Status) -> Task {
-    let mut task = make_test_task(id);
-    task.title = title.to_string();
-    task.status = status;
-    task
-  }
 
   mod call {
     use super::*;
@@ -171,15 +156,15 @@ mod tests {
     #[test]
     fn it_filters_by_status() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_test_config(dir.path());
+      let config = make_config(dir.path());
       store::write_task(
         dir.path(),
-        &make_task_with("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Open", Status::Open),
+        &make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Open", Status::Open),
       )
       .unwrap();
       store::write_task(
         dir.path(),
-        &make_task_with("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "InProg", Status::InProgress),
+        &make_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "InProg", Status::InProgress),
       )
       .unwrap();
 
@@ -196,7 +181,7 @@ mod tests {
     #[test]
     fn it_handles_empty_list() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_test_config(dir.path());
+      let config = make_config(dir.path());
 
       let cmd = Command {
         show_all: false,
@@ -211,8 +196,8 @@ mod tests {
     #[test]
     fn it_includes_resolved_tasks() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_test_config(dir.path());
-      let task = make_task_with("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Resolved", Status::Open);
+      let config = make_config(dir.path());
+      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Resolved", Status::Open);
       store::write_task(dir.path(), &task).unwrap();
       store::resolve_task(dir.path(), &task.id).unwrap();
 
@@ -229,8 +214,8 @@ mod tests {
     #[test]
     fn it_lists_tasks() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_test_config(dir.path());
-      let task = make_task_with("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Task One", Status::Open);
+      let config = make_config(dir.path());
+      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Task One", Status::Open);
       store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
@@ -246,8 +231,8 @@ mod tests {
     #[test]
     fn it_outputs_json() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_test_config(dir.path());
-      let task = make_task_with("zyxwvutsrqponmlkzyxwvutsrqponmlk", "JSON Task", Status::Open);
+      let config = make_config(dir.path());
+      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "JSON Task", Status::Open);
       store::write_task(dir.path(), &task).unwrap();
 
       let cmd = Command {
@@ -263,16 +248,16 @@ mod tests {
     #[test]
     fn it_groups_tasks_by_status() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_test_config(dir.path());
+      let config = make_config(dir.path());
 
       store::write_task(
         dir.path(),
-        &make_task_with("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkku", "Open task", Status::Open),
+        &make_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkku", "Open task", Status::Open),
       )
       .unwrap();
       store::write_task(
         dir.path(),
-        &make_task_with(
+        &make_task(
           "lllllllllllllllllllllllllllllllu",
           "In progress task",
           Status::InProgress,
@@ -281,7 +266,7 @@ mod tests {
       .unwrap();
       store::write_task(
         dir.path(),
-        &make_task_with("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm", "Done task", Status::Done),
+        &make_task("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm", "Done task", Status::Done),
       )
       .unwrap();
 
@@ -298,9 +283,9 @@ mod tests {
     #[test]
     fn it_shows_blocked_indicator() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_test_config(dir.path());
+      let config = make_config(dir.path());
 
-      let mut task = make_task_with("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocked task", Status::Open);
+      let mut task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocked task", Status::Open);
       task.links = vec![Link {
         ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string(),
         rel: RelationshipType::BlockedBy,
@@ -320,9 +305,9 @@ mod tests {
     #[test]
     fn it_shows_blocking_indicator() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_test_config(dir.path());
+      let config = make_config(dir.path());
 
-      let mut task = make_task_with("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocking task", Status::Open);
+      let mut task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocking task", Status::Open);
       task.links = vec![
         Link {
           ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkku".to_string(),
@@ -348,9 +333,9 @@ mod tests {
     #[test]
     fn it_renders_tags_with_at_prefix() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_test_config(dir.path());
+      let config = make_config(dir.path());
 
-      let mut task = make_task_with("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Tagged task", Status::Open);
+      let mut task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Tagged task", Status::Open);
       task.tags = vec!["bug".to_string(), "urgent".to_string()];
       store::write_task(dir.path(), &task).unwrap();
 
@@ -362,6 +347,32 @@ mod tests {
       };
 
       cmd.call(&config, &Theme::default()).unwrap();
+    }
+  }
+
+  fn make_config(dir: &std::path::Path) -> Config {
+    store::ensure_dirs(dir).unwrap();
+    Config {
+      storage: StorageConfig {
+        data_dir: Some(dir.to_path_buf()),
+      },
+      ..Config::default()
+    }
+  }
+
+  fn make_task(id: &str, title: &str, status: Status) -> Task {
+    let now = Utc::now();
+    Task {
+      resolved_at: None,
+      created_at: now,
+      description: String::new(),
+      id: id.parse().unwrap(),
+      links: vec![],
+      metadata: toml::Table::new(),
+      status,
+      tags: vec![],
+      title: title.to_string(),
+      updated_at: now,
     }
   }
 }

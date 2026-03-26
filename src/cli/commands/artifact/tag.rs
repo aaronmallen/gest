@@ -5,7 +5,7 @@ use crate::{
   config,
   config::Config,
   store,
-  ui::{components::Confirmation, theme::Theme},
+  ui::{components::TagChange, theme::Theme},
 };
 
 /// Add tags to an artifact
@@ -18,7 +18,7 @@ pub struct Command {
 }
 
 impl Command {
-  pub fn call(&self, config: &Config, theme: &Theme) -> crate::Result<()> {
+  pub fn call(&self, config: &Config, _theme: &Theme) -> crate::Result<()> {
     let data_dir = config::data_dir(config)?;
     let id = store::resolve_artifact_id(&data_dir, &self.id, true)?;
     let mut artifact = store::read_artifact(&data_dir, &id)?;
@@ -31,7 +31,7 @@ impl Command {
 
     artifact.updated_at = Utc::now();
     store::write_artifact(&data_dir, &artifact)?;
-    Confirmation::new("Tagged", "artifact", &artifact.id).write_to(&mut std::io::stdout(), theme)?;
+    TagChange::new("Tagged", "artifact", &id, &self.tags).write_to(&mut std::io::stdout())?;
     Ok(())
   }
 }

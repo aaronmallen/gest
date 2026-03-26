@@ -64,10 +64,7 @@ impl Command {
       Some(table)
     };
 
-    let tags = self
-      .tags
-      .as_deref()
-      .map(crate::cli::helpers::parse_tags);
+    let tags = self.tags.as_deref().map(crate::cli::helpers::parse_tags);
 
     let patch = TaskPatch {
       description,
@@ -140,6 +137,30 @@ mod tests {
     }
 
     #[test]
+    fn it_preserves_links_and_metadata() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_test_config(dir.path());
+      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      store::write_task(dir.path(), &task).unwrap();
+
+      let cmd = Command {
+        id: "zyxw".to_string(),
+        title: None,
+        description: Some("New desc".to_string()),
+        status: None,
+        tags: None,
+        metadata: vec![],
+      };
+
+      cmd.call(&config, &Theme::default()).unwrap();
+
+      let updated = store::read_task(dir.path(), &task.id).unwrap();
+      assert_eq!(updated.links.len(), 1);
+      assert_eq!(updated.links[0].rel, crate::model::RelationshipType::RelatesTo);
+      assert_eq!(updated.metadata.get("priority").unwrap().as_str().unwrap(), "low");
+    }
+
+    #[test]
     fn it_resolves_task_on_terminal_status_cancelled() {
       let dir = tempfile::tempdir().unwrap();
       let config = make_test_config(dir.path());
@@ -196,30 +217,6 @@ mod tests {
       );
       let updated = store::read_task(dir.path(), &task.id).unwrap();
       assert!(updated.resolved_at.is_some());
-    }
-
-    #[test]
-    fn it_preserves_links_and_metadata() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_test_config(dir.path());
-      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(dir.path(), &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        title: None,
-        description: Some("New desc".to_string()),
-        status: None,
-        tags: None,
-        metadata: vec![],
-      };
-
-      cmd.call(&config, &Theme::default()).unwrap();
-
-      let updated = store::read_task(dir.path(), &task.id).unwrap();
-      assert_eq!(updated.links.len(), 1);
-      assert_eq!(updated.links[0].rel, crate::model::RelationshipType::RelatesTo);
-      assert_eq!(updated.metadata.get("priority").unwrap().as_str().unwrap(), "low");
     }
 
     #[test]

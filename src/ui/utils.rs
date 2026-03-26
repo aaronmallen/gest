@@ -68,7 +68,10 @@ pub fn shortest_unique_prefixes(ids: &[String]) -> Vec<usize> {
   impl TrieNode {
     fn new() -> Self {
       const NONE: Option<Box<TrieNode>> = None;
-      Self { count: 0, children: [NONE; 16] }
+      Self {
+        count: 0,
+        children: [NONE; 16],
+      }
     }
   }
 

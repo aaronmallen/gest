@@ -36,9 +36,7 @@ pub(crate) fn resolve_id(
     _ => {}
   }
 
-  if include_secondary
-    && let Some(secondary) = secondary_dir
-  {
+  if include_secondary && let Some(secondary) = secondary_dir {
     let secondary_matches = collect_prefix_matches(secondary, extension, prefix)?;
     match secondary_matches.len() {
       0 => {}

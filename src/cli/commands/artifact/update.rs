@@ -48,10 +48,7 @@ impl Command {
       let pairs = crate::cli::helpers::split_key_value_pairs(&self.metadata)?;
       let mut map = store::read_artifact(&data_dir, &id)?.metadata;
       for (key, value) in pairs {
-        map.insert(
-          yaml_serde::Value::String(key),
-          yaml_serde::Value::String(value),
-        );
+        map.insert(yaml_serde::Value::String(key), yaml_serde::Value::String(value));
       }
       Some(map)
     };
@@ -60,10 +57,7 @@ impl Command {
       body: self.body.clone(),
       kind: self.kind.clone(),
       metadata,
-      tags: self
-        .tags
-        .as_deref()
-        .map(crate::cli::helpers::parse_tags),
+      tags: self.tags.as_deref().map(crate::cli::helpers::parse_tags),
       title: self.title.clone(),
     };
 

@@ -54,10 +54,7 @@ impl Command {
       let pairs = crate::cli::helpers::split_key_value_pairs(&self.metadata)?;
       let mut map = yaml_serde::Mapping::new();
       for (key, value) in pairs {
-        map.insert(
-          yaml_serde::Value::String(key),
-          yaml_serde::Value::String(value),
-        );
+        map.insert(yaml_serde::Value::String(key), yaml_serde::Value::String(value));
       }
       map
     };
@@ -155,5 +152,4 @@ mod tests {
       assert_eq!(extract_title(body), Some("Spaced Title".to_string()));
     }
   }
-
 }

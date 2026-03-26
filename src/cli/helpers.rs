@@ -31,16 +31,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_splits_comma_separated_tags() {
-      assert_eq!(parse_tags("rust,cli,test"), vec!["rust", "cli", "test"]);
-    }
-
-    #[test]
-    fn it_trims_whitespace() {
-      assert_eq!(parse_tags(" rust , cli , test "), vec!["rust", "cli", "test"]);
-    }
-
-    #[test]
     fn it_filters_empty_strings() {
       assert_eq!(parse_tags("rust,,cli,,,test"), vec!["rust", "cli", "test"]);
     }
@@ -61,12 +51,50 @@ mod tests {
       let result: Vec<String> = parse_tags(",,,");
       assert!(result.is_empty());
     }
+
+    #[test]
+    fn it_splits_comma_separated_tags() {
+      assert_eq!(parse_tags("rust,cli,test"), vec!["rust", "cli", "test"]);
+    }
+
+    #[test]
+    fn it_trims_whitespace() {
+      assert_eq!(parse_tags(" rust , cli , test "), vec!["rust", "cli", "test"]);
+    }
   }
 
   mod split_key_value_pairs_tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
+
+    #[test]
+    fn it_errors_on_missing_equals() {
+      let pairs = vec!["invalid".to_string()];
+      let result = split_key_value_pairs(&pairs);
+      assert!(result.is_err());
+    }
+
+    #[test]
+    fn it_handles_empty_list() {
+      let pairs: Vec<String> = vec![];
+      let result = split_key_value_pairs(&pairs).unwrap();
+      assert!(result.is_empty());
+    }
+
+    #[test]
+    fn it_handles_empty_value() {
+      let pairs = vec!["key=".to_string()];
+      let result = split_key_value_pairs(&pairs).unwrap();
+      assert_eq!(result, vec![("key".to_string(), String::new())]);
+    }
+
+    #[test]
+    fn it_handles_value_with_equals_sign() {
+      let pairs = vec!["key=val=ue".to_string()];
+      let result = split_key_value_pairs(&pairs).unwrap();
+      assert_eq!(result, vec![("key".to_string(), "val=ue".to_string())]);
+    }
 
     #[test]
     fn it_parses_key_value_pairs() {
@@ -79,34 +107,6 @@ mod tests {
           ("baz".to_string(), "qux".to_string()),
         ]
       );
-    }
-
-    #[test]
-    fn it_handles_empty_list() {
-      let pairs: Vec<String> = vec![];
-      let result = split_key_value_pairs(&pairs).unwrap();
-      assert!(result.is_empty());
-    }
-
-    #[test]
-    fn it_errors_on_missing_equals() {
-      let pairs = vec!["invalid".to_string()];
-      let result = split_key_value_pairs(&pairs);
-      assert!(result.is_err());
-    }
-
-    #[test]
-    fn it_handles_value_with_equals_sign() {
-      let pairs = vec!["key=val=ue".to_string()];
-      let result = split_key_value_pairs(&pairs).unwrap();
-      assert_eq!(result, vec![("key".to_string(), "val=ue".to_string())]);
-    }
-
-    #[test]
-    fn it_handles_empty_value() {
-      let pairs = vec!["key=".to_string()];
-      let result = split_key_value_pairs(&pairs).unwrap();
-      assert_eq!(result, vec![("key".to_string(), String::new())]);
     }
   }
 }

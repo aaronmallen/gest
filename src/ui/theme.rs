@@ -14,6 +14,8 @@ pub struct Theme {
   pub error: Style,
   pub id_prefix: Style,
   pub id_rest: Style,
+  pub indicator_blocked: Style,
+  pub indicator_blocking: Style,
   pub list_heading: Style,
   pub log_debug: Style,
   pub log_error: Style,
@@ -53,6 +55,8 @@ impl Theme {
         "error" => theme.error = value.apply_to(theme.error),
         "id_prefix" => theme.id_prefix = value.apply_to(theme.id_prefix),
         "id_rest" => theme.id_rest = value.apply_to(theme.id_rest),
+        "indicator.blocked" => theme.indicator_blocked = value.apply_to(theme.indicator_blocked),
+        "indicator.blocking" => theme.indicator_blocking = value.apply_to(theme.indicator_blocking),
         "list_heading" => theme.list_heading = value.apply_to(theme.list_heading),
         "log.debug" => theme.log_debug = value.apply_to(theme.log_debug),
         "log.error" => theme.log_error = value.apply_to(theme.log_error),
@@ -90,6 +94,8 @@ impl Default for Theme {
       error: Style::new().fg(colors::ERROR).bold(),
       id_prefix: Style::new().fg(colors::AZURE).bold(),
       id_rest: Style::new().fg(colors::PEWTER),
+      indicator_blocked: Style::new().fg(colors::ERROR).bold(),
+      indicator_blocking: Style::new().fg(colors::WARNING).bold(),
       list_heading: Style::new().fg(colors::VIOLET).bold().underline(),
       log_debug: Style::new().fg(colors::VIOLET_LIGHT),
       log_error: Style::new().fg(colors::ERROR),
@@ -110,7 +116,7 @@ impl Default for Theme {
       status_in_progress: Style::new().fg(colors::WARNING),
       status_open: Style::new().fg(colors::SILVER),
       success: Style::new().fg(colors::SUCCESS).bold(),
-      tag: Style::new().fg(colors::PEWTER),
+      tag: Style::new().fg(colors::AZURE).italic(),
     }
   }
 }
@@ -183,6 +189,8 @@ mod tests {
       colors.insert("error".to_string(), red.clone());
       colors.insert("id_prefix".to_string(), red.clone());
       colors.insert("id_rest".to_string(), red.clone());
+      colors.insert("indicator.blocked".to_string(), red.clone());
+      colors.insert("indicator.blocking".to_string(), red.clone());
       colors.insert("list_heading".to_string(), red.clone());
       colors.insert("muted".to_string(), red.clone());
       colors.insert("success".to_string(), red.clone());
@@ -214,11 +222,14 @@ mod tests {
       assert_eq!(theme.border, red);
       assert_eq!(theme.id_rest, red);
       assert_eq!(theme.muted, red);
-      assert_eq!(theme.tag, red);
+      // Tokens with default italic keep it
+      assert_eq!(theme.tag, red_italic);
       // Tokens with default bold keep it (apply_to layers on top)
       assert_eq!(theme.emphasis, red_bold);
       assert_eq!(theme.error, red_bold);
       assert_eq!(theme.id_prefix, red_bold);
+      assert_eq!(theme.indicator_blocked, red_bold);
+      assert_eq!(theme.indicator_blocking, red_bold);
       assert_eq!(theme.md_bold, red_bold);
       assert_eq!(theme.md_heading, red_bold);
       assert_eq!(theme.success, red_bold);

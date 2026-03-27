@@ -106,12 +106,16 @@ impl Command {
 
             let has_blocked_by = task.links.iter().any(|l| l.rel == RelationshipType::BlockedBy);
             if has_blocked_by {
-              indicators.push("!!".paint(theme.error).to_string());
+              indicators.push("!!".paint(theme.indicator_blocked).to_string());
             }
 
             let blocks_count = task.links.iter().filter(|l| l.rel == RelationshipType::Blocks).count();
             if blocks_count > 0 {
-              indicators.push(format!("\u{26a0} {}", blocks_count).paint(theme.emphasis).to_string());
+              indicators.push(
+                format!("\u{26a0} {}", blocks_count)
+                  .paint(theme.indicator_blocking)
+                  .to_string(),
+              );
             }
 
             let indicators_cell = indicators.join(" ");

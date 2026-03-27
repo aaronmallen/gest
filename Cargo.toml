@@ -21,7 +21,7 @@ clap_complete = "4"
 clap_mangen = "0.2"
 dir_spec = "0.5"
 log = "0.4"
-pulldown-cmark = "0.12"
+pulldown-cmark = "0.13"
 rand = "0.10"
 rayon = "1"
 self_update = { version = "0.43", default-features = false, features = [

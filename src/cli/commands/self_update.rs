@@ -1,8 +1,12 @@
-use std::fmt;
-
 use clap::Args;
 
-use crate::{config::Config, ui::theme::Theme};
+use crate::{
+  config::Config,
+  ui::{
+    components::{AlreadyOnVersion, UpdateAvailable, UpdateCancelled, UpdateComplete, UpdatePrompt},
+    theme::Theme,
+  },
+};
 
 /// Binary name.
 const BIN_NAME: &str = "gest";
@@ -39,19 +43,13 @@ impl Command {
     let target_version = self.target.as_deref().unwrap_or(&latest.version);
 
     if target_version == CURRENT_VERSION {
-      use yansi::Paint;
-      println!("{} Already on v{target_version}", "OK".paint(theme.success),);
+      AlreadyOnVersion::new(target_version).write_to(&mut std::io::stdout(), theme)?;
       return Ok(());
     }
 
-    let diff = VersionDiff {
-      current: CURRENT_VERSION,
-      target: target_version,
-    };
-
     // Prompt for confirmation
-    println!("Update available: {diff}");
-    print!("Do you want to continue? [y/N] ");
+    UpdateAvailable::new(CURRENT_VERSION, target_version).write_to(&mut std::io::stdout())?;
+    UpdatePrompt.write_to(&mut std::io::stdout())?;
     use std::io::Write;
     std::io::stdout().flush()?;
 
@@ -60,7 +58,7 @@ impl Command {
     let answer = answer.trim().to_lowercase();
 
     if answer != "y" && answer != "yes" {
-      println!("Update cancelled.");
+      UpdateCancelled.write_to(&mut std::io::stdout())?;
       return Ok(());
     }
 
@@ -75,21 +73,8 @@ impl Command {
       .build()?
       .update()?;
 
-    use yansi::Paint;
-    println!("{} Updated to v{}", "OK".paint(theme.success), status.version(),);
+    UpdateComplete::new(status.version()).write_to(&mut std::io::stdout(), theme)?;
 
     Ok(())
-  }
-}
-
-/// Displays a version transition like `v0.0.1 -> v0.1.0`.
-struct VersionDiff<'a> {
-  current: &'a str,
-  target: &'a str,
-}
-
-impl fmt::Display for VersionDiff<'_> {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "v{} -> v{}", self.current, self.target)
   }
 }

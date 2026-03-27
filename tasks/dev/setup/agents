@@ -1,0 +1,388 @@
+#!/usr/bin/env bash
+#MISE description="Setup agentic workflows for your preferred AI coding assistant"
+#MISE alias=["dev:setup:agents"]
+#USAGE flag "--reconfigure" help="Reconfigure even if already set up"
+
+set -euo pipefail
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+PROFILES_DIR="$PROJECT_ROOT/.agents/profiles"
+AGENTS_DIR="$PROJECT_ROOT/.agents"
+CONFIG_FILE="$AGENTS_DIR/.config"
+
+# --- gum helpers (fallback to plain bash when gum is not available) ---
+
+HAS_GUM=false
+if command -v gum &>/dev/null; then
+  HAS_GUM=true
+fi
+
+_style() {
+  if $HAS_GUM; then
+    gum style --bold --foreground "$1" "$2"
+  else
+    printf '\033[1m%s\033[0m\n' "$2"
+  fi
+}
+
+_confirm() {
+  if $HAS_GUM; then
+    gum confirm "$1"
+  else
+    printf '%s [y/N] ' "$1"
+    read -r answer
+    case "$answer" in
+      [yY]|[yY][eE][sS]) return 0 ;;
+      *) return 1 ;;
+    esac
+  fi
+}
+
+_choose_one() {
+  local header="$1"
+  shift
+  local options=("$@")
+
+  if $HAS_GUM; then
+    gum choose --header "$header" "${options[@]}"
+  else
+    echo "$header" >&2
+    local i=1
+    for opt in "${options[@]}"; do
+      echo "  $i) $opt" >&2
+      ((i++))
+    done
+    printf 'Choice [1-%d]: ' "${#options[@]}" >&2
+    read -r choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#options[@]}" ]; then
+      echo "${options[$((choice - 1))]}"
+    else
+      echo "" # invalid
+    fi
+  fi
+}
+
+_choose_multi() {
+  local header="$1"
+  local default="$2"
+  shift 2
+  local options=("$@")
+
+  if $HAS_GUM; then
+    gum choose --no-limit --header "$header" --selected "$default" "${options[@]}"
+  else
+    echo "$header (enter numbers separated by spaces, default: 1)" >&2
+    local i=1
+    for opt in "${options[@]}"; do
+      echo "  $i) $opt" >&2
+      ((i++))
+    done
+    printf 'Choices: ' >&2
+    read -r choices
+    if [ -z "$choices" ]; then
+      echo "$default"
+    else
+      for c in $choices; do
+        if [[ "$c" =~ ^[0-9]+$ ]] && [ "$c" -ge 1 ] && [ "$c" -le "${#options[@]}" ]; then
+          echo "${options[$((c - 1))]}"
+        fi
+      done
+    fi
+  fi
+}
+
+_spin() {
+  local title="$1"
+  shift
+  if $HAS_GUM; then
+    gum spin --spinner dot --title "$title" -- "$@"
+  else
+    printf '%s\n' "$title"
+    "$@"
+  fi
+}
+
+# --- Check for existing configuration ---
+
+if [ -f "$CONFIG_FILE" ]; then
+  if [ "${usage_reconfigure:-false}" = "true" ]; then
+    echo ""
+    _style 212 "Agent Setup"
+    echo ""
+    echo "Reconfiguring agentic workflows..."
+    echo ""
+  else
+    exit 0
+  fi
+fi
+
+# --- Step 1: Enable agentic workflows? ---
+
+echo ""
+_style 212 "Agent Setup"
+echo ""
+
+if ! _confirm "Enable agentic workflows for this project?"; then
+  echo ""
+  echo "Cleaning up any previous setup..."
+  rm -f "$CONFIG_FILE"
+  rm -rf "$PROJECT_ROOT/.claude/agents" "$PROJECT_ROOT/.claude/skills" "$PROJECT_ROOT/.claude/hooks"
+  rm -rf "$PROJECT_ROOT/.gemini/agents" "$PROJECT_ROOT/.gemini/skills"
+  rm -rf "$PROJECT_ROOT/.opencode/agents" "$PROJECT_ROOT/.opencode/skills"
+  rm -rf "$PROJECT_ROOT/.codex/agents" "$PROJECT_ROOT/.codex/skills"
+  echo "Done."
+  exit 0
+fi
+
+# --- Step 2: Which AI coding assistants? ---
+
+echo ""
+ASSISTANTS=$(_choose_multi \
+  "Which AI coding assistants do you use?" \
+  "Claude Code" \
+  "Claude Code" \
+  "Codex CLI" \
+  "Gemini CLI" \
+  "OpenCode")
+
+if [ -z "$ASSISTANTS" ]; then
+  echo "No assistants selected. Exiting."
+  exit 1
+fi
+
+# --- Step 3: Which VCS? ---
+
+echo ""
+VCS=$(_choose_one \
+  "Which version control system do you use?" \
+  "jj (Jujutsu)" \
+  "git" \
+  "git-butler")
+
+case "$VCS" in
+  "jj (Jujutsu)") VCS="jj" ;;
+  "git")          VCS="git" ;;
+  "git-butler")   VCS="git-butler" ;;
+esac
+
+# --- Step 4: Which task runner? ---
+
+echo ""
+TASKS=$(_choose_one \
+  "Which task runner do you use?" \
+  "mise (recommended)" \
+  "sh (run task scripts directly)")
+
+case "$TASKS" in
+  "mise (recommended)")             TASKS="mise" ;;
+  "sh (run task scripts directly)") TASKS="sh" ;;
+esac
+
+# --- Validate profiles ---
+
+if [ ! -d "$PROFILES_DIR/$VCS" ]; then
+  echo "Error: VCS profile '$VCS' not found in $PROFILES_DIR/"
+  exit 1
+fi
+
+if [ ! -d "$PROFILES_DIR/$TASKS" ]; then
+  echo "Error: Task runner profile '$TASKS' not found in $PROFILES_DIR/"
+  exit 1
+fi
+
+# --- Confirm ---
+
+echo ""
+_style 212 "Configuration Summary"
+echo ""
+echo "  Assistants:   $(echo "$ASSISTANTS" | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')"
+echo "  VCS:          $VCS"
+echo "  Task runner:  $TASKS"
+echo ""
+
+if ! _confirm "Apply this configuration?"; then
+  echo "Aborted."
+  exit 1
+fi
+
+# --- Resolve profiles ---
+
+echo ""
+_spin "Assembling agents and skills..." sleep 0.5
+
+PROFILES=("default" "$VCS" "$TASKS")
+
+# --- Wire up each assistant ---
+
+wire_assistant() {
+  local assistant_dir="$1"
+  local rel_prefix="$2"  # relative path from assistant dir to .agents
+
+  mkdir -p "$assistant_dir/agents" "$assistant_dir/skills"
+
+  # Clear old symlinks
+  find "$assistant_dir/agents" -maxdepth 1 -type l -delete 2>/dev/null || true
+  find "$assistant_dir/skills" -maxdepth 1 -type l -delete 2>/dev/null || true
+
+  # Symlink agents and skills directly from profiles (later profiles override earlier)
+  for profile in "${PROFILES[@]}"; do
+    local profile_dir="$PROFILES_DIR/$profile"
+
+    if [ -d "$profile_dir/agents" ]; then
+      for agent_dir in "$profile_dir/agents"/*/; do
+        [ -d "$agent_dir" ] || continue
+        local name
+        name="$(basename "$agent_dir")"
+        ln -sfn "${rel_prefix}/profiles/${profile}/agents/${name}" "$assistant_dir/agents/${name}"
+      done
+    fi
+
+    if [ -d "$profile_dir/skills" ]; then
+      for skill_dir in "$profile_dir/skills"/*/; do
+        [ -d "$skill_dir" ] || continue
+        local name
+        name="$(basename "$skill_dir")"
+        ln -sfn "${rel_prefix}/profiles/${profile}/skills/${name}" "$assistant_dir/skills/${name}"
+      done
+    fi
+  done
+}
+
+# --- Build hooks config (Claude Code format) ---
+
+build_hooks_json() {
+  local hooks_json='{"hooks":{}}'
+  local session_hook="" pre_edit_hook="" pre_commit_hook="" vcs_hook=""
+
+  # Walk profiles in order — last one with a given hook wins
+  for profile in "${PROFILES[@]}"; do
+    local profile_dir="$PROFILES_DIR/$profile"
+    [ -d "$profile_dir/hooks" ] || continue
+
+    if [ -f "$profile_dir/hooks/session-start.sh" ]; then
+      session_hook=".agents/profiles/${profile}/hooks/session-start.sh"
+    fi
+    if [ -f "$profile_dir/hooks/pre-edit.sh" ]; then
+      pre_edit_hook=".agents/profiles/${profile}/hooks/pre-edit.sh"
+    fi
+    if [ -f "$profile_dir/hooks/pre-commit.sh" ]; then
+      pre_commit_hook=".agents/profiles/${profile}/hooks/pre-commit.sh"
+    fi
+    if [ -f "$profile_dir/hooks/vcs.sh" ]; then
+      vcs_hook=".agents/profiles/${profile}/hooks/vcs.sh"
+    fi
+  done
+
+  if command -v jq &>/dev/null; then
+    # SessionStart: collect all session hooks
+    local session_hooks="[]"
+    if [ -n "$session_hook" ]; then
+      session_hooks=$(echo "$session_hooks" | jq --arg cmd "$session_hook" \
+        '. + [{"type":"command","command":$cmd}]')
+    fi
+    if [ -n "$vcs_hook" ]; then
+      session_hooks=$(echo "$session_hooks" | jq --arg cmd "$vcs_hook" \
+        '. + [{"type":"command","command":$cmd}]')
+    fi
+    if [ "$(echo "$session_hooks" | jq 'length')" -gt 0 ]; then
+      hooks_json=$(echo "$hooks_json" | jq --argjson hooks "$session_hooks" \
+        '.hooks.SessionStart = [{"hooks":$hooks}]')
+    fi
+
+    # PreToolUse: collect matcher groups
+    local pre_tool_use="[]"
+    if [ -n "$pre_edit_hook" ]; then
+      pre_tool_use=$(echo "$pre_tool_use" | jq --arg cmd "$pre_edit_hook" \
+        '. + [{"matcher":"Write|Edit","hooks":[{"type":"command","command":$cmd}]}]')
+    fi
+    if [ -n "$pre_commit_hook" ]; then
+      pre_tool_use=$(echo "$pre_tool_use" | jq --arg cmd "$pre_commit_hook" \
+        '. + [{"matcher":"Bash","hooks":[{"type":"command","command":$cmd}]}]')
+    fi
+    if [ "$(echo "$pre_tool_use" | jq 'length')" -gt 0 ]; then
+      hooks_json=$(echo "$hooks_json" | jq --argjson ptu "$pre_tool_use" \
+        '.hooks.PreToolUse = $ptu')
+    fi
+
+    hooks_json=$(echo "$hooks_json" | jq '.')
+  fi
+
+  echo "$hooks_json"
+}
+
+wire_claude_hooks() {
+  local settings_file="$1/settings.local.json"
+  local hooks_json
+  hooks_json="$(build_hooks_json)"
+
+  if [ -f "$settings_file" ] && command -v jq &>/dev/null; then
+    local existing
+    existing="$(cat "$settings_file")"
+    echo "$existing" | jq --argjson hooks "$(echo "$hooks_json" | jq '.hooks')" \
+      '.hooks = $hooks' > "$settings_file"
+  else
+    echo "$hooks_json" > "$settings_file"
+  fi
+}
+
+echo "$ASSISTANTS" | while IFS= read -r assistant; do
+  case "$assistant" in
+    "Claude Code")
+      wire_assistant "$PROJECT_ROOT/.claude" "../../.agents"
+      wire_claude_hooks "$PROJECT_ROOT/.claude"
+      ;;
+    "Codex CLI")
+      wire_assistant "$PROJECT_ROOT/.codex" "../../.agents"
+      ;;
+    "Gemini CLI")
+      wire_assistant "$PROJECT_ROOT/.gemini" "../../.agents"
+      ;;
+    "OpenCode")
+      wire_assistant "$PROJECT_ROOT/.opencode" "../../.agents"
+      ;;
+  esac
+done
+
+# --- Save configuration ---
+
+cat > "$CONFIG_FILE" <<EOF
+assistants=$(echo "$ASSISTANTS" | tr '\n' ',' | sed 's/,$//')
+vcs=$VCS
+tasks=$TASKS
+EOF
+
+# --- Summary ---
+
+echo ""
+_style 76 "Setup complete!"
+echo ""
+
+echo "$ASSISTANTS" | while IFS= read -r assistant; do
+  local_dir=""
+  case "$assistant" in
+    "Claude Code") local_dir=".claude" ;;
+    "Codex CLI")   local_dir=".codex" ;;
+    "Gemini CLI")  local_dir=".gemini" ;;
+    "OpenCode")    local_dir=".opencode" ;;
+  esac
+
+  echo "  $assistant ($local_dir/):"
+
+  if [ -d "$PROJECT_ROOT/$local_dir/agents" ] && [ "$(ls -A "$PROJECT_ROOT/$local_dir/agents/" 2>/dev/null)" ]; then
+    echo "    Agents:"
+    ls "$PROJECT_ROOT/$local_dir/agents/" 2>/dev/null | sed 's/^/      /'
+  fi
+
+  if [ -d "$PROJECT_ROOT/$local_dir/skills" ] && [ "$(ls -A "$PROJECT_ROOT/$local_dir/skills/" 2>/dev/null)" ]; then
+    echo "    Skills:"
+    ls "$PROJECT_ROOT/$local_dir/skills/" 2>/dev/null | sed 's/^/      /'
+  fi
+
+  if [ "$assistant" = "Claude Code" ]; then
+    echo "    Hooks: configured in $local_dir/settings.local.json"
+  fi
+
+  echo ""
+done
+
+echo "To reconfigure: mise run dev:setup:agents --reconfigure"

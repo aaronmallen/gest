@@ -18,7 +18,7 @@ pub struct Command {
 }
 
 impl Command {
-  pub fn call(&self, config: &Config, _theme: &Theme) -> crate::Result<()> {
+  pub fn call(&self, config: &Config, theme: &Theme) -> crate::Result<()> {
     log::info!("showing artifact with prefix '{}'", self.id);
     let data_dir = config::data_dir(config)?;
     log::debug!("resolving artifact ID from prefix '{}'", self.id);
@@ -45,7 +45,7 @@ impl Command {
       });
       println!("{}", serde_json::to_string_pretty(&json)?);
     } else {
-      ArtifactDetail::new(&artifact).write_to(&mut std::io::stdout())?;
+      ArtifactDetail::new(&artifact).write_to(&mut std::io::stdout(), theme)?;
     }
 
     Ok(())

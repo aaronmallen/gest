@@ -95,15 +95,12 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::{
-      config::{Config, StorageConfig},
-      store,
-    };
+    use crate::{store, test_helpers::make_test_config};
 
     #[test]
     fn it_resolves_task_created_with_cancelled_status() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
 
       let cmd = Command {
         title: "Cancelled Task".to_string(),
@@ -133,7 +130,7 @@ mod tests {
     #[test]
     fn it_resolves_task_created_with_done_status() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
 
       let cmd = Command {
         title: "Done Task".to_string(),
@@ -166,7 +163,7 @@ mod tests {
     #[test]
     fn it_creates_a_task_with_all_flags() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
 
       let cmd = Command {
         title: "Full Task".to_string(),
@@ -194,7 +191,7 @@ mod tests {
     #[test]
     fn it_creates_a_task_with_defaults() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
 
       let cmd = Command {
         title: "My Task".to_string(),
@@ -213,16 +210,6 @@ mod tests {
       assert_eq!(tasks[0].title, "My Task");
       assert_eq!(tasks[0].status, Status::Open);
       assert!(tasks[0].description.is_empty());
-    }
-
-    fn make_config(dir: &std::path::Path) -> Config {
-      store::ensure_dirs(dir).unwrap();
-      Config {
-        storage: StorageConfig {
-          data_dir: Some(dir.to_path_buf()),
-        },
-        ..Config::default()
-      }
     }
   }
 }

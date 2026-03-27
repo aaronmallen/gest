@@ -4,7 +4,7 @@ use chrono::Utc;
 
 use crate::{
   config::{Config, StorageConfig},
-  model::{Task, task::Status},
+  model::{Artifact, Task, task::Status},
 };
 
 /// Create a test `Config` whose `data_dir` points at the given directory.
@@ -16,6 +16,23 @@ pub fn make_test_config(dir: &Path) -> Config {
       data_dir: Some(dir.to_path_buf()),
     },
     ..Config::default()
+  }
+}
+
+/// Create a minimal `Artifact` with sensible defaults. `id` must be a valid
+/// 32-character lowercase hex string.
+pub fn make_test_artifact(id: &str) -> Artifact {
+  let now = Utc::now();
+  Artifact {
+    archived_at: None,
+    body: String::new(),
+    created_at: now,
+    id: id.parse().unwrap(),
+    kind: None,
+    metadata: yaml_serde::Mapping::new(),
+    tags: vec![],
+    title: format!("Artifact {id}"),
+    updated_at: now,
   }
 }
 

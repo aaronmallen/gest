@@ -132,13 +132,10 @@ fn capitalize(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
-
   use super::*;
   use crate::{
-    config::{Config, StorageConfig},
-    model::Artifact,
     store,
+    test_helpers::{make_test_artifact, make_test_config},
   };
 
   mod call {
@@ -147,7 +144,7 @@ mod tests {
     #[test]
     fn it_handles_empty_list() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
 
       let cmd = Command {
         archived: false,
@@ -163,7 +160,7 @@ mod tests {
     #[test]
     fn it_lists_artifacts() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       store::write_artifact(
         dir.path(),
         &make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Artifact One"),
@@ -184,7 +181,7 @@ mod tests {
     #[test]
     fn it_outputs_json_empty() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
 
       let cmd = Command {
         archived: false,
@@ -200,7 +197,7 @@ mod tests {
     #[test]
     fn it_outputs_json() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       store::write_artifact(
         dir.path(),
         &make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk", "JSON Artifact"),
@@ -221,7 +218,7 @@ mod tests {
     #[test]
     fn it_filters_by_type() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let mut artifact = make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Typed");
       artifact.kind = Some("spec".to_string());
       store::write_artifact(dir.path(), &artifact).unwrap();
@@ -244,7 +241,7 @@ mod tests {
     #[test]
     fn it_filters_by_tag() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let mut artifact = make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Tagged");
       artifact.tags = vec!["important".to_string()];
       store::write_artifact(dir.path(), &artifact).unwrap();
@@ -263,7 +260,7 @@ mod tests {
     #[test]
     fn it_handles_filtered_empty() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let mut artifact = make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk", "A Spec");
       artifact.kind = Some("spec".to_string());
       store::write_artifact(dir.path(), &artifact).unwrap();
@@ -282,7 +279,7 @@ mod tests {
     #[test]
     fn it_includes_archived_artifacts() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let artifact = make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Archived");
       store::write_artifact(dir.path(), &artifact).unwrap();
       store::archive_artifact(dir.path(), &artifact.id).unwrap();
@@ -299,28 +296,10 @@ mod tests {
     }
   }
 
-  fn make_artifact(id: &str, title: &str) -> Artifact {
-    let now = Utc::now();
-    Artifact {
-      archived_at: None,
-      body: String::new(),
-      created_at: now,
-      id: id.parse().unwrap(),
-      kind: None,
-      metadata: yaml_serde::Mapping::new(),
-      tags: vec![],
+  fn make_artifact(id: &str, title: &str) -> crate::model::Artifact {
+    crate::model::Artifact {
       title: title.to_string(),
-      updated_at: now,
-    }
-  }
-
-  fn make_config(dir: &std::path::Path) -> Config {
-    store::ensure_dirs(dir).unwrap();
-    Config {
-      storage: StorageConfig {
-        data_dir: Some(dir.to_path_buf()),
-      },
-      ..Config::default()
+      ..make_test_artifact(id)
     }
   }
 }

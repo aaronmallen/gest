@@ -212,18 +212,12 @@ fn build_task_groups(tasks: &[Task], theme: &Theme) -> Vec<Group> {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
-
-  use crate::{
-    model::{Artifact, Task, task::Status},
-    ui::theme::Theme,
-  };
+  use crate::{model::Artifact, test_helpers::make_test_config, ui::theme::Theme};
 
   mod call {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::config::{Config, StorageConfig};
 
     #[test]
     fn it_errors_when_expand_without_json() {
@@ -236,7 +230,7 @@ mod tests {
         json: false,
         expand: true,
       };
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let result = cmd.call(&config, &Theme::default());
       assert!(result.is_err());
       assert_eq!(result.unwrap_err().to_string(), "--expand requires --json");
@@ -255,7 +249,7 @@ mod tests {
         json: true,
         expand: false,
       };
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let result = cmd.call(&config, &Theme::default());
       assert!(result.is_ok());
     }
@@ -272,7 +266,7 @@ mod tests {
         json: false,
         expand: false,
       };
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let result = cmd.call(&config, &Theme::default());
       assert!(result.is_ok());
     }
@@ -289,7 +283,7 @@ mod tests {
         json: false,
         expand: false,
       };
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let result = cmd.call(&config, &Theme::default());
       assert!(result.is_ok());
     }
@@ -305,7 +299,7 @@ mod tests {
         json: false,
         expand: false,
       };
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let result = cmd.call(&config, &Theme::default());
       assert!(result.is_ok());
     }
@@ -323,7 +317,7 @@ mod tests {
         json: false,
         expand: false,
       };
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let result = cmd.call(&config, &Theme::default());
       assert!(result.is_ok());
     }
@@ -362,7 +356,7 @@ mod tests {
         json: true,
         expand: true,
       };
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let result = cmd.call(&config, &Theme::default());
       assert!(result.is_ok());
     }
@@ -379,7 +373,7 @@ mod tests {
         json: true,
         expand: false,
       };
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let result = cmd.call(&config, &Theme::default());
       assert!(result.is_ok());
     }
@@ -395,47 +389,24 @@ mod tests {
         json: true,
         expand: false,
       };
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let result = cmd.call(&config, &Theme::default());
       assert!(result.is_ok());
-    }
-
-    fn make_config(dir: &std::path::Path) -> Config {
-      Config {
-        storage: StorageConfig {
-          data_dir: Some(dir.to_path_buf()),
-        },
-        ..Config::default()
-      }
     }
   }
 
   fn make_test_artifact(id: &str, title: &str, body: &str) -> Artifact {
     Artifact {
-      archived_at: None,
-      body: body.to_string(),
-      created_at: Utc::now(),
-      id: id.parse().unwrap(),
-      kind: None,
-      metadata: yaml_serde::Mapping::new(),
-      tags: vec![],
       title: title.to_string(),
-      updated_at: Utc::now(),
+      body: body.to_string(),
+      ..crate::test_helpers::make_test_artifact(id)
     }
   }
 
-  fn make_test_task(id: &str, title: &str) -> Task {
-    Task {
-      resolved_at: None,
-      created_at: Utc::now(),
-      description: String::new(),
-      id: id.parse().unwrap(),
-      links: vec![],
-      metadata: toml::Table::new(),
-      status: Status::Open,
-      tags: vec![],
+  fn make_test_task(id: &str, title: &str) -> crate::model::Task {
+    crate::model::Task {
       title: title.to_string(),
-      updated_at: Utc::now(),
+      ..crate::test_helpers::make_test_task(id)
     }
   }
 }

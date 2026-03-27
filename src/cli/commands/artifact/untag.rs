@@ -39,11 +39,10 @@ impl Command {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
   use tempfile::TempDir;
 
   use super::*;
-  use crate::model::Artifact;
+  use crate::test_helpers::{make_test_artifact, make_test_config};
 
   mod call {
     use pretty_assertions::assert_eq;
@@ -53,7 +52,7 @@ mod tests {
     #[test]
     fn it_removes_tags() {
       let (_dir, config) = setup();
-      let mut artifact = make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       artifact.tags = vec!["rust".to_string(), "cli".to_string(), "keep".to_string()];
       store::write_artifact(_dir.path(), &artifact).unwrap();
 
@@ -70,7 +69,7 @@ mod tests {
     #[test]
     fn it_can_remove_all_tags() {
       let (_dir, config) = setup();
-      let mut artifact = make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       artifact.tags = vec!["rust".to_string(), "cli".to_string()];
       store::write_artifact(_dir.path(), &artifact).unwrap();
 
@@ -87,7 +86,7 @@ mod tests {
     #[test]
     fn it_handles_nonexistent_tags_gracefully() {
       let (_dir, config) = setup();
-      let mut artifact = make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       artifact.tags = vec!["rust".to_string()];
       store::write_artifact(_dir.path(), &artifact).unwrap();
 
@@ -102,29 +101,9 @@ mod tests {
     }
   }
 
-  fn make_artifact(id: &str) -> Artifact {
-    Artifact {
-      archived_at: None,
-      body: String::new(),
-      created_at: Utc::now(),
-      id: id.parse().unwrap(),
-      kind: None,
-      metadata: yaml_serde::Mapping::new(),
-      tags: vec![],
-      title: format!("Artifact {id}"),
-      updated_at: Utc::now(),
-    }
-  }
-
   fn setup() -> (TempDir, crate::config::Config) {
     let dir = TempDir::new().unwrap();
-    let config = crate::config::Config {
-      storage: crate::config::StorageConfig {
-        data_dir: Some(dir.path().to_path_buf()),
-      },
-      ..Default::default()
-    };
-    store::ensure_dirs(dir.path()).unwrap();
+    let config = make_test_config(dir.path());
     (dir, config)
   }
 }

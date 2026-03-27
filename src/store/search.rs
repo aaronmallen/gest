@@ -62,37 +62,20 @@ pub fn search(data_dir: &Path, query: &str, show_all: bool) -> crate::Result<Sea
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
-
   use super::*;
-  use crate::model::task::Status;
 
   fn make_test_artifact(id: &str, title: &str, body: &str) -> Artifact {
     Artifact {
-      archived_at: None,
-      body: body.to_string(),
-      created_at: Utc::now(),
-      id: id.parse().unwrap(),
-      kind: None,
-      metadata: yaml_serde::Mapping::new(),
-      tags: vec![],
       title: title.to_string(),
-      updated_at: Utc::now(),
+      body: body.to_string(),
+      ..crate::test_helpers::make_test_artifact(id)
     }
   }
 
   fn make_test_task(id: &str, title: &str) -> Task {
     Task {
-      created_at: Utc::now(),
-      description: String::new(),
-      id: id.parse().unwrap(),
-      links: vec![],
-      metadata: toml::Table::new(),
-      resolved_at: None,
-      status: Status::Open,
-      tags: vec![],
       title: title.to_string(),
-      updated_at: Utc::now(),
+      ..crate::test_helpers::make_test_task(id)
     }
   }
 

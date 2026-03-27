@@ -43,11 +43,10 @@ impl Command {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
   use tempfile::TempDir;
 
   use super::*;
-  use crate::model::Artifact;
+  use crate::test_helpers::{make_test_artifact, make_test_config};
 
   mod call {
     use pretty_assertions::assert_eq;
@@ -57,7 +56,7 @@ mod tests {
     #[test]
     fn it_adds_tags() {
       let (_dir, config) = setup();
-      let artifact = make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_artifact(_dir.path(), &artifact).unwrap();
 
       let cmd = Command {
@@ -73,7 +72,7 @@ mod tests {
     #[test]
     fn it_deduplicates_tags() {
       let (_dir, config) = setup();
-      let mut artifact = make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       artifact.tags = vec!["rust".to_string()];
       store::write_artifact(_dir.path(), &artifact).unwrap();
 
@@ -90,7 +89,7 @@ mod tests {
     #[test]
     fn it_preserves_existing_tags() {
       let (_dir, config) = setup();
-      let mut artifact = make_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       artifact.tags = vec!["existing".to_string()];
       store::write_artifact(_dir.path(), &artifact).unwrap();
 
@@ -105,29 +104,9 @@ mod tests {
     }
   }
 
-  fn make_artifact(id: &str) -> Artifact {
-    Artifact {
-      archived_at: None,
-      body: String::new(),
-      created_at: Utc::now(),
-      id: id.parse().unwrap(),
-      kind: None,
-      metadata: yaml_serde::Mapping::new(),
-      tags: vec![],
-      title: format!("Artifact {id}"),
-      updated_at: Utc::now(),
-    }
-  }
-
   fn setup() -> (TempDir, crate::config::Config) {
     let dir = TempDir::new().unwrap();
-    let config = crate::config::Config {
-      storage: crate::config::StorageConfig {
-        data_dir: Some(dir.path().to_path_buf()),
-      },
-      ..Default::default()
-    };
-    store::ensure_dirs(dir.path()).unwrap();
+    let config = make_test_config(dir.path());
     (dir, config)
   }
 }

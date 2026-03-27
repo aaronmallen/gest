@@ -188,21 +188,13 @@ fn serialize_artifact(artifact: &Artifact) -> crate::Result<String> {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
-
   use crate::model::{Artifact, ArtifactFilter};
 
   fn make_test_artifact(id: &str, title: &str, body: &str) -> Artifact {
     Artifact {
-      archived_at: None,
-      body: body.to_string(),
-      created_at: Utc::now(),
-      id: id.parse().unwrap(),
-      kind: None,
-      metadata: yaml_serde::Mapping::new(),
-      tags: vec![],
       title: title.to_string(),
-      updated_at: Utc::now(),
+      body: body.to_string(),
+      ..crate::test_helpers::make_test_artifact(id)
     }
   }
 

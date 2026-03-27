@@ -145,13 +145,11 @@ fn status_heading(status: &Status) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
-
   use super::*;
   use crate::{
-    config::{Config, StorageConfig},
-    model::{Task, link::Link},
+    model::{Task, link::Link, task::Status},
     store,
+    test_helpers::{make_test_config, make_test_task},
   };
 
   mod call {
@@ -160,7 +158,7 @@ mod tests {
     #[test]
     fn it_filters_by_status() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       store::write_task(
         dir.path(),
         &make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Open", Status::Open),
@@ -185,7 +183,7 @@ mod tests {
     #[test]
     fn it_handles_empty_list() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
 
       let cmd = Command {
         show_all: false,
@@ -200,7 +198,7 @@ mod tests {
     #[test]
     fn it_includes_resolved_tasks() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Resolved", Status::Open);
       store::write_task(dir.path(), &task).unwrap();
       store::resolve_task(dir.path(), &task.id).unwrap();
@@ -218,7 +216,7 @@ mod tests {
     #[test]
     fn it_lists_tasks() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Task One", Status::Open);
       store::write_task(dir.path(), &task).unwrap();
 
@@ -235,7 +233,7 @@ mod tests {
     #[test]
     fn it_outputs_json() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
       let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "JSON Task", Status::Open);
       store::write_task(dir.path(), &task).unwrap();
 
@@ -252,7 +250,7 @@ mod tests {
     #[test]
     fn it_groups_tasks_by_status() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
 
       store::write_task(
         dir.path(),
@@ -287,7 +285,7 @@ mod tests {
     #[test]
     fn it_shows_blocked_indicator() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
 
       let mut task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocked task", Status::Open);
       task.links = vec![Link {
@@ -309,7 +307,7 @@ mod tests {
     #[test]
     fn it_shows_blocking_indicator() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
 
       let mut task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocking task", Status::Open);
       task.links = vec![
@@ -337,7 +335,7 @@ mod tests {
     #[test]
     fn it_renders_tags_with_at_prefix() {
       let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
+      let config = make_test_config(dir.path());
 
       let mut task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Tagged task", Status::Open);
       task.tags = vec!["bug".to_string(), "urgent".to_string()];
@@ -354,29 +352,11 @@ mod tests {
     }
   }
 
-  fn make_config(dir: &std::path::Path) -> Config {
-    store::ensure_dirs(dir).unwrap();
-    Config {
-      storage: StorageConfig {
-        data_dir: Some(dir.to_path_buf()),
-      },
-      ..Config::default()
-    }
-  }
-
   fn make_task(id: &str, title: &str, status: Status) -> Task {
-    let now = Utc::now();
     Task {
-      resolved_at: None,
-      created_at: now,
-      description: String::new(),
-      id: id.parse().unwrap(),
-      links: vec![],
-      metadata: toml::Table::new(),
-      status,
-      tags: vec![],
       title: title.to_string(),
-      updated_at: now,
+      status,
+      ..make_test_task(id)
     }
   }
 }

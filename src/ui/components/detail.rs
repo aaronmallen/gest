@@ -113,26 +113,21 @@ fn strip_leading_title(body: &str, title: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
-
   use super::*;
-  use crate::model::{Id, Status};
+  use crate::model::Id;
 
   mod artifact_detail {
     use super::*;
 
     fn make_artifact(title: &str, kind: Option<&str>, tags: Vec<&str>, body: &str) -> Artifact {
-      let now = Utc::now();
+      let id = Id::new();
       Artifact {
-        archived_at: None,
         body: body.to_string(),
-        created_at: now,
-        id: Id::new(),
+        id,
         kind: kind.map(|k| k.to_string()),
-        metadata: yaml_serde::Mapping::new(),
         tags: tags.into_iter().map(|t| t.to_string()).collect(),
         title: title.to_string(),
-        updated_at: now,
+        ..crate::test_helpers::make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk")
       }
     }
 
@@ -285,18 +280,9 @@ mod tests {
     use crate::model::{Link, RelationshipType};
 
     fn make_task() -> Task {
-      let now = Utc::now();
       Task {
-        created_at: now,
-        description: String::new(),
-        id: "zyxwvutsrqponmlkzyxwvutsrqponmlk".parse().unwrap(),
-        links: vec![],
-        metadata: toml::Table::new(),
-        resolved_at: None,
-        status: Status::Open,
-        tags: vec![],
         title: "Test Task".to_string(),
-        updated_at: now,
+        ..crate::test_helpers::make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk")
       }
     }
 

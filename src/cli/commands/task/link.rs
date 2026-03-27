@@ -68,11 +68,13 @@ impl Command {
 
 #[cfg(test)]
 mod tests {
-  use chrono::Utc;
   use tempfile::TempDir;
 
   use super::*;
-  use crate::model::{Artifact, RelationshipType, Status, Task};
+  use crate::{
+    model::RelationshipType,
+    test_helpers::{make_test_artifact, make_test_config, make_test_task},
+  };
 
   mod call {
     use pretty_assertions::assert_eq;
@@ -82,9 +84,9 @@ mod tests {
     #[test]
     fn it_appends_multiple_links() {
       let (_dir, config) = setup();
-      let source = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      let target1 = make_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      let target2 = make_task("nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn");
+      let source = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let target1 = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      let target2 = make_test_task("nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn");
       store::write_task(_dir.path(), &source).unwrap();
       store::write_task(_dir.path(), &target1).unwrap();
       store::write_task(_dir.path(), &target2).unwrap();
@@ -112,7 +114,7 @@ mod tests {
     #[test]
     fn it_errors_when_target_not_found() {
       let (_dir, config) = setup();
-      let source = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let source = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_task(_dir.path(), &source).unwrap();
 
       let cmd = Command {
@@ -128,8 +130,8 @@ mod tests {
     #[test]
     fn it_links_task_to_artifact() {
       let (_dir, config) = setup();
-      let source = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      let target = make_artifact("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      let source = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let target = make_test_artifact("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
       store::write_task(_dir.path(), &source).unwrap();
       store::write_artifact(_dir.path(), &target).unwrap();
 
@@ -150,8 +152,8 @@ mod tests {
     #[test]
     fn it_links_task_to_task() {
       let (_dir, config) = setup();
-      let source = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      let target = make_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      let source = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let target = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
       store::write_task(_dir.path(), &source).unwrap();
       store::write_task(_dir.path(), &target).unwrap();
 
@@ -178,8 +180,8 @@ mod tests {
     #[test]
     fn it_creates_reciprocal_relates_to_on_both() {
       let (_dir, config) = setup();
-      let source = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      let target = make_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      let source = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let target = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
       store::write_task(_dir.path(), &source).unwrap();
       store::write_task(_dir.path(), &target).unwrap();
 
@@ -201,8 +203,8 @@ mod tests {
     #[test]
     fn it_does_not_create_reciprocal_for_artifact_links() {
       let (_dir, config) = setup();
-      let source = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      let target = make_artifact("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      let source = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let target = make_test_artifact("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
       store::write_task(_dir.path(), &source).unwrap();
       store::write_artifact(_dir.path(), &target).unwrap();
 
@@ -221,44 +223,9 @@ mod tests {
     }
   }
 
-  fn make_artifact(id: &str) -> Artifact {
-    Artifact {
-      archived_at: None,
-      body: String::new(),
-      created_at: Utc::now(),
-      id: id.parse().unwrap(),
-      kind: None,
-      metadata: yaml_serde::Mapping::new(),
-      tags: vec![],
-      title: format!("Artifact {id}"),
-      updated_at: Utc::now(),
-    }
-  }
-
-  fn make_task(id: &str) -> Task {
-    Task {
-      resolved_at: None,
-      created_at: Utc::now(),
-      description: String::new(),
-      id: id.parse().unwrap(),
-      links: vec![],
-      metadata: toml::Table::new(),
-      status: Status::Open,
-      tags: vec![],
-      title: format!("Task {id}"),
-      updated_at: Utc::now(),
-    }
-  }
-
   fn setup() -> (TempDir, crate::config::Config) {
     let dir = TempDir::new().unwrap();
-    let config = crate::config::Config {
-      storage: crate::config::StorageConfig {
-        data_dir: Some(dir.path().to_path_buf()),
-      },
-      ..Default::default()
-    };
-    store::ensure_dirs(dir.path()).unwrap();
+    let config = make_test_config(dir.path());
     (dir, config)
   }
 }

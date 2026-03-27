@@ -1,5 +1,6 @@
 // Command-specific integration tests.
 
+mod artifact;
 mod config;
 mod generate;
 mod init;

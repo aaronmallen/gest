@@ -15,12 +15,21 @@ use crate::{
 pub struct Command {
   /// Task ID or unique prefix
   pub id: String,
+  /// Actor assigned to this task
+  #[arg(long)]
+  pub assigned_to: Option<String>,
   /// New description (opens $EDITOR with current description if omitted and stdin is a terminal)
   #[arg(short, long)]
   pub description: Option<String>,
   /// Key=value metadata pair, merged with existing (repeatable, e.g. -m key=value)
   #[arg(short, long)]
   pub metadata: Vec<String>,
+  /// Execution phase for parallel grouping
+  #[arg(long)]
+  pub phase: Option<u16>,
+  /// Priority level (0-4, where 0 is highest)
+  #[arg(short, long)]
+  pub priority: Option<u8>,
   /// New status: open, in-progress, done, or cancelled (done/cancelled auto-archives; open/in-progress unarchives)
   #[arg(short, long)]
   pub status: Option<String>,
@@ -67,8 +76,11 @@ impl Command {
     let tags = self.tags.as_deref().map(crate::cli::helpers::parse_tags);
 
     let patch = TaskPatch {
+      assigned_to: self.assigned_to.as_ref().map(|v| Some(v.clone())),
       description,
       metadata,
+      phase: self.phase.map(Some),
+      priority: self.priority.map(Some),
       status,
       tags,
       title: self.title.clone(),
@@ -122,8 +134,11 @@ mod tests {
 
       let cmd = Command {
         id: "zyxw".to_string(),
+        assigned_to: None,
         title: None,
         description: None,
+        phase: None,
+        priority: None,
         status: None,
         tags: None,
         metadata: vec!["team=backend".to_string()],
@@ -145,8 +160,11 @@ mod tests {
 
       let cmd = Command {
         id: "zyxw".to_string(),
+        assigned_to: None,
         title: None,
         description: Some("New desc".to_string()),
+        phase: None,
+        priority: None,
         status: None,
         tags: None,
         metadata: vec![],
@@ -169,8 +187,11 @@ mod tests {
 
       let cmd = Command {
         id: "zyxw".to_string(),
+        assigned_to: None,
         title: None,
         description: None,
+        phase: None,
+        priority: None,
         status: Some("cancelled".to_string()),
         tags: None,
         metadata: vec![],
@@ -199,8 +220,11 @@ mod tests {
 
       let cmd = Command {
         id: "zyxw".to_string(),
+        assigned_to: None,
         title: None,
         description: None,
+        phase: None,
+        priority: None,
         status: Some("done".to_string()),
         tags: None,
         metadata: vec![],
@@ -229,8 +253,11 @@ mod tests {
 
       let cmd = Command {
         id: "zyxw".to_string(),
+        assigned_to: None,
         title: Some("Changed".to_string()),
         description: None,
+        phase: None,
+        priority: None,
         status: None,
         tags: None,
         metadata: vec![],
@@ -252,8 +279,11 @@ mod tests {
 
       let cmd = Command {
         id: "zyxw".to_string(),
+        assigned_to: None,
         title: None,
         description: None,
+        phase: None,
+        priority: None,
         status: Some("in-progress".to_string()),
         tags: None,
         metadata: vec![],
@@ -283,8 +313,11 @@ mod tests {
 
       let cmd = Command {
         id: "zyxw".to_string(),
+        assigned_to: None,
         title: None,
         description: None,
+        phase: None,
+        priority: None,
         status: Some("open".to_string()),
         tags: None,
         metadata: vec![],
@@ -313,8 +346,11 @@ mod tests {
 
       let cmd = Command {
         id: "zyxw".to_string(),
+        assigned_to: None,
         title: None,
         description: None,
+        phase: None,
+        priority: None,
         status: Some("done".to_string()),
         tags: None,
         metadata: vec![],
@@ -335,8 +371,11 @@ mod tests {
 
       let cmd = Command {
         id: "zyxw".to_string(),
+        assigned_to: None,
         title: Some("New Title".to_string()),
         description: None,
+        phase: None,
+        priority: None,
         status: None,
         tags: None,
         metadata: vec![],

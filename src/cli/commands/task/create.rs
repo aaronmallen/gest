@@ -15,12 +15,21 @@ use crate::{
 pub struct Command {
   /// Task title
   pub title: String,
+  /// Actor assigned to this task
+  #[arg(long)]
+  pub assigned_to: Option<String>,
   /// Description text (opens $EDITOR if omitted and stdin is a terminal)
   #[arg(short, long)]
   pub description: Option<String>,
   /// Key=value metadata pair (repeatable, e.g. -m key=value)
   #[arg(short, long)]
   pub metadata: Vec<String>,
+  /// Execution phase for parallel grouping
+  #[arg(long)]
+  pub phase: Option<u16>,
+  /// Priority level (0-4, where 0 is highest)
+  #[arg(short, long)]
+  pub priority: Option<u8>,
   /// Initial status: open, in-progress, done, or cancelled (default: open)
   #[arg(short, long)]
   pub status: Option<String>,
@@ -54,9 +63,12 @@ impl Command {
     let description = self.read_description()?;
 
     let new = NewTask {
+      assigned_to: self.assigned_to.clone(),
       description,
       links: vec![],
       metadata,
+      phase: self.phase,
+      priority: self.priority,
       status,
       tags,
       title: self.title.clone(),
@@ -104,9 +116,11 @@ mod tests {
 
       let cmd = Command {
         title: "Cancelled Task".to_string(),
+        assigned_to: None,
         description: Some("Cancelled".to_string()),
-
         metadata: vec![],
+        phase: None,
+        priority: None,
         status: Some("cancelled".to_string()),
         tags: None,
       };
@@ -134,9 +148,11 @@ mod tests {
 
       let cmd = Command {
         title: "Done Task".to_string(),
+        assigned_to: None,
         description: Some("Already done".to_string()),
-
         metadata: vec![],
+        phase: None,
+        priority: None,
         status: Some("done".to_string()),
         tags: None,
       };
@@ -167,8 +183,11 @@ mod tests {
 
       let cmd = Command {
         title: "Full Task".to_string(),
+        assigned_to: Some("agent-1".to_string()),
         description: Some("A description".to_string()),
-        metadata: vec!["priority=high".to_string()],
+        metadata: vec!["custom=high".to_string()],
+        phase: Some(1),
+        priority: Some(2),
         status: Some("in-progress".to_string()),
         tags: Some("rust,cli".to_string()),
       };
@@ -184,8 +203,11 @@ mod tests {
       assert_eq!(task.description, "A description");
       assert_eq!(task.status, Status::InProgress);
       assert_eq!(task.tags, vec!["rust", "cli"]);
+      assert_eq!(task.assigned_to.as_deref(), Some("agent-1"));
+      assert_eq!(task.phase, Some(1));
+      assert_eq!(task.priority, Some(2));
       assert_eq!(task.links.len(), 0);
-      assert_eq!(task.metadata.get("priority").unwrap().as_str().unwrap(), "high");
+      assert_eq!(task.metadata.get("custom").unwrap().as_str().unwrap(), "high");
     }
 
     #[test]
@@ -195,9 +217,11 @@ mod tests {
 
       let cmd = Command {
         title: "My Task".to_string(),
+        assigned_to: None,
         description: None,
-
         metadata: vec![],
+        phase: None,
+        priority: None,
         status: None,
         tags: None,
       };

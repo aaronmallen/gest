@@ -3,11 +3,11 @@ use std::io;
 use yansi::Paint;
 
 use crate::{
-  model::{Artifact, Task},
+  model::{Artifact, Iteration, Task},
   ui::{
     markdown,
     theme::Theme,
-    utils::{format_status, format_tags},
+    utils::{format_iteration_status, format_status, format_tags},
   },
 };
 
@@ -44,6 +44,67 @@ impl<'a> ArtifactDetail<'a> {
 
 crate::ui::macros::impl_display_via_write_to!(ArtifactDetail<'_>, theme);
 
+/// Detail view for an iteration, matching the output of `iteration show`.
+pub struct IterationDetail<'a> {
+  iteration: &'a Iteration,
+}
+
+impl<'a> IterationDetail<'a> {
+  pub fn new(iteration: &'a Iteration) -> Self {
+    Self {
+      iteration,
+    }
+  }
+
+  /// Write the detail view to the given writer.
+  pub fn write_to(&self, w: &mut impl io::Write, theme: &Theme) -> io::Result<()> {
+    writeln!(w, "{}", self.iteration.title.paint(theme.md_heading))?;
+    writeln!(w, "{}", format_iteration_status(&self.iteration.status, theme))?;
+    if !self.iteration.tags.is_empty() {
+      writeln!(w, "{}", format_tags(&self.iteration.tags, theme))?;
+    }
+
+    if !self.iteration.description.is_empty() {
+      writeln!(w)?;
+      markdown::render(w, &self.iteration.description, theme)?;
+    }
+
+    // Tasks section
+    if !self.iteration.tasks.is_empty() {
+      writeln!(w)?;
+      writeln!(w, "{}", "── Tasks ──".paint(theme.border))?;
+      writeln!(w)?;
+      for task_ref in &self.iteration.tasks {
+        writeln!(w, "- {task_ref}")?;
+      }
+    }
+
+    // Links section
+    if !self.iteration.links.is_empty() {
+      writeln!(w)?;
+      writeln!(w, "{}", "── Links ──".paint(theme.border))?;
+      writeln!(w)?;
+      for link in &self.iteration.links {
+        writeln!(w, "- **{}:** {}", link.rel, link.ref_)?;
+      }
+    }
+
+    // Metadata section
+    if !self.iteration.metadata.is_empty() {
+      writeln!(w)?;
+      writeln!(w, "{}", "── Metadata ──".paint(theme.border))?;
+      writeln!(w)?;
+      for (key, value) in &self.iteration.metadata {
+        writeln!(w, "- **{key}:** {value}")?;
+      }
+    }
+
+    Ok(())
+  }
+}
+
+crate::ui::macros::impl_display_via_write_to!(IterationDetail<'_>, theme);
+
 /// Detail view for a task, matching the output of `task show`.
 pub struct TaskDetail<'a> {
   task: &'a Task,
@@ -62,6 +123,16 @@ impl<'a> TaskDetail<'a> {
     writeln!(w, "{}", self.task.title.paint(theme.md_heading))?;
     // Status on its own line
     writeln!(w, "{}", format_status(&self.task.status, theme))?;
+    // Priority, phase, assigned_to (omitted if absent)
+    if let Some(priority) = self.task.priority {
+      writeln!(w, "{} P{priority}", "priority:".paint(theme.muted))?;
+    }
+    if let Some(phase) = self.task.phase {
+      writeln!(w, "{} {phase}", "phase:".paint(theme.muted))?;
+    }
+    if let Some(ref assigned_to) = self.task.assigned_to {
+      writeln!(w, "{} {assigned_to}", "assigned:".paint(theme.muted))?;
+    }
     // Tags with @ prefix (omitted if empty)
     if !self.task.tags.is_empty() {
       writeln!(w, "{}", format_tags(&self.task.tags, theme))?;

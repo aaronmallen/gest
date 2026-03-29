@@ -4,7 +4,7 @@ use chrono::Utc;
 
 use crate::{
   config::{Config, StorageConfig},
-  model::{Artifact, Task, task::Status},
+  model::{Artifact, Iteration, Task, iteration, task::Status},
 };
 
 /// Create a test `Config` whose `data_dir` points at the given directory.
@@ -36,16 +36,38 @@ pub fn make_test_artifact(id: &str) -> Artifact {
   }
 }
 
-/// Create a minimal `Task` with sensible defaults. `id` must be a valid
-/// 32-character lowercase hex string.
-pub fn make_test_task(id: &str) -> Task {
+/// Create a minimal `Iteration` with sensible defaults. `id` must be a valid
+/// 32-character reversed-hex string.
+pub fn make_test_iteration(id: &str) -> Iteration {
   let now = Utc::now();
-  Task {
+  Iteration {
+    completed_at: None,
     created_at: now,
     description: String::new(),
     id: id.parse().unwrap(),
     links: vec![],
     metadata: toml::Table::new(),
+    status: iteration::Status::Active,
+    tags: vec![],
+    tasks: vec![],
+    title: format!("Iteration {id}"),
+    updated_at: now,
+  }
+}
+
+/// Create a minimal `Task` with sensible defaults. `id` must be a valid
+/// 32-character lowercase hex string.
+pub fn make_test_task(id: &str) -> Task {
+  let now = Utc::now();
+  Task {
+    assigned_to: None,
+    created_at: now,
+    description: String::new(),
+    id: id.parse().unwrap(),
+    links: vec![],
+    metadata: toml::Table::new(),
+    phase: None,
+    priority: None,
     resolved_at: None,
     status: Status::Open,
     tags: vec![],

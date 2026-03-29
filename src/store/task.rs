@@ -8,11 +8,14 @@ use crate::model::{Id, NewTask, Task, TaskFilter, TaskPatch};
 pub fn create_task(data_dir: &Path, new: NewTask) -> crate::Result<Task> {
   let now = Utc::now();
   let task = Task {
+    assigned_to: new.assigned_to,
     created_at: now,
     description: new.description,
     id: Id::new(),
     links: new.links,
     metadata: new.metadata,
+    phase: new.phase,
+    priority: new.priority,
     resolved_at: None,
     status: new.status,
     tags: new.tags,
@@ -122,11 +125,20 @@ pub fn update_task(data_dir: &Path, id: &Id, patch: TaskPatch) -> crate::Result<
   let mut task = read_task(data_dir, id)?;
   let was_resolved = is_task_resolved(data_dir, id);
 
+  if let Some(assigned_to) = patch.assigned_to {
+    task.assigned_to = assigned_to;
+  }
   if let Some(description) = patch.description {
     task.description = description;
   }
   if let Some(metadata) = patch.metadata {
     task.metadata = metadata;
+  }
+  if let Some(phase) = patch.phase {
+    task.phase = phase;
+  }
+  if let Some(priority) = patch.priority {
+    task.priority = priority;
   }
   if let Some(status) = patch.status {
     task.status = status;

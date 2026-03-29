@@ -10,9 +10,15 @@ pub const STATUS_ORDER: &[Status] = &[Status::Open, Status::InProgress, Status::
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct NewTask {
+  #[serde(default)]
+  pub assigned_to: Option<String>,
   pub description: String,
   pub links: Vec<Link>,
   pub metadata: toml::Table,
+  #[serde(default)]
+  pub phase: Option<u16>,
+  #[serde(default)]
+  pub priority: Option<u8>,
   pub status: Status,
   pub tags: Vec<String>,
   pub title: String,
@@ -65,6 +71,8 @@ impl FromStr for Status {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Task {
+  #[serde(default)]
+  pub assigned_to: Option<String>,
   pub created_at: DateTime<Utc>,
   pub description: String,
   pub id: Id,
@@ -72,6 +80,10 @@ pub struct Task {
   pub links: Vec<Link>,
   #[serde(default)]
   pub metadata: toml::Table,
+  #[serde(default)]
+  pub phase: Option<u16>,
+  #[serde(default)]
+  pub priority: Option<u8>,
   #[serde(alias = "archived_at", with = "resolved_at_serde")]
   pub resolved_at: Option<DateTime<Utc>>,
   pub status: Status,
@@ -90,8 +102,11 @@ pub struct TaskFilter {
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct TaskPatch {
+  pub assigned_to: Option<Option<String>>,
   pub description: Option<String>,
   pub metadata: Option<toml::Table>,
+  pub phase: Option<Option<u16>>,
+  pub priority: Option<Option<u8>>,
   pub status: Option<Status>,
   pub tags: Option<Vec<String>>,
   pub title: Option<String>,
@@ -179,6 +194,7 @@ mod tests {
       fn it_roundtrips_through_toml() {
         let now = Utc::now();
         let task = Task {
+          assigned_to: Some("agent-1".to_string()),
           resolved_at: None,
           created_at: now,
           description: "A test task description".to_string(),
@@ -189,9 +205,11 @@ mod tests {
           }],
           metadata: {
             let mut table = toml::Table::new();
-            table.insert("priority".to_string(), toml::Value::String("high".to_string()));
+            table.insert("custom_key".to_string(), toml::Value::String("high".to_string()));
             table
           },
+          phase: Some(2),
+          priority: Some(1),
           status: Status::Open,
           tags: vec!["test".to_string(), "example".to_string()],
           title: "Test Task".to_string(),

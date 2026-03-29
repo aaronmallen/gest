@@ -1,17 +1,15 @@
 use clap::Args;
-use yansi::Paint;
 
 use crate::{
   config,
   config::Config,
   model::{
     TaskFilter,
-    link::RelationshipType,
     task::{STATUS_ORDER, Status, Task},
   },
   store,
   ui::{
-    components::{EmptyList, Group, GroupedList},
+    components::{EmptyList, Group, GroupedList, Indicators},
     theme::Theme,
     utils::{format_id, format_tags, shortest_unique_prefixes},
   },
@@ -109,20 +107,9 @@ fn build_row(task: &Task, prefix_map: &std::collections::HashMap<String, usize>,
   let title_cell = format!("{}{}", task.title, status_marker);
   let tags_cell = format_tags(&task.tags, theme);
 
-  let mut indicators = Vec::new();
-  if task.links.iter().any(|l| l.rel == RelationshipType::BlockedBy) {
-    indicators.push("!!".paint(theme.indicator_blocked).to_string());
-  }
-  let blocks_count = task.links.iter().filter(|l| l.rel == RelationshipType::Blocks).count();
-  if blocks_count > 0 {
-    indicators.push(
-      format!("\u{26a0} {}", blocks_count)
-        .paint(theme.indicator_blocking)
-        .to_string(),
-    );
-  }
+  let indicators_cell = Indicators::new(&task.links, theme).to_string();
 
-  vec![id_cell, title_cell, tags_cell, indicators.join(" ")]
+  vec![id_cell, title_cell, tags_cell, indicators_cell]
 }
 
 fn status_heading(status: &Status) -> &'static str {
@@ -138,7 +125,11 @@ fn status_heading(status: &Status) -> &'static str {
 mod tests {
   use super::*;
   use crate::{
-    model::{Task, link::Link, task::Status},
+    model::{
+      Task,
+      link::{Link, RelationshipType},
+      task::Status,
+    },
     store,
     test_helpers::{make_test_config, make_test_task},
   };

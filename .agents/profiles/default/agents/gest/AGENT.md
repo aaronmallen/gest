@@ -1,6 +1,6 @@
 ---
 name: gest
-description: Gest CLI reference for managing artifacts and tasks. Use as context when skills need to create, read, or link gest entities.
+description: Gest CLI reference for managing artifacts and tasks. Use when skills need to create, read, or link entities.
 tools: Bash, Read
 model: haiku
 ---
@@ -133,13 +133,13 @@ cargo run -- task link <task-id> <rel> <target-task-id>              # task-to-t
 cargo run -- task link <task-id> <rel> <target-artifact-id> --artifact  # task-to-artifact
 ```
 
-Relation types are freeform strings. Conventions:
+Valid relation types:
 
 - `blocks` -- this task blocks the target
 - `blocked-by` -- this task is blocked by the target
-- `related` -- general association
-- `implements` -- this task implements the target artifact (e.g., a spec)
-- `parent` -- this task is a subtask of the target
+- `relates-to` -- general association
+- `child-of` -- this task is a child of the target (e.g., a task that implements a spec)
+- `parent-of` -- the target is a child of this task
 
 ### Metadata
 
@@ -198,7 +198,7 @@ cargo run -- artifact create --title "My Spec" --type spec --file /tmp/my-spec.m
 # Create the task
 cargo run -- task create "Implement feature X" --description "..." --status open
 # Link it to the source spec artifact
-cargo run -- task link <task-id> implements <artifact-id> --artifact
+cargo run -- task link <task-id> child-of <artifact-id> --artifact
 # Set orchestration metadata
 cargo run -- task meta set <task-id> wave 1
 cargo run -- task meta set <task-id> parallel true

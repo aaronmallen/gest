@@ -44,7 +44,7 @@ For **multi-issue**:
 1. Identify the natural breakdown (by component, by layer, by acceptance criteria groups)
 2. Determine dependencies between tasks (what must be done first)
 3. Invoke `/write-issue` for each task, including dependency references
-4. Link each task to the source spec: `cargo run -- task link <task-id> implements <spec-id> --artifact`
+4. Link each task to the source spec: `cargo run -- task link <task-id> child-of <spec-id> --artifact`
 5. For issues that affect CLI behavior (commands, flags, output format), include integration test
    acceptance criteria in the task description. Example: "Integration test verifies
    `gest task create --description` outputs the created task ID."

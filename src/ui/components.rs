@@ -25,6 +25,5 @@ pub use self::{
   self_update::{AlreadyOnVersion, UpdateAvailable, UpdateCancelled, UpdateComplete, UpdatePrompt},
   status::{IterationStatus, TaskStatus},
   tags::Tags,
-  title::Title,
   value::ConfigDisplay,
 };

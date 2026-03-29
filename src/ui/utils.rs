@@ -1,7 +1,7 @@
 use yansi::Paint;
 
 use super::theme::Theme;
-use crate::model::{Id, Status};
+use crate::model::{Id, Status, iteration};
 
 /// Returns the display width of a string after stripping ANSI escape sequences.
 ///
@@ -38,6 +38,14 @@ pub fn format_id(id: &Id, prefix_len: usize, max_display_len: Option<usize>, the
   };
   let (prefix, rest) = s.split_at(prefix_len.min(s.len()));
   format!("{}{}", prefix.paint(theme.id_prefix), rest.paint(theme.id_rest))
+}
+
+pub fn format_iteration_status(status: &iteration::Status, theme: &Theme) -> String {
+  match status {
+    iteration::Status::Active => status.to_string().paint(theme.status_in_progress).to_string(),
+    iteration::Status::Completed => status.to_string().paint(theme.status_done).to_string(),
+    iteration::Status::Failed => status.to_string().paint(theme.status_cancelled).to_string(),
+  }
 }
 
 pub fn format_status(status: &Status, theme: &Theme) -> String {

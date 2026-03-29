@@ -8,7 +8,7 @@ pub mod value;
 
 pub use self::{
   banner::Banner,
-  detail::{ArtifactDetail, TaskDetail},
+  detail::{ArtifactDetail, IterationDetail, TaskDetail},
   grouped_detail::{DetailGroup, GroupedDetail},
   grouped_list::{Group, GroupedList},
   message::{

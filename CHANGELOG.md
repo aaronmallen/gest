@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [v0.2.3] - 2026-03-29
+
+### Added
+
+- Iteration entity type with storage, UI components, CLI commands, and graph visualization for planning multi-phase work
+- `priority`, `assigned_to`, and `phase` fields on tasks for richer project tracking
+- `--expand` flag on `gest search` now works without `--json`, showing full detail blocks directly in the terminal
+
 ## [v0.2.2] - 2026-03-27
 
 ### Added
@@ -58,7 +66,8 @@ Initial release
 [#4]: https://github.com/aaronmallen/gest/issues/4
 [#5]: https://github.com/aaronmallen/gest/issues/5
 
-[Unreleased]: https://github.com/aaronmallen/gest/compare/0.2.2...main
+[Unreleased]: https://github.com/aaronmallen/gest/compare/0.2.3...main
 [v0.2.0]: https://github.com/aaronmallen/gest/compare/0.1.0...0.2.0
 [v0.2.1]: https://github.com/aaronmallen/gest/compare/0.2.0...0.2.1
 [v0.2.2]: https://github.com/aaronmallen/gest/compare/0.2.1...0.2.2
+[v0.2.3]: https://github.com/aaronmallen/gest/compare/0.2.2...0.2.3

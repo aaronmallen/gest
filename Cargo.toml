@@ -7,7 +7,7 @@ keywords = ["cli", "agent", "artifact", "task"]
 license = "MIT"
 name = "gest"
 repository = "https://github.com/aaronmallen/gest"
-version = "0.2.2"
+version = "0.2.3"
 
 [package.metadata.binstall]
 bin-dir = "{bin}{binary-ext}"
@@ -18,7 +18,7 @@ pkg-url = "{repo}/releases/download/v{version}/{name}-v{version}-{target}.tar.gz
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
-clap_mangen = "0.2"
+clap_mangen = "0.3"
 dir_spec = "0.5"
 log = "0.4"
 pulldown-cmark = "0.13"

@@ -4,6 +4,7 @@
 
 mod artifact;
 mod fs;
+mod iteration;
 mod search;
 mod task;
 
@@ -12,6 +13,10 @@ pub use artifact::{
   update_artifact, write_artifact,
 };
 pub use fs::ensure_dirs;
+pub use iteration::{
+  add_task as add_iteration_task, create_iteration, is_iteration_resolved, list_iterations, read_iteration,
+  remove_task as remove_iteration_task, resolve_iteration, resolve_iteration_id, update_iteration, write_iteration,
+};
 pub use search::{SearchResults, search};
 pub use task::{
   create_task, is_task_resolved, list_tasks, read_task, resolve_task, resolve_task_id, update_task, write_task,

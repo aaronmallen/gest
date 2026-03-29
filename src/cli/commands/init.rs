@@ -10,7 +10,14 @@ use crate::{
   },
 };
 
-const SUBDIRS: &[&str] = &["tasks", "artifacts", "tasks/archive", "artifacts/archive"];
+const SUBDIRS: &[&str] = &[
+  "artifacts",
+  "artifacts/archive",
+  "iterations",
+  "iterations/resolved",
+  "tasks",
+  "tasks/archive",
+];
 
 /// Initialize a .gest directory in the current project
 #[derive(Debug, Args)]
@@ -61,6 +68,8 @@ mod tests {
       assert!(base.join("tasks/archive").is_dir());
       assert!(base.join("artifacts").is_dir());
       assert!(base.join("artifacts/archive").is_dir());
+      assert!(base.join("iterations").is_dir());
+      assert!(base.join("iterations/resolved").is_dir());
     }
 
     #[test]

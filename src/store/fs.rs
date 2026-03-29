@@ -19,6 +19,8 @@ pub(crate) fn move_entity_file(data_dir: &Path, content: &str, dest: &Path, src:
 pub fn ensure_dirs(data_dir: &Path) -> crate::Result<()> {
   fs::create_dir_all(data_dir.join("artifacts"))?;
   fs::create_dir_all(data_dir.join("artifacts/archive"))?;
+  fs::create_dir_all(data_dir.join("iterations"))?;
+  fs::create_dir_all(data_dir.join("iterations/resolved"))?;
   fs::create_dir_all(data_dir.join("tasks"))?;
   fs::create_dir_all(data_dir.join("tasks/resolved"))?;
   Ok(())
@@ -112,10 +114,12 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       crate::store::ensure_dirs(dir.path()).unwrap();
 
-      assert!(dir.path().join("tasks").is_dir());
-      assert!(dir.path().join("tasks/resolved").is_dir());
       assert!(dir.path().join("artifacts").is_dir());
       assert!(dir.path().join("artifacts/archive").is_dir());
+      assert!(dir.path().join("iterations").is_dir());
+      assert!(dir.path().join("iterations/resolved").is_dir());
+      assert!(dir.path().join("tasks").is_dir());
+      assert!(dir.path().join("tasks/resolved").is_dir());
     }
 
     #[test]

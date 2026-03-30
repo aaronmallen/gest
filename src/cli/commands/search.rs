@@ -1,8 +1,10 @@
+use std::path::Path;
+
 use clap::Args;
 
 use crate::{
   cli::{self, AppContext},
-  model::{link::RelationshipType, task::Status},
+  model::task::Status,
   store,
   ui::{
     composites::{artifact_list_row::ArtifactListRow, task_list_row::TaskListRow},
@@ -43,7 +45,7 @@ impl Command {
       return Ok(());
     }
 
-    let items = build_search_items(&results, &ctx.theme);
+    let items = build_search_items(&ctx.data_dir, &results, &ctx.theme);
 
     if self.expand {
       println!("{}", SearchExpandedView::new(&self.query, &items, &ctx.theme));
@@ -56,7 +58,7 @@ impl Command {
 }
 
 /// Convert raw search results into view-layer items with pre-rendered row content.
-fn build_search_items(results: &store::SearchResults, theme: &Theme) -> Vec<SearchResultItem> {
+fn build_search_items(data_dir: &Path, results: &store::SearchResults, theme: &Theme) -> Vec<SearchResultItem> {
   let mut items = Vec::with_capacity(results.tasks.len() + results.artifacts.len());
 
   for task in &results.tasks {
@@ -68,19 +70,14 @@ fn build_search_items(results: &store::SearchResults, theme: &Theme) -> Vec<Sear
       Status::Cancelled => "cancelled",
     };
 
-    let blocked_by = task
-      .links
-      .iter()
-      .find(|l| l.rel == RelationshipType::BlockedBy)
-      .map(|l| l.ref_.strip_prefix("tasks/").unwrap_or(&l.ref_).to_string());
-
-    let is_blocking = task.links.iter().any(|l| l.rel == RelationshipType::Blocks);
+    let resolved = store::resolve_blocking(data_dir, task);
+    let blocked_by = resolved.blocked_by_ids.first().map(String::as_str);
 
     let row_content = TaskListRow::new(status_str, &id_str, &task.title, theme)
       .priority(task.priority)
       .tags(&task.tags)
-      .blocking(is_blocking)
-      .blocked_by(blocked_by.as_deref())
+      .blocking(resolved.is_blocking)
+      .blocked_by(blocked_by)
       .to_string();
 
     let snippet = if task.description.is_empty() {

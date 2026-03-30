@@ -12,8 +12,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Changed
 
 - **Breaking:** Configuration files are now TOML only — JSON and YAML configs are no longer supported
-- **Breaking:** `gest init` now creates the global data store by default; use `gest init --local` for in-repo `.gest/` mode
-- Complete UI overhaul with an atomic architecture (atoms, composites, views) for consistent, aligned rendering across all commands
+- **Breaking:** `gest init` now creates the global data store by default; use `gest init --local`
+  for in-repo `.gest/` mode
+- Complete UI overhaul with an atomic architecture (atoms, composites, views) for consistent,
+  aligned rendering across all commands
 
 ## [v0.2.3] - 2026-03-29
 

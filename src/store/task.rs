@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{collections::HashMap, fs, path::Path};
 
 use chrono::Utc;
 
@@ -44,6 +44,61 @@ pub fn resolve_blocking(data_dir: &Path, task: &Task) -> ResolvedBlocking {
     blocked_by_ids,
     is_blocking,
   }
+}
+
+/// Resolve blocking state for multiple tasks in a single batch.
+///
+/// Instead of N individual disk reads (one per `blocked-by` link), this collects all referenced
+/// task IDs, reads each unique one once, and resolves blocking status from the in-memory set.
+/// The returned vec is in the same order as `tasks`.
+pub fn resolve_blocking_batch(data_dir: &Path, tasks: &[Task]) -> Vec<ResolvedBlocking> {
+  // Collect all unique blocked-by task IDs across every task.
+  let mut needed_ids: HashMap<String, Option<Task>> = HashMap::new();
+  for task in tasks {
+    for link in &task.links {
+      if link.rel == RelationshipType::BlockedBy {
+        if let Some(id_str) = link.ref_.strip_prefix("tasks/") {
+          needed_ids.entry(id_str.to_string()).or_insert(None);
+        }
+      }
+    }
+  }
+
+  // Read each unique referenced task exactly once.
+  for (id_str, slot) in &mut needed_ids {
+    if let Ok(id) = id_str.parse::<Id>() {
+      if let Ok(referenced) = read_task(data_dir, &id) {
+        *slot = Some(referenced);
+      }
+    }
+  }
+
+  // Resolve blocking state per task from the in-memory map.
+  tasks
+    .iter()
+    .map(|task| {
+      let blocked_by_ids: Vec<String> = task
+        .links
+        .iter()
+        .filter(|link| link.rel == RelationshipType::BlockedBy)
+        .filter_map(|link| {
+          let id_str = link.ref_.strip_prefix("tasks/")?;
+          match needed_ids.get(id_str) {
+            Some(Some(referenced)) if !referenced.status.is_terminal() => Some(id_str.to_string()),
+            _ => None,
+          }
+        })
+        .collect();
+
+      let is_blocking =
+        !task.status.is_terminal() && task.links.iter().any(|link| link.rel == RelationshipType::Blocks);
+
+      ResolvedBlocking {
+        blocked_by_ids,
+        is_blocking,
+      }
+    })
+    .collect()
 }
 
 /// Persist a new task, resolving it immediately if the status is terminal.

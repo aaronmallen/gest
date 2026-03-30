@@ -48,6 +48,6 @@ pub use iteration::{
 };
 pub use search::{SearchResults, search};
 pub use task::{
-  ResolvedBlocking, create_task, is_task_resolved, list_tasks, read_task, resolve_blocking, resolve_task,
-  resolve_task_id, update_task, write_task,
+  ResolvedBlocking, create_task, is_task_resolved, list_tasks, read_task, resolve_blocking, resolve_blocking_batch,
+  resolve_task, resolve_task_id, update_task, write_task,
 };

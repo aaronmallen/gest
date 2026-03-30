@@ -57,7 +57,7 @@ impl Command {
       return Ok(());
     }
 
-    let resolved: Vec<ResolvedBlocking> = tasks.iter().map(|t| store::resolve_blocking(data_dir, t)).collect();
+    let resolved: Vec<ResolvedBlocking> = store::resolve_blocking_batch(data_dir, &tasks);
 
     let view_data: Vec<TaskViewData> = tasks
       .into_iter()

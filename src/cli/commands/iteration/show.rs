@@ -31,6 +31,9 @@ impl Command {
       return Ok(());
     }
 
+    let tasks = store::read_iteration_tasks(data_dir, &iteration);
+    let resolved = store::resolve_blocking_batch(data_dir, &tasks);
+
     let mut counts = TaskCounts {
       total: 0,
       done: 0,
@@ -41,15 +44,13 @@ impl Command {
 
     let mut phase_set = std::collections::BTreeSet::new();
 
-    for task in store::read_iteration_tasks(data_dir, &iteration) {
+    for (task, blocking) in tasks.iter().zip(&resolved) {
       counts.total += 1;
       if let Some(phase) = task.phase {
         phase_set.insert(phase);
       }
 
-      let resolved = store::resolve_blocking(data_dir, &task);
-
-      if !resolved.blocked_by_ids.is_empty() {
+      if !blocking.blocked_by_ids.is_empty() {
         counts.blocked += 1;
       } else {
         match task.status {

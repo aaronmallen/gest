@@ -37,16 +37,17 @@ impl Command {
     let id = store::resolve_iteration_id(data_dir, &self.id, true)?;
     let iteration = store::read_iteration(data_dir, &id)?;
 
+    let tasks = store::read_iteration_tasks(data_dir, &iteration);
+    let resolved = store::resolve_blocking_batch(data_dir, &tasks);
+
     let mut phase_map: BTreeMap<u16, Vec<TaskRow>> = BTreeMap::new();
 
-    for task in store::read_iteration_tasks(data_dir, &iteration) {
+    for (task, blocking) in tasks.into_iter().zip(resolved) {
       let phase = task.phase.unwrap_or(0);
       let status_str = task.status.as_str();
 
-      let resolved = store::resolve_blocking(data_dir, &task);
-
-      let blocked_by = resolved.blocked_by_ids.into_iter().next();
-      let is_blocking = resolved.is_blocking;
+      let blocked_by = blocking.blocked_by_ids.into_iter().next();
+      let is_blocking = blocking.is_blocking;
 
       phase_map.entry(phase).or_default().push(TaskRow {
         blocked_by,

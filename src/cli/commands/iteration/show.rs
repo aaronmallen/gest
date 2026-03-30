@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::{
   cli::{self, AppContext},
-  model::link::RelationshipType,
+  model::task::Status,
   store,
   ui::{composites::iteration_detail::TaskCounts, views::iteration::IterationDetailView},
 };
@@ -51,16 +51,16 @@ impl Command {
           phase_set.insert(phase);
         }
 
-        let is_blocked = task.links.iter().any(|l| l.rel == RelationshipType::BlockedBy);
+        let resolved = store::resolve_blocking(data_dir, &task);
 
-        if is_blocked {
+        if !resolved.blocked_by_ids.is_empty() {
           counts.blocked += 1;
         } else {
           match task.status {
-            crate::model::task::Status::Open => counts.open += 1,
-            crate::model::task::Status::InProgress => counts.in_progress += 1,
-            crate::model::task::Status::Done => counts.done += 1,
-            crate::model::task::Status::Cancelled => counts.done += 1,
+            Status::Open => counts.open += 1,
+            Status::InProgress => counts.in_progress += 1,
+            Status::Done => counts.done += 1,
+            Status::Cancelled => counts.done += 1,
           }
         }
       }
@@ -134,6 +134,42 @@ mod tests {
       iteration.tasks = vec!["tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string()];
       store::write_iteration(&ctx.data_dir, &iteration).unwrap();
 
+      let cmd = Command {
+        id: "zyxw".to_string(),
+        json: false,
+      };
+
+      cmd.call(&ctx).unwrap();
+    }
+
+    #[test]
+    fn it_does_not_count_blocked_by_done_task_as_blocked() {
+      use crate::model::{
+        link::{Link, RelationshipType},
+        task::Status,
+      };
+
+      let dir = tempfile::tempdir().unwrap();
+      let ctx = make_test_context(dir.path());
+
+      // Create a blocker task that is already done
+      let mut blocker = make_test_task("llllllllllllllllllllllllllllllll");
+      blocker.status = Status::Done;
+      store::write_task(&ctx.data_dir, &blocker).unwrap();
+
+      // Create a task that is blocked-by the done blocker
+      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      task.links = vec![Link {
+        ref_: "llllllllllllllllllllllllllllllll".to_string(),
+        rel: RelationshipType::BlockedBy,
+      }];
+      store::write_task(&ctx.data_dir, &task).unwrap();
+
+      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      iteration.tasks = vec!["tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string()];
+      store::write_iteration(&ctx.data_dir, &iteration).unwrap();
+
+      // The command should succeed and the task should be counted as open, not blocked
       let cmd = Command {
         id: "zyxw".to_string(),
         json: false,

@@ -17,17 +17,37 @@ pub fn ensure_dirs(data_dir: &Path) -> super::Result<()> {
   Ok(())
 }
 
-/// Collect file stems in `dir` whose names start with `prefix` and have the given extension.
-pub(crate) fn collect_prefix_matches(dir: &Path, extension: &str, prefix: &str) -> super::Result<Vec<String>> {
-  let mut matches = Vec::new();
+/// Result of scanning a directory for file stems matching a given prefix.
+///
+/// Only the first two matches are retained—enough to distinguish between
+/// "not found", "unique", and "ambiguous".
+enum PrefixMatch {
+  /// No files matched the prefix.
+  None,
+  /// Exactly one file matched.
+  Unique(String),
+  /// Two or more files matched (carries the first two for diagnostics).
+  Ambiguous(String, String),
+}
+
+/// Scan `dir` for file stems starting with `prefix` (with the given extension),
+/// returning as soon as two matches are found.
+fn collect_prefix_matches(dir: &Path, extension: &str, prefix: &str) -> super::Result<PrefixMatch> {
+  let mut first: Option<String> = None;
   for path in read_dir_files(dir, extension)? {
     if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
       && stem.starts_with(prefix)
     {
-      matches.push(stem.to_string());
+      match first {
+        None => first = Some(stem.to_string()),
+        Some(ref f) => return Ok(PrefixMatch::Ambiguous(f.clone(), stem.to_string())),
+      }
     }
   }
-  Ok(matches)
+  Ok(match first {
+    Some(s) => PrefixMatch::Unique(s),
+    None => PrefixMatch::None,
+  })
 }
 
 /// Write `content` to `dest` and remove `src` if it exists, ensuring store dirs first.
@@ -71,34 +91,25 @@ pub(crate) fn resolve_id(
   include_secondary: bool,
   hint: &str,
 ) -> super::Result<Id> {
-  let active_matches = collect_prefix_matches(primary_dir, extension, prefix)?;
-
-  match active_matches.len() {
-    1 => {
-      return active_matches[0].parse().map_err(|e: String| Error::generic(e));
-    }
-    n if n > 1 => {
-      let ids = active_matches.join(", ");
+  match collect_prefix_matches(primary_dir, extension, prefix)? {
+    PrefixMatch::Unique(id) => return id.parse().map_err(|e: String| Error::generic(e)),
+    PrefixMatch::Ambiguous(a, b) => {
       return Err(Error::generic(format!(
-        "Ambiguous ID prefix '{prefix}', matches: {ids}"
+        "Ambiguous ID prefix '{prefix}', matches: {a}, {b}"
       )));
     }
-    _ => {}
+    PrefixMatch::None => {}
   }
 
   if include_secondary && let Some(secondary) = secondary_dir {
-    let secondary_matches = collect_prefix_matches(secondary, extension, prefix)?;
-    match secondary_matches.len() {
-      0 => {}
-      1 => {
-        return secondary_matches[0].parse().map_err(|e: String| Error::generic(e));
-      }
-      _ => {
-        let ids = secondary_matches.join(", ");
+    match collect_prefix_matches(secondary, extension, prefix)? {
+      PrefixMatch::Unique(id) => return id.parse().map_err(|e: String| Error::generic(e)),
+      PrefixMatch::Ambiguous(a, b) => {
         return Err(Error::generic(format!(
-          "Ambiguous ID prefix '{prefix}', matches: {ids}"
+          "Ambiguous ID prefix '{prefix}', matches: {a}, {b}"
         )));
       }
+      PrefixMatch::None => {}
     }
   }
 

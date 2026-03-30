@@ -43,7 +43,12 @@ impl Command {
       .iter()
       .map(|l| {
         let rel = l.rel.to_string();
-        let target = l.ref_.rsplit('/').next().unwrap_or(&l.ref_).to_string();
+        let full = l.ref_.rsplit('/').next().unwrap_or(&l.ref_);
+        let target = if full.len() > 8 {
+          full[..8].to_string()
+        } else {
+          full.to_string()
+        };
         (rel, target)
       })
       .collect();

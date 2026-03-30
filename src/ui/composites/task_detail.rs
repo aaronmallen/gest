@@ -189,7 +189,7 @@ impl Display for TaskDetail<'_> {
           f,
           "{INDENT}{label}{GAP}{} {}",
           relation.paint(self.theme.indicator_blocked_by_label),
-          id.paint(self.theme.indicator_blocked_by_id),
+          Id::new(id, self.theme),
         )?;
       }
     }

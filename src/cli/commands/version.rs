@@ -29,11 +29,12 @@ impl Command {
       }
     });
 
+    let platform = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
     let mut banner = Banner::new(
       env!("CARGO_PKG_VERSION"),
-      std::env::consts::OS,
-      "",
-      "",
+      &platform,
+      env!("BUILD_DATE"),
+      env!("GIT_SHA"),
       "aaronmallen",
       &ctx.theme,
     );

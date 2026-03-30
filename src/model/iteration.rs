@@ -77,6 +77,14 @@ pub enum Status {
 }
 
 impl Status {
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      Self::Active => "active",
+      Self::Completed => "completed",
+      Self::Failed => "failed",
+    }
+  }
+
   pub fn is_terminal(&self) -> bool {
     matches!(self, Self::Completed | Self::Failed)
   }
@@ -84,12 +92,7 @@ impl Status {
 
 impl Display for Status {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-    let s = match self {
-      Self::Active => "active",
-      Self::Completed => "completed",
-      Self::Failed => "failed",
-    };
-    f.write_str(s)
+    f.write_str(self.as_str())
   }
 }
 

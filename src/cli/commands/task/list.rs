@@ -64,7 +64,7 @@ impl Command {
       .iter()
       .enumerate()
       .map(|(i, t)| TaskViewData {
-        status: status_str(&t.status),
+        status: t.status.as_str(),
         id: &id_strings[i],
         title: &t.title,
         priority: t.priority,
@@ -77,16 +77,6 @@ impl Command {
     println!("{}", TaskListView::new(view_data, theme));
 
     Ok(())
-  }
-}
-
-/// Map a [`Status`] variant to its lowercase CLI representation.
-fn status_str(status: &Status) -> &'static str {
-  match status {
-    Status::Open => "open",
-    Status::InProgress => "in-progress",
-    Status::Done => "done",
-    Status::Cancelled => "cancelled",
   }
 }
 

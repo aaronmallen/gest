@@ -31,12 +31,7 @@ impl Command {
     }
 
     let id_str = task.id.to_string();
-    let status_str = match task.status {
-      crate::model::task::Status::Open => "open",
-      crate::model::task::Status::InProgress => "in-progress",
-      crate::model::task::Status::Done => "done",
-      crate::model::task::Status::Cancelled => "cancelled",
-    };
+    let status_str = task.status.as_str();
 
     let link_strings: Vec<(String, String)> = task
       .links

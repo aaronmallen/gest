@@ -4,7 +4,6 @@ use clap::Args;
 
 use crate::{
   cli::{self, AppContext},
-  model::task::Status,
   store,
   ui::{
     composites::{artifact_list_row::ArtifactListRow, task_list_row::TaskListRow},
@@ -63,12 +62,7 @@ fn build_search_items(data_dir: &Path, results: &store::SearchResults, theme: &T
 
   for task in &results.tasks {
     let id_str = task.id.to_string();
-    let status_str = match task.status {
-      Status::Open => "open",
-      Status::InProgress => "in-progress",
-      Status::Done => "done",
-      Status::Cancelled => "cancelled",
-    };
+    let status_str = task.status.as_str();
 
     let resolved = store::resolve_blocking(data_dir, task);
     let blocked_by = resolved.blocked_by_ids.first().map(String::as_str);

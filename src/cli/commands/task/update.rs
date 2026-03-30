@@ -81,12 +81,7 @@ impl Command {
     let id_str = task.id.to_string();
 
     let status_str = if self.status.is_some() {
-      Some(match task.status {
-        Status::Open => "open",
-        Status::InProgress => "in-progress",
-        Status::Done => "done",
-        Status::Cancelled => "cancelled",
-      })
+      Some(task.status.as_str())
     } else {
       None
     };

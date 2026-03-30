@@ -45,12 +45,7 @@ impl Command {
         && let Ok(task) = store::read_task(data_dir, &task_id)
       {
         let phase = task.phase.unwrap_or(0);
-        let status_str = match task.status {
-          crate::model::task::Status::Open => "open",
-          crate::model::task::Status::InProgress => "in-progress",
-          crate::model::task::Status::Done => "done",
-          crate::model::task::Status::Cancelled => "cancelled",
-        };
+        let status_str = task.status.as_str();
 
         let resolved = store::resolve_blocking(data_dir, &task);
 

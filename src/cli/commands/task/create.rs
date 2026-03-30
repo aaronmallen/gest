@@ -78,12 +78,7 @@ impl Command {
 
     let task = store::create_task(data_dir, new)?;
 
-    let status_str = match task.status {
-      Status::Open => "open",
-      Status::InProgress => "in-progress",
-      Status::Done => "done",
-      Status::Cancelled => "cancelled",
-    };
+    let status_str = task.status.as_str();
     let fields = vec![("title", task.title.clone())];
 
     let view = TaskCreateView {

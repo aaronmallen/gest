@@ -26,7 +26,7 @@ impl Command {
     let id = store::resolve_iteration_id(data_dir, &self.id, false)?;
     let mut iteration = store::read_iteration(data_dir, &id)?;
 
-    set_dot_path(&mut iteration.metadata, &self.path, &self.value)?;
+    store::meta::set_dot_path(&mut iteration.metadata, &self.path, &self.value);
 
     iteration.updated_at = Utc::now();
     store::write_iteration(data_dir, &iteration)?;
@@ -34,57 +34,6 @@ impl Command {
     let msg = format!("Set {}.{} = {}", id, self.path, self.value);
     println!("{}", SuccessMessage::new(&msg, theme));
     Ok(())
-  }
-}
-
-/// Auto-detect the TOML type of a string value (integer, float, boolean, or string).
-fn parse_toml_value(s: &str) -> toml::Value {
-  if let Ok(n) = s.parse::<i64>() {
-    return toml::Value::Integer(n);
-  }
-  if let Ok(n) = s.parse::<f64>() {
-    return toml::Value::Float(n);
-  }
-  match s {
-    "true" => toml::Value::Boolean(true),
-    "false" => toml::Value::Boolean(false),
-    _ => toml::Value::String(s.to_string()),
-  }
-}
-
-/// Insert a value at a dot-delimited path, creating intermediate tables as needed.
-fn set_dot_path(table: &mut toml::Table, path: &str, value: &str) -> cli::Result<()> {
-  let segments: Vec<&str> = path.split('.').collect();
-  let toml_value = parse_toml_value(value);
-
-  if segments.len() == 1 {
-    table.insert(segments[0].to_string(), toml_value);
-    return Ok(());
-  }
-
-  set_nested(table, &segments, toml_value);
-  Ok(())
-}
-
-/// Recursively descend into nested tables, inserting the value at the final segment.
-fn set_nested(table: &mut toml::Table, segments: &[&str], value: toml::Value) {
-  let key = segments[0].to_string();
-
-  if segments.len() == 1 {
-    table.insert(key, value);
-    return;
-  }
-
-  let nested = table
-    .entry(&key)
-    .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-
-  if let toml::Value::Table(t) = nested {
-    set_nested(t, &segments[1..], value);
-  } else {
-    let mut new_table = toml::Table::new();
-    set_nested(&mut new_table, &segments[1..], value);
-    table.insert(key, toml::Value::Table(new_table));
   }
 }
 

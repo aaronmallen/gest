@@ -21,48 +21,12 @@ impl Command {
     let id = store::resolve_task_id(data_dir, &self.id, false)?;
     let task = store::read_task(data_dir, &id)?;
 
-    let value = resolve_dot_path(&toml::Value::Table(task.metadata), &self.path)
+    let value = store::meta::resolve_dot_path(&toml::Value::Table(task.metadata), &self.path)
       .ok_or_else(|| cli::Error::generic(format!("Metadata key not found: '{}'", self.path)))?;
 
-    print_toml_value(&value);
+    store::meta::print_toml_value(&value);
     Ok(())
   }
-}
-
-/// Print a TOML value in a human-readable format (JSON for nested structures).
-fn print_toml_value(value: &toml::Value) {
-  match value {
-    toml::Value::String(s) => println!("{s}"),
-    toml::Value::Boolean(b) => println!("{b}"),
-    toml::Value::Integer(n) => println!("{n}"),
-    toml::Value::Float(n) => println!("{n}"),
-    toml::Value::Datetime(dt) => println!("{dt}"),
-    toml::Value::Array(arr) => {
-      let json = serde_json::to_string_pretty(arr).unwrap_or_else(|_| format!("{arr:?}"));
-      println!("{json}");
-    }
-    toml::Value::Table(t) => {
-      let json = serde_json::to_string_pretty(t).unwrap_or_else(|_| format!("{t:?}"));
-      println!("{json}");
-    }
-  }
-}
-
-/// Walk a dot-delimited path through nested TOML tables, returning the leaf value.
-fn resolve_dot_path(root: &toml::Value, path: &str) -> Option<toml::Value> {
-  let segments: Vec<&str> = path.split('.').collect();
-  let mut current = root.clone();
-
-  for segment in &segments {
-    match current {
-      toml::Value::Table(t) => {
-        current = t.get(*segment)?.clone();
-      }
-      _ => return None,
-    }
-  }
-
-  Some(current)
 }
 
 #[cfg(test)]
@@ -103,37 +67,6 @@ mod tests {
         path: "priority".to_string(),
       };
       cmd.call(&ctx).unwrap();
-    }
-  }
-
-  mod resolve_dot_path {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_resolves_nested_key() {
-      let mut inner = toml::Table::new();
-      inner.insert("nested".to_string(), toml::Value::String("deep".to_string()));
-      let mut table = toml::Table::new();
-      table.insert("outer".to_string(), toml::Value::Table(inner));
-      let result = resolve_dot_path(&toml::Value::Table(table), "outer.nested");
-      assert_eq!(result, Some(toml::Value::String("deep".to_string())));
-    }
-
-    #[test]
-    fn it_resolves_top_level_key() {
-      let mut table = toml::Table::new();
-      table.insert("key".to_string(), toml::Value::String("value".to_string()));
-      let result = resolve_dot_path(&toml::Value::Table(table), "key");
-      assert_eq!(result, Some(toml::Value::String("value".to_string())));
-    }
-
-    #[test]
-    fn it_returns_none_for_missing_key() {
-      let table = toml::Table::new();
-      let result = resolve_dot_path(&toml::Value::Table(table), "missing");
-      assert_eq!(result, None);
     }
   }
 }

@@ -5,6 +5,7 @@
 mod artifact;
 mod fs;
 mod iteration;
+pub mod meta;
 mod search;
 mod task;
 

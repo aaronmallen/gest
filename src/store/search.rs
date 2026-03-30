@@ -33,10 +33,11 @@ pub fn search(data_dir: &Path, query: &str, show_all: bool) -> super::Result<Sea
         || task.description.to_lowercase().contains(&query_lower)
         || task.tags.iter().any(|t| t.to_lowercase().contains(&query_lower))
         || task.status.to_string().to_lowercase().contains(&query_lower)
-        || toml::to_string(&task.metadata)
-          .unwrap_or_default()
-          .to_lowercase()
-          .contains(&query_lower)
+        || (!task.metadata.is_empty()
+          && toml::to_string(&task.metadata)
+            .unwrap_or_default()
+            .to_lowercase()
+            .contains(&query_lower))
     })
     .collect();
 
@@ -52,10 +53,11 @@ pub fn search(data_dir: &Path, query: &str, show_all: bool) -> super::Result<Sea
           .unwrap_or("")
           .to_lowercase()
           .contains(&query_lower)
-        || yaml_serde::to_string(&artifact.metadata)
-          .unwrap_or_default()
-          .to_lowercase()
-          .contains(&query_lower)
+        || (!artifact.metadata.is_empty()
+          && yaml_serde::to_string(&artifact.metadata)
+            .unwrap_or_default()
+            .to_lowercase()
+            .contains(&query_lower))
     })
     .collect();
 

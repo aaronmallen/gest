@@ -4,7 +4,7 @@ use yansi::Paint;
 
 use crate::ui::{
   atoms::{badge::Badge, icon::Icon, id::Id, title::Title},
-  composites::status_badge::StatusBadge,
+  composites::{indicators::Indicators, status_badge::StatusBadge},
   layout::Row,
   theme::Theme,
   utils,
@@ -150,6 +150,14 @@ impl<'a> IterationGraph<'a> {
     );
 
     row = row.col(self.status_badge(task));
+
+    let indicators = Indicators::new(self.theme)
+      .blocking(task.is_blocking)
+      .blocked_by(task.blocked_by.into_iter().collect());
+    let indicators_str = indicators.to_string();
+    if !indicators_str.is_empty() {
+      row = row.col(indicators_str);
+    }
 
     write!(f, "  {row}")
   }

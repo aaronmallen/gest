@@ -1,3 +1,22 @@
 # gest version
 
-<!-- Content will be added in a subsequent task -->
+Print the current version, platform info, and check for available updates.
+
+## Usage
+
+```
+gest version
+```
+
+## Options
+
+| Flag | Description |
+|------|-------------|
+| `-v, --verbose` | Increase verbosity (repeatable) |
+| `-h, --help` | Print help |
+
+## Examples
+
+```sh
+gest version
+```

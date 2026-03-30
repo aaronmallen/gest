@@ -1,10 +1,8 @@
 use std::fmt::{self, Display, Formatter};
 
-use yansi::Paint;
-
 use crate::ui::{
   atoms::{badge::Badge, icon::Icon, id::Id, tag::Tags, title::Title},
-  composites::status_badge::StatusBadge,
+  composites::{indicators::Indicators, status_badge::StatusBadge},
   layout::Row,
   theme::Theme,
   utils,
@@ -102,20 +100,11 @@ impl<'a> TaskListRow<'a> {
 
   /// Returns the rendered blocking info string for this row.
   pub fn blocking_info_string(&self) -> String {
-    let mut parts: Vec<String> = Vec::new();
-
-    if self.blocking {
-      let icon = Icon::blocking(self.theme);
-      parts.push(Badge::new(format!("{icon} blocking"), self.theme.indicator_blocking).to_string());
-    }
-
-    if let Some(blocker_id) = self.blocked_by {
-      let label = "blocked-by".paint(self.theme.indicator_blocked_by_label);
-      let id = Id::new(blocker_id, self.theme);
-      parts.push(format!("{label} {id}"));
-    }
-
-    parts.join("  ")
+    let blocked_by = self.blocked_by.into_iter().collect();
+    Indicators::new(self.theme)
+      .blocking(self.blocking)
+      .blocked_by(blocked_by)
+      .to_string()
   }
 
   /// Returns the display width of the blocking info for this row.

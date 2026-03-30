@@ -2,7 +2,10 @@ use std::fmt::{self, Display, Formatter};
 
 use yansi::Paint;
 
-use crate::ui::theme::Theme;
+use crate::ui::{
+  atoms::{icon::Icon, id::Id},
+  theme::Theme,
+};
 
 /// Renders inline blocked/blocking status indicators for a task.
 pub struct Indicators<'a> {
@@ -37,19 +40,16 @@ impl Display for Indicators<'_> {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     let mut parts = Vec::new();
 
-    if !self.blocked_by.is_empty() {
-      parts.push(format!("{}", "⊗ blocked".paint(self.theme.indicator_blocked)));
-      for id in &self.blocked_by {
-        parts.push(format!(
-          "{}{}",
-          "blocked-by ".paint(self.theme.indicator_blocked_by_label),
-          id.paint(self.theme.indicator_blocked_by_id),
-        ));
-      }
+    if self.is_blocking {
+      let icon = Icon::blocking(self.theme);
+      let label = "blocking".paint(self.theme.indicator_blocking);
+      parts.push(format!("{icon} {label}"));
     }
 
-    if self.is_blocking {
-      parts.push(format!("{}", "! blocking".paint(self.theme.indicator_blocking)));
+    for id in &self.blocked_by {
+      let label = "blocked-by".paint(self.theme.indicator_blocked_by_label);
+      let id = Id::new(id, self.theme);
+      parts.push(format!("{label} {id}"));
     }
 
     write!(f, "{}", parts.join("  "))
@@ -64,37 +64,46 @@ mod tests {
     Theme::default()
   }
 
+  fn render(indicators: &Indicators) -> String {
+    yansi::disable();
+    let out = indicators.to_string();
+    yansi::enable();
+    out
+  }
+
   #[test]
   fn it_renders_blocked_by_one_id() {
     let t = theme();
-    let rendered = format!("{}", Indicators::new(&t).blocked_by(vec!["hpvrlbme"]));
-    assert!(rendered.contains("⊗ blocked"));
-    assert!(rendered.contains("blocked-by"));
-    assert!(rendered.contains("hpvrlbme"));
+    let indicators = Indicators::new(&t).blocked_by(vec!["hpvrlbme"]);
+    let output = render(&indicators);
+    assert!(output.contains("blocked-by"));
+    assert!(output.contains("hpvrlbme"));
   }
 
   #[test]
   fn it_renders_blocking_only() {
     let t = theme();
-    let rendered = format!("{}", Indicators::new(&t).blocking(true));
-    assert!(rendered.contains("! blocking"));
-    assert!(!rendered.contains("blocked-by"));
+    let indicators = Indicators::new(&t).blocking(true);
+    let output = render(&indicators);
+    assert!(output.contains("! blocking"));
+    assert!(!output.contains("blocked-by"));
   }
 
   #[test]
   fn it_renders_both_blocked_and_blocking() {
     let t = theme();
-    let rendered = format!("{}", Indicators::new(&t).blocked_by(vec!["abc12345"]).blocking(true));
-    assert!(rendered.contains("⊗ blocked"));
-    assert!(rendered.contains("blocked-by"));
-    assert!(rendered.contains("abc12345"));
-    assert!(rendered.contains("! blocking"));
+    let indicators = Indicators::new(&t).blocked_by(vec!["abc12345"]).blocking(true);
+    let output = render(&indicators);
+    assert!(output.contains("blocked-by"));
+    assert!(output.contains("abc12345"));
+    assert!(output.contains("! blocking"));
   }
 
   #[test]
   fn it_renders_empty_string_for_no_indicators() {
     let t = theme();
-    let rendered = format!("{}", Indicators::new(&t));
-    assert_eq!(rendered, "");
+    let indicators = Indicators::new(&t);
+    let output = render(&indicators);
+    assert_eq!(output, "");
   }
 }

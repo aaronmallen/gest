@@ -25,7 +25,7 @@ impl Command {
     let task = store::read_task(data_dir, &id)?;
 
     if self.json {
-      let json = serde_json::to_string_pretty(&task).map_err(|e| cli::Error::generic(e.to_string()))?;
+      let json = serde_json::to_string_pretty(&task)?;
       println!("{json}");
       return Ok(());
     }

@@ -39,7 +39,7 @@ impl Command {
         "tasks": results.tasks,
         "artifacts": results.artifacts,
       });
-      let json = serde_json::to_string_pretty(&json_value).map_err(|e| cli::Error::generic(e.to_string()))?;
+      let json = serde_json::to_string_pretty(&json_value)?;
       println!("{json}");
       return Ok(());
     }

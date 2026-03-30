@@ -45,7 +45,7 @@ impl Command {
     let artifacts = store::list_artifacts(data_dir, &filter)?;
 
     if self.json {
-      let json = serde_json::to_string_pretty(&artifacts).map_err(|e| cli::Error::generic(e.to_string()))?;
+      let json = serde_json::to_string_pretty(&artifacts)?;
       println!("{json}");
       return Ok(());
     }

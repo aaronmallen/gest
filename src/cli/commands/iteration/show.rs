@@ -26,7 +26,7 @@ impl Command {
     let iteration = store::read_iteration(data_dir, &id)?;
 
     if self.json {
-      let json = serde_json::to_string_pretty(&iteration).map_err(|e| cli::Error::generic(e.to_string()))?;
+      let json = serde_json::to_string_pretty(&iteration)?;
       println!("{json}");
       return Ok(());
     }

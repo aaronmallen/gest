@@ -6,6 +6,7 @@ use crate::ui::{
   atoms::{badge::Badge, icon::Icon, id::Id, tag::Tags, title::Title},
   layout::Row,
   theme::Theme,
+  utils,
 };
 
 /// Max display width for task titles in list rows.
@@ -15,9 +16,11 @@ const TITLE_PAD: usize = 35;
 pub struct TaskListRow<'a> {
   blocked_by: Option<&'a str>,
   blocking: bool,
+  blocking_pad: usize,
   id: &'a str,
   priority: Option<u8>,
   status: &'a str,
+  status_pad: usize,
   tags: &'a [String],
   theme: &'a Theme,
   title_text: &'a str,
@@ -33,6 +36,8 @@ impl<'a> TaskListRow<'a> {
       tags: &[],
       blocking: false,
       blocked_by: None,
+      blocking_pad: 0,
+      status_pad: 0,
       theme,
     }
   }
@@ -55,10 +60,55 @@ impl<'a> TaskListRow<'a> {
     self
   }
 
+  /// Sets minimum display width for the blocking info column.
+  pub fn blocking_pad(mut self, w: usize) -> Self {
+    self.blocking_pad = w;
+    self
+  }
+
+  /// Sets minimum display width for the status badge column.
+  pub fn status_pad(mut self, w: usize) -> Self {
+    self.status_pad = w;
+    self
+  }
+
   /// Sets the tags to append after the status badge.
   pub fn tags(mut self, t: &'a [String]) -> Self {
     self.tags = t;
     self
+  }
+
+  /// Returns the rendered blocking info string for this row.
+  pub fn blocking_info_string(&self) -> String {
+    let mut parts: Vec<String> = Vec::new();
+
+    if self.blocking {
+      let icon = Icon::blocking(self.theme);
+      parts.push(Badge::new(format!("{icon} blocking"), self.theme.indicator_blocking).to_string());
+    }
+
+    if let Some(blocker_id) = self.blocked_by {
+      let label = "blocked-by".paint(self.theme.indicator_blocked_by_label);
+      let id = Id::new(blocker_id, self.theme);
+      parts.push(format!("{label} {id}"));
+    }
+
+    parts.join("  ")
+  }
+
+  /// Returns the display width of the blocking info for this row.
+  pub fn blocking_info_width(&self) -> usize {
+    utils::display_width(&self.blocking_info_string())
+  }
+
+  /// Returns the rendered status badge string for this row.
+  pub fn status_badge_string(&self) -> String {
+    self.status_badge().to_string()
+  }
+
+  /// Returns the display width of the status badge for this row.
+  pub fn status_badge_width(&self) -> usize {
+    utils::display_width(&self.status_badge_string())
   }
 
   fn leading_icon(&self) -> Icon {
@@ -112,17 +162,20 @@ impl Display for TaskListRow<'_> {
 
     row = row.col(self.title());
 
-    row = row.col(self.status_badge());
-
-    if self.blocking {
-      let icon = Icon::blocking(self.theme);
-      row = row.col(Badge::new(format!("{icon} blocking"), self.theme.indicator_blocking));
+    let status_str = self.status_badge_string();
+    if self.status_pad > 0 {
+      let pad = self.status_pad.saturating_sub(utils::display_width(&status_str));
+      row = row.col(format!("{status_str}{}", " ".repeat(pad)));
+    } else {
+      row = row.col(status_str);
     }
 
-    if let Some(blocker_id) = self.blocked_by {
-      let label = "blocked-by".paint(self.theme.indicator_blocked_by_label);
-      let id = Id::new(blocker_id, self.theme);
-      row = row.col(format!("{label} {id}"));
+    let blocking_str = self.blocking_info_string();
+    if self.blocking_pad > 0 {
+      let pad = self.blocking_pad.saturating_sub(utils::display_width(&blocking_str));
+      row = row.col(format!("{blocking_str}{}", " ".repeat(pad)));
+    } else if !blocking_str.is_empty() {
+      row = row.col(blocking_str);
     }
 
     if !self.tags.is_empty() {

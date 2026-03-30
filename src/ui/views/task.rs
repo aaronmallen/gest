@@ -97,7 +97,7 @@ impl<'a> TaskListView<'a> {
 
 impl Display for TaskListView<'_> {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-    let rows: Vec<String> = self
+    let proto_rows: Vec<TaskListRow> = self
       .tasks
       .iter()
       .map(|t| {
@@ -106,8 +106,15 @@ impl Display for TaskListView<'_> {
           .tags(t.tags)
           .blocking(t.is_blocking)
           .blocked_by(t.blocked_by)
-          .to_string()
       })
+      .collect();
+
+    let max_status = proto_rows.iter().map(|r| r.status_badge_width()).max().unwrap_or(0);
+    let max_blocking = proto_rows.iter().map(|r| r.blocking_info_width()).max().unwrap_or(0);
+
+    let rows: Vec<String> = proto_rows
+      .into_iter()
+      .map(|r| r.status_pad(max_status).blocking_pad(max_blocking).to_string())
       .collect();
 
     let list = GroupedList::new("tasks", self.summary(), self.theme).rows(rows);

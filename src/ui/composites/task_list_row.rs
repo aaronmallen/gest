@@ -20,6 +20,7 @@ pub struct TaskListRow<'a> {
   blocking_pad: usize,
   id: &'a str,
   priority: Option<u8>,
+  priority_pad: usize,
   status: &'a str,
   status_pad: usize,
   tags: &'a [String],
@@ -34,6 +35,7 @@ impl<'a> TaskListRow<'a> {
       id,
       title_text,
       priority: None,
+      priority_pad: 0,
       tags: &[],
       blocking: false,
       blocked_by: None,
@@ -61,9 +63,28 @@ impl<'a> TaskListRow<'a> {
     self
   }
 
+  /// Returns the rendered priority badge string for this row.
+  pub fn priority_badge_string(&self) -> String {
+    match self.priority {
+      Some(p) => Badge::new(format!("[P{p}]"), self.theme.task_list_priority).to_string(),
+      None => String::new(),
+    }
+  }
+
+  /// Returns the display width of the priority badge for this row.
+  pub fn priority_badge_width(&self) -> usize {
+    utils::display_width(&self.priority_badge_string())
+  }
+
   /// Sets minimum display width for the blocking info column.
   pub fn blocking_pad(mut self, w: usize) -> Self {
     self.blocking_pad = w;
+    self
+  }
+
+  /// Sets minimum display width for the priority badge column.
+  pub fn priority_pad(mut self, w: usize) -> Self {
+    self.priority_pad = w;
     self
   }
 
@@ -149,8 +170,12 @@ impl Display for TaskListRow<'_> {
 
     row = row.col(Id::new(self.id, self.theme));
 
-    if let Some(p) = self.priority {
-      row = row.col(Badge::new(format!("[P{p}]"), self.theme.task_list_priority));
+    let priority_str = self.priority_badge_string();
+    if self.priority_pad > 0 {
+      let pad = self.priority_pad.saturating_sub(utils::display_width(&priority_str));
+      row = row.col(format!("{priority_str}{}", " ".repeat(pad)));
+    } else if !priority_str.is_empty() {
+      row = row.col(priority_str);
     }
 
     row = row.col(self.title());
@@ -258,6 +283,38 @@ mod tests {
     assert!(output.contains("nfkbqmrx"));
     assert!(output.contains("[P1]"));
     assert!(output.contains("in progress"));
+  }
+
+  #[test]
+  fn it_reserves_priority_slot_when_padded() {
+    let theme = theme();
+    let with_priority = TaskListRow::new("open", "aaaaaaaa", "has priority", &theme)
+      .priority(Some(1))
+      .priority_pad(4);
+    let without_priority = TaskListRow::new("open", "bbbbbbbb", "no priority", &theme).priority_pad(4);
+
+    let out_with = render(&with_priority);
+    let out_without = render(&without_priority);
+
+    assert!(out_with.contains("[P1]"), "should contain priority badge");
+    assert!(!out_without.contains("[P"), "should not contain priority badge");
+
+    let title_pos_with = out_with.find("has priority").unwrap();
+    let title_pos_without = out_without.find("no priority").unwrap();
+    assert_eq!(
+      title_pos_with, title_pos_without,
+      "titles should align when priority_pad is set"
+    );
+  }
+
+  #[test]
+  fn it_omits_priority_column_when_pad_is_zero() {
+    let theme = theme();
+    let row = TaskListRow::new("open", "aaaaaaaa", "no priority", &theme);
+    let output = render(&row);
+
+    assert_eq!(row.priority_badge_width(), 0, "width should be zero with no priority");
+    assert!(!output.contains("  [P"), "should not contain priority column");
   }
 
   #[test]

@@ -7,6 +7,7 @@ use crate::ui::{
   composites::status_badge::StatusBadge,
   layout::Row,
   theme::Theme,
+  utils,
 };
 
 /// Max display width for task titles in graph rows.
@@ -104,6 +105,7 @@ impl<'a> IterationGraph<'a> {
     task: &TaskData<'_>,
     task_idx: usize,
     total_tasks: usize,
+    priority_pad: usize,
     f: &mut Formatter<'_>,
   ) -> fmt::Result {
     let branch = self.theme.iteration_graph_branch;
@@ -128,8 +130,12 @@ impl<'a> IterationGraph<'a> {
 
     row = row.col(Id::new(task.id, self.theme));
 
-    if let Some(p) = task.priority {
-      row = row.col(Badge::new(format!("[P{p}]"), self.theme.task_list_priority));
+    let priority_str = self.priority_badge_string(task);
+    if priority_pad > 0 {
+      let pad = priority_pad.saturating_sub(utils::display_width(&priority_str));
+      row = row.col(format!("{priority_str}{}", " ".repeat(pad)));
+    } else if !priority_str.is_empty() {
+      row = row.col(priority_str);
     }
 
     let title_style = if task.status == "cancelled" {
@@ -150,6 +156,13 @@ impl<'a> IterationGraph<'a> {
 
   fn fmt_title(&self, f: &mut Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.title.paint(self.theme.iteration_graph_title))
+  }
+
+  fn priority_badge_string(&self, task: &TaskData<'_>) -> String {
+    match task.priority {
+      Some(p) => Badge::new(format!("[P{p}]"), self.theme.task_list_priority).to_string(),
+      None => String::new(),
+    }
   }
 
   fn status_badge<'b>(&self, task: &TaskData<'b>) -> StatusBadge<'b>
@@ -192,8 +205,15 @@ impl Display for IterationGraph<'_> {
         writeln!(f)?;
       }
 
+      let max_priority = phase
+        .tasks
+        .iter()
+        .map(|t| utils::display_width(&self.priority_badge_string(t)))
+        .max()
+        .unwrap_or(0);
+
       for (ti, task) in phase.tasks.iter().enumerate() {
-        self.fmt_task_row(task, ti, task_count, f)?;
+        self.fmt_task_row(task, ti, task_count, max_priority, f)?;
         writeln!(f)?;
       }
 
@@ -498,6 +518,47 @@ mod tests {
     assert!(output.contains("1 phase"), "should use singular 'phase'");
     assert!(output.contains("1 task"), "should use singular 'task'");
     assert!(!output.contains("1 phases"), "should not use plural for 1");
+  }
+
+  #[test]
+  fn it_aligns_titles_with_mixed_priorities() {
+    let t = theme();
+    let graph = IterationGraph {
+      title: "Mixed priority test",
+      phases: vec![PhaseData {
+        number: 1,
+        name: Some("mixed"),
+        tasks: vec![
+          TaskData {
+            status: "done",
+            id: "aaaaaaaa",
+            title: "has priority",
+            priority: Some(1),
+            tags: &[],
+            is_blocking: false,
+            blocked_by: None,
+          },
+          TaskData {
+            status: "open",
+            id: "bbbbbbbb",
+            title: "no priority",
+            priority: None,
+            tags: &[],
+            is_blocking: false,
+            blocked_by: None,
+          },
+        ],
+      }],
+      theme: &t,
+    };
+    let output = render(&graph);
+
+    let line_with = output.lines().find(|l| l.contains("has priority")).unwrap();
+    let line_without = output.lines().find(|l| l.contains("no priority")).unwrap();
+
+    let pos_with = line_with.find("has priority").unwrap();
+    let pos_without = line_without.find("no priority").unwrap();
+    assert_eq!(pos_with, pos_without, "titles should align when priorities are mixed");
   }
 
   #[test]

@@ -113,12 +113,18 @@ impl Display for TaskListView<'_> {
       })
       .collect();
 
+    let max_priority = proto_rows.iter().map(|r| r.priority_badge_width()).max().unwrap_or(0);
     let max_status = proto_rows.iter().map(|r| r.status_badge_width()).max().unwrap_or(0);
     let max_blocking = proto_rows.iter().map(|r| r.blocking_info_width()).max().unwrap_or(0);
 
     let rows: Vec<String> = proto_rows
       .into_iter()
-      .map(|r| r.status_pad(max_status).blocking_pad(max_blocking).to_string())
+      .map(|r| {
+        r.priority_pad(max_priority)
+          .status_pad(max_status)
+          .blocking_pad(max_blocking)
+          .to_string()
+      })
       .collect();
 
     let list = GroupedList::new("tasks", self.summary(), self.theme).rows(rows);

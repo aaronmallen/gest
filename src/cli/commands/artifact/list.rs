@@ -33,7 +33,7 @@ pub struct Command {
 impl Command {
   /// Fetch, filter, and display the artifact list (or JSON output).
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
     let filter = ArtifactFilter {
       kind: self.kind.clone(),
@@ -42,7 +42,7 @@ impl Command {
       tag: self.tag.clone(),
     };
 
-    let artifacts = store::list_artifacts(data_dir, &filter)?;
+    let artifacts = store::list_artifacts(layout, &filter)?;
 
     if self.json {
       let json = serde_json::to_string_pretty(&artifacts)?;
@@ -94,10 +94,10 @@ mod tests {
 
       let mut a1 = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       a1.tags = vec!["spec".to_string()];
-      store::write_artifact(&ctx.data_dir, &a1).unwrap();
+      store::write_artifact(&ctx.layout, &a1).unwrap();
 
       let a2 = make_test_artifact("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      store::write_artifact(&ctx.data_dir, &a2).unwrap();
+      store::write_artifact(&ctx.layout, &a2).unwrap();
 
       let cmd = Command {
         json: false,
@@ -132,8 +132,8 @@ mod tests {
       let ctx = make_test_context(dir.path());
 
       let a = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.data_dir, &a).unwrap();
-      store::archive_artifact(&ctx.data_dir, &a.id).unwrap();
+      store::write_artifact(&ctx.layout, &a).unwrap();
+      store::archive_artifact(&ctx.layout, &a.id).unwrap();
 
       let cmd = Command {
         json: false,
@@ -151,7 +151,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         json: false,
@@ -169,7 +169,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         json: true,

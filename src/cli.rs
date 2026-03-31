@@ -7,11 +7,15 @@ use std::path::PathBuf;
 
 use clap::{ArgAction, Parser, Subcommand};
 
-use crate::{config::Settings, ui::theme::Theme};
+use crate::{
+  config::{Settings, storage::DataLayout},
+  ui::theme::Theme,
+};
 
 /// Bundles all runtime context that commands need: resolved settings, theme, and data directory.
 pub(crate) struct AppContext {
   pub(crate) data_dir: PathBuf,
+  pub(crate) layout: DataLayout,
   pub(crate) settings: Settings,
   pub(crate) theme: Theme,
 }
@@ -62,8 +66,10 @@ impl Cli {
   fn call(&self, settings: Settings) -> Result<()> {
     if self.print_version {
       let theme = Theme::from_config(&settings);
+      let layout = DataLayout::new(settings.storage(), &PathBuf::new());
       let ctx = AppContext {
         data_dir: PathBuf::new(),
+        layout,
         settings,
         theme,
       };
@@ -87,8 +93,10 @@ impl Cli {
     log::debug!("log level set to {level}");
     log::debug!("data directory: {}", data_dir.display());
 
+    let layout = DataLayout::new(settings.storage(), &data_dir);
     let ctx = AppContext {
       data_dir,
+      layout,
       settings,
       theme,
     };

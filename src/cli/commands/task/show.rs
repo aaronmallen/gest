@@ -19,10 +19,10 @@ pub struct Command {
 impl Command {
   /// Resolve the task by ID prefix and render its detail view.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
-    let id = store::resolve_task_id(data_dir, &self.id, true)?;
-    let task = store::read_task(data_dir, &id)?;
+    let id = store::resolve_task_id(layout, &self.id, true)?;
+    let task = store::read_task(layout, &id)?;
 
     if self.json {
       let json = serde_json::to_string_pretty(&task)?;
@@ -98,8 +98,8 @@ mod tests {
         rel: RelationshipType::RelatesTo,
       }];
       task.title = "Test Task".to_string();
-      store::write_task(&ctx.data_dir, &task).unwrap();
-      store::resolve_task(&ctx.data_dir, &task.id).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
+      store::resolve_task(&ctx.layout, &task.id).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -114,7 +114,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.data_dir, &task).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -129,7 +129,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.data_dir, &task).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use chrono::Utc;
 
 use crate::{
-  config::Settings,
+  config::{Settings, storage::DataLayout},
   model::{Artifact, Iteration, Task, iteration, task::Status},
 };
 
@@ -31,12 +31,18 @@ pub fn make_test_config(data_dir: PathBuf) -> Settings {
 }
 
 /// Build an [`AppContext`] rooted at the given base directory with default theme and settings.
+pub fn make_test_layout(base: &std::path::Path) -> DataLayout {
+  DataLayout::new(&crate::config::storage::Settings::default(), base)
+}
+
 pub fn make_test_context(base: &std::path::Path) -> crate::cli::AppContext {
   let settings = make_test_config(base.to_path_buf());
   let data_dir = settings.storage().data_dir(base.to_path_buf()).unwrap();
+  let layout = DataLayout::new(settings.storage(), &data_dir);
   let theme = crate::ui::theme::Theme::default();
   crate::cli::AppContext {
     data_dir,
+    layout,
     settings,
     theme,
   }

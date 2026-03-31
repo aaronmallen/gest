@@ -29,9 +29,9 @@ pub struct Command {
 impl Command {
   /// Apply the provided patch fields to the artifact and print a summary of changes.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
-    let id = store::resolve_artifact_id(data_dir, &self.id, true)?;
+    let id = store::resolve_artifact_id(layout, &self.id, true)?;
 
     let tags = self.tags.as_deref().map(crate::cli::helpers::parse_tags);
 
@@ -43,7 +43,7 @@ impl Command {
       title: self.title.clone(),
     };
 
-    let artifact = store::update_artifact(data_dir, &id, patch)?;
+    let artifact = store::update_artifact(layout, &id, patch)?;
     let id_str = artifact.id.to_string();
 
     let mut msg = SuccessMessage::new("updated artifact", theme).id(&id_str);
@@ -77,7 +77,7 @@ mod tests {
       let ctx = make_test_context(dir.path());
       let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       artifact.body = "Old body".to_string();
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -89,7 +89,7 @@ mod tests {
 
       cmd.call(&ctx).unwrap();
 
-      let updated = store::read_artifact(&ctx.data_dir, &artifact.id).unwrap();
+      let updated = store::read_artifact(&ctx.layout, &artifact.id).unwrap();
       assert_eq!(updated.body, "New body");
     }
 
@@ -99,7 +99,7 @@ mod tests {
       let ctx = make_test_context(dir.path());
       let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       artifact.tags = vec!["old".to_string()];
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -111,7 +111,7 @@ mod tests {
 
       cmd.call(&ctx).unwrap();
 
-      let updated = store::read_artifact(&ctx.data_dir, &artifact.id).unwrap();
+      let updated = store::read_artifact(&ctx.layout, &artifact.id).unwrap();
       assert_eq!(updated.tags, vec!["new", "tags"]);
     }
 
@@ -122,7 +122,7 @@ mod tests {
       let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       artifact.title = "Original Title".to_string();
       artifact.body = "Original body".to_string();
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -134,7 +134,7 @@ mod tests {
 
       cmd.call(&ctx).unwrap();
 
-      let updated = store::read_artifact(&ctx.data_dir, &artifact.id).unwrap();
+      let updated = store::read_artifact(&ctx.layout, &artifact.id).unwrap();
       assert_eq!(updated.title, "New Title");
       assert_eq!(updated.body, "Original body");
     }

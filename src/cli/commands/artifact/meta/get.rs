@@ -17,9 +17,9 @@ pub struct Command {
 impl Command {
   /// Resolve the artifact, look up the metadata key, and print its value.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
-    let id = store::resolve_artifact_id(data_dir, &self.id, false)?;
-    let artifact = store::read_artifact(data_dir, &id)?;
+    let layout = &ctx.layout;
+    let id = store::resolve_artifact_id(layout, &self.id, false)?;
+    let artifact = store::read_artifact(layout, &id)?;
 
     let root = yaml_serde::Value::Mapping(artifact.metadata);
     let value = resolve_dot_path(&root, &self.path)
@@ -82,7 +82,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -101,7 +101,7 @@ mod tests {
         yaml_serde::Value::String("priority".to_string()),
         yaml_serde::Value::String("high".to_string()),
       );
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),

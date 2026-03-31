@@ -19,15 +19,15 @@ pub struct Command {
 impl Command {
   /// Remove the given tags from the artifact's tag list and persist.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
-    let id = store::resolve_artifact_id(data_dir, &self.id, false)?;
-    let mut artifact = store::read_artifact(data_dir, &id)?;
+    let id = store::resolve_artifact_id(layout, &self.id, false)?;
+    let mut artifact = store::read_artifact(layout, &id)?;
 
     super::super::tags::remove_tags(&mut artifact.tags, &self.tags);
 
     artifact.updated_at = Utc::now();
-    store::write_artifact(data_dir, &artifact)?;
+    store::write_artifact(layout, &artifact)?;
 
     let msg = format!("Untagged artifact {} from {}", id, self.tags.join(", "));
     println!("{}", SuccessMessage::new(&msg, theme));
@@ -51,7 +51,7 @@ mod tests {
       let ctx = make_test_context(dir.path());
       let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       artifact.tags = vec!["spec".to_string()];
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -59,7 +59,7 @@ mod tests {
       };
       cmd.call(&ctx).unwrap();
 
-      let loaded = store::read_artifact(&ctx.data_dir, &artifact.id).unwrap();
+      let loaded = store::read_artifact(&ctx.layout, &artifact.id).unwrap();
       assert_eq!(loaded.tags, vec!["spec".to_string()]);
     }
 
@@ -69,7 +69,7 @@ mod tests {
       let ctx = make_test_context(dir.path());
       let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       artifact.tags = vec!["spec".to_string(), "backend".to_string(), "keep".to_string()];
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -77,7 +77,7 @@ mod tests {
       };
       cmd.call(&ctx).unwrap();
 
-      let loaded = store::read_artifact(&ctx.data_dir, &artifact.id).unwrap();
+      let loaded = store::read_artifact(&ctx.layout, &artifact.id).unwrap();
       assert_eq!(loaded.tags, vec!["keep".to_string()]);
     }
   }

@@ -21,15 +21,15 @@ pub struct Command {
 impl Command {
   /// Resolve the artifact, set the metadata key to the given value, and persist.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
-    let id = store::resolve_artifact_id(data_dir, &self.id, false)?;
-    let mut artifact = store::read_artifact(data_dir, &id)?;
+    let id = store::resolve_artifact_id(layout, &self.id, false)?;
+    let mut artifact = store::read_artifact(layout, &id)?;
 
     set_dot_path(&mut artifact.metadata, &self.path, &self.value)?;
 
     artifact.updated_at = Utc::now();
-    store::write_artifact(data_dir, &artifact)?;
+    store::write_artifact(layout, &artifact)?;
 
     let msg = format!("Set {}.{} = {}", id, self.path, self.value);
     println!("{}", SuccessMessage::new(&msg, theme));
@@ -104,7 +104,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -113,7 +113,7 @@ mod tests {
       };
       cmd.call(&ctx).unwrap();
 
-      let loaded = store::read_artifact(&ctx.data_dir, &artifact.id).unwrap();
+      let loaded = store::read_artifact(&ctx.layout, &artifact.id).unwrap();
       assert_eq!(
         loaded.metadata.get(yaml_serde::Value::String("priority".to_string())),
         Some(&yaml_serde::Value::String("high".to_string()))
@@ -125,7 +125,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -134,7 +134,7 @@ mod tests {
       };
       cmd.call(&ctx).unwrap();
 
-      let loaded = store::read_artifact(&ctx.data_dir, &artifact.id).unwrap();
+      let loaded = store::read_artifact(&ctx.layout, &artifact.id).unwrap();
       let config_key = yaml_serde::Value::String("config".to_string());
       let config_val = loaded.metadata.get(config_key).unwrap();
       if let yaml_serde::Value::Mapping(m) = config_val {

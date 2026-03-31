@@ -29,7 +29,7 @@ pub struct Command {
 impl Command {
   /// Build a `NewIteration` from CLI args, persist it, and print confirmation.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
     let status = match &self.status {
       Some(s) => s.parse::<Status>().map_err(cli::Error::generic)?,
@@ -61,7 +61,7 @@ impl Command {
       title: self.title.clone(),
     };
 
-    let iteration = store::create_iteration(data_dir, new)?;
+    let iteration = store::create_iteration(layout, new)?;
 
     let msg = format!("Created iteration {}", iteration.id);
     println!("{}", SuccessMessage::new(&msg, theme));
@@ -95,7 +95,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let filter = IterationFilter::default();
-      let iterations = store::list_iterations(&ctx.data_dir, &filter).unwrap();
+      let iterations = store::list_iterations(&ctx.layout, &filter).unwrap();
       assert_eq!(iterations.len(), 1);
       assert_eq!(iterations[0].title, "Full Iteration");
       assert_eq!(iterations[0].description, "A description");
@@ -119,7 +119,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let filter = IterationFilter::default();
-      let iterations = store::list_iterations(&ctx.data_dir, &filter).unwrap();
+      let iterations = store::list_iterations(&ctx.layout, &filter).unwrap();
       assert_eq!(iterations.len(), 1);
       assert_eq!(iterations[0].title, "Sprint 1");
       assert_eq!(iterations[0].status, Status::Active);
@@ -141,14 +141,14 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let filter = IterationFilter::default();
-      let iterations = store::list_iterations(&ctx.data_dir, &filter).unwrap();
+      let iterations = store::list_iterations(&ctx.layout, &filter).unwrap();
       assert_eq!(iterations.len(), 0);
 
       let filter = IterationFilter {
         all: true,
         ..Default::default()
       };
-      let iterations = store::list_iterations(&ctx.data_dir, &filter).unwrap();
+      let iterations = store::list_iterations(&ctx.layout, &filter).unwrap();
       assert_eq!(iterations.len(), 1);
       assert_eq!(iterations[0].status, Status::Completed);
       assert!(iterations[0].completed_at.is_some());

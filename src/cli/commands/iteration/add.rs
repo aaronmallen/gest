@@ -18,13 +18,13 @@ pub struct Command {
 impl Command {
   /// Resolve both IDs, then append the task reference to the iteration.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
-    let iteration_id = store::resolve_iteration_id(data_dir, &self.id, false)?;
-    let task_id = store::resolve_task_id(data_dir, &self.task_id, true)?;
+    let iteration_id = store::resolve_iteration_id(layout, &self.id, false)?;
+    let task_id = store::resolve_task_id(layout, &self.task_id, true)?;
 
     let task_ref = format!("tasks/{task_id}");
-    store::add_iteration_task(data_dir, &iteration_id, &task_ref)?;
+    store::add_iteration_task(layout, &iteration_id, &task_ref)?;
 
     let msg = format!("Added task {} to iteration {}", task_id, iteration_id);
     println!("{}", SuccessMessage::new(&msg, theme));
@@ -48,8 +48,8 @@ mod tests {
       let ctx = make_test_context(dir.path());
       let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       let task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      store::write_iteration(&ctx.data_dir, &iteration).unwrap();
-      store::write_task(&ctx.data_dir, &task).unwrap();
+      store::write_iteration(&ctx.layout, &iteration).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -57,7 +57,7 @@ mod tests {
       };
       cmd.call(&ctx).unwrap();
 
-      let loaded = store::read_iteration(&ctx.data_dir, &iteration.id).unwrap();
+      let loaded = store::read_iteration(&ctx.layout, &iteration.id).unwrap();
       assert_eq!(loaded.tasks, vec!["tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"]);
     }
 
@@ -67,8 +67,8 @@ mod tests {
       let ctx = make_test_context(dir.path());
       let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       let task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      store::write_iteration(&ctx.data_dir, &iteration).unwrap();
-      store::write_task(&ctx.data_dir, &task).unwrap();
+      store::write_iteration(&ctx.layout, &iteration).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -77,7 +77,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
       cmd.call(&ctx).unwrap();
 
-      let loaded = store::read_iteration(&ctx.data_dir, &iteration.id).unwrap();
+      let loaded = store::read_iteration(&ctx.layout, &iteration.id).unwrap();
       assert_eq!(loaded.tasks.len(), 1);
     }
   }

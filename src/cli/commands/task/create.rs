@@ -38,7 +38,7 @@ pub struct Command {
 impl Command {
   /// Persist a new task and print a confirmation view.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
     let status = match &self.status {
       Some(s) => s.parse::<Status>().map_err(cli::Error::generic)?,
@@ -75,7 +75,7 @@ impl Command {
       title: self.title.clone(),
     };
 
-    let task = store::create_task(data_dir, new)?;
+    let task = store::create_task(layout, new)?;
 
     let status_str = task.status.as_str();
     let fields = vec![("title", task.title.clone())];
@@ -120,7 +120,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let filter = crate::model::TaskFilter::default();
-      let tasks = store::list_tasks(&ctx.data_dir, &filter).unwrap();
+      let tasks = store::list_tasks(&ctx.layout, &filter).unwrap();
       assert_eq!(tasks.len(), 1);
 
       let task = &tasks[0];
@@ -154,7 +154,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let filter = crate::model::TaskFilter::default();
-      let tasks = store::list_tasks(&ctx.data_dir, &filter).unwrap();
+      let tasks = store::list_tasks(&ctx.layout, &filter).unwrap();
       assert_eq!(tasks.len(), 1);
       assert_eq!(tasks[0].title, "My Task");
       assert_eq!(tasks[0].status, Status::Open);
@@ -180,14 +180,14 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let filter = crate::model::TaskFilter::default();
-      let tasks = store::list_tasks(&ctx.data_dir, &filter).unwrap();
+      let tasks = store::list_tasks(&ctx.layout, &filter).unwrap();
       assert_eq!(tasks.len(), 0);
 
       let filter = crate::model::TaskFilter {
         all: true,
         ..Default::default()
       };
-      let tasks = store::list_tasks(&ctx.data_dir, &filter).unwrap();
+      let tasks = store::list_tasks(&ctx.layout, &filter).unwrap();
       assert_eq!(tasks.len(), 1);
       assert_eq!(tasks[0].status, Status::Cancelled);
       assert!(tasks[0].resolved_at.is_some());
@@ -212,14 +212,14 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let filter = crate::model::TaskFilter::default();
-      let tasks = store::list_tasks(&ctx.data_dir, &filter).unwrap();
+      let tasks = store::list_tasks(&ctx.layout, &filter).unwrap();
       assert_eq!(tasks.len(), 0);
 
       let filter = crate::model::TaskFilter {
         all: true,
         ..Default::default()
       };
-      let tasks = store::list_tasks(&ctx.data_dir, &filter).unwrap();
+      let tasks = store::list_tasks(&ctx.layout, &filter).unwrap();
       assert_eq!(tasks.len(), 1);
       assert_eq!(tasks[0].title, "Done Task");
       assert_eq!(tasks[0].status, Status::Done);

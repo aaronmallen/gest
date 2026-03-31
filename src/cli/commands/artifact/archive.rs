@@ -16,10 +16,10 @@ pub struct Command {
 impl Command {
   /// Archive the artifact matching `self.id` and print a confirmation.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
-    let id = store::resolve_artifact_id(data_dir, &self.id, false)?;
-    store::archive_artifact(data_dir, &id)?;
+    let id = store::resolve_artifact_id(layout, &self.id, false)?;
+    store::archive_artifact(layout, &id)?;
 
     let msg = format!("Archived artifact {id}");
     println!("{}", SuccessMessage::new(&msg, theme));
@@ -46,7 +46,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.data_dir, &artifact).unwrap();
+      store::write_artifact(&ctx.layout, &artifact).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -54,14 +54,14 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let filter = ArtifactFilter::default();
-      let artifacts = store::list_artifacts(&ctx.data_dir, &filter).unwrap();
+      let artifacts = store::list_artifacts(&ctx.layout, &filter).unwrap();
       assert_eq!(artifacts.len(), 0);
 
       let filter = ArtifactFilter {
         show_all: true,
         ..Default::default()
       };
-      let artifacts = store::list_artifacts(&ctx.data_dir, &filter).unwrap();
+      let artifacts = store::list_artifacts(&ctx.layout, &filter).unwrap();
       assert_eq!(artifacts.len(), 1);
       assert!(artifacts[0].archived_at.is_some());
     }

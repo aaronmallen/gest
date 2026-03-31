@@ -31,7 +31,7 @@ pub struct Command {
 impl Command {
   /// Fetch and display tasks, rendering as JSON or a themed list view.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
     let status = match &self.status {
       Some(s) => Some(s.parse::<Status>().map_err(cli::Error::generic)?),
@@ -44,7 +44,7 @@ impl Command {
       tag: self.tag.clone(),
     };
 
-    let tasks = store::list_tasks(data_dir, &filter)?;
+    let tasks = store::list_tasks(layout, &filter)?;
 
     if self.json {
       let json = serde_json::to_string_pretty(&tasks)?;
@@ -57,7 +57,7 @@ impl Command {
       return Ok(());
     }
 
-    let resolved: Vec<ResolvedBlocking> = store::resolve_blocking_batch(data_dir, &tasks);
+    let resolved: Vec<ResolvedBlocking> = store::resolve_blocking_batch(layout, &tasks);
 
     let view_data: Vec<TaskViewData> = tasks
       .into_iter()
@@ -99,12 +99,12 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       store::write_task(
-        &ctx.data_dir,
+        &ctx.layout,
         &make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Open", Status::Open),
       )
       .unwrap();
       store::write_task(
-        &ctx.data_dir,
+        &ctx.layout,
         &make_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "InProg", Status::InProgress),
       )
       .unwrap();
@@ -139,7 +139,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Task One", Status::Open);
-      store::write_task(&ctx.data_dir, &task).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
 
       let cmd = Command {
         show_all: false,
@@ -156,7 +156,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "JSON Task", Status::Open);
-      store::write_task(&ctx.data_dir, &task).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
 
       let cmd = Command {
         show_all: false,
@@ -178,7 +178,7 @@ mod tests {
         ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string(),
         rel: RelationshipType::BlockedBy,
       }];
-      store::write_task(&ctx.data_dir, &task).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
 
       let cmd = Command {
         show_all: false,
@@ -200,7 +200,7 @@ mod tests {
         ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string(),
         rel: RelationshipType::Blocks,
       }];
-      store::write_task(&ctx.data_dir, &task).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
 
       let cmd = Command {
         show_all: false,

@@ -41,9 +41,9 @@ pub struct Command {
 impl Command {
   /// Apply the patch to an existing task and print the confirmation view.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
-    let id = store::resolve_task_id(data_dir, &self.id, true)?;
+    let id = store::resolve_task_id(layout, &self.id, true)?;
 
     let description = self.description.clone();
 
@@ -57,7 +57,7 @@ impl Command {
       None
     } else {
       let pairs = crate::cli::helpers::split_key_value_pairs(&self.metadata)?;
-      let mut table = store::read_task(data_dir, &id)?.metadata;
+      let mut table = store::read_task(layout, &id)?.metadata;
       for (key, value) in pairs {
         table.insert(key, toml::Value::String(value));
       }
@@ -77,7 +77,7 @@ impl Command {
       title: self.title.clone(),
     };
 
-    let task = store::update_task(data_dir, &id, patch)?;
+    let task = store::update_task(layout, &id, patch)?;
     let id_str = task.id.to_string();
 
     let status_str = if self.status.is_some() {
@@ -120,7 +120,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.data_dir, &task).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -136,7 +136,7 @@ mod tests {
 
       cmd.call(&ctx).unwrap();
 
-      let updated = store::read_task(&ctx.data_dir, &task.id).unwrap();
+      let updated = store::read_task(&ctx.layout, &task.id).unwrap();
       assert_eq!(updated.metadata.get("priority").unwrap().as_str().unwrap(), "low");
       assert_eq!(updated.metadata.get("team").unwrap().as_str().unwrap(), "backend");
     }
@@ -146,7 +146,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.data_dir, &task).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -162,7 +162,7 @@ mod tests {
 
       cmd.call(&ctx).unwrap();
 
-      let updated = store::read_task(&ctx.data_dir, &task.id).unwrap();
+      let updated = store::read_task(&ctx.layout, &task.id).unwrap();
       assert_eq!(updated.links.len(), 1);
       assert_eq!(updated.links[0].rel, RelationshipType::RelatesTo);
       assert_eq!(updated.metadata.get("priority").unwrap().as_str().unwrap(), "low");
@@ -173,7 +173,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.data_dir, &task).unwrap();
+      store::write_task(&ctx.layout, &task).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -189,7 +189,7 @@ mod tests {
 
       cmd.call(&ctx).unwrap();
 
-      let updated = store::read_task(&ctx.data_dir, &task.id).unwrap();
+      let updated = store::read_task(&ctx.layout, &task.id).unwrap();
       assert_eq!(updated.title, "New Title");
       assert_eq!(updated.description, "Original description");
       assert_eq!(updated.status, Status::Open);

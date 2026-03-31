@@ -32,9 +32,9 @@ pub struct Command {
 impl Command {
   /// Apply the provided patch fields to the iteration and persist the result.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
-    let id = store::resolve_iteration_id(data_dir, &self.id, true)?;
+    let id = store::resolve_iteration_id(layout, &self.id, true)?;
 
     let status = self
       .status
@@ -46,7 +46,7 @@ impl Command {
       None
     } else {
       let pairs = crate::cli::helpers::split_key_value_pairs(&self.metadata)?;
-      let mut table = store::read_iteration(data_dir, &id)?.metadata;
+      let mut table = store::read_iteration(layout, &id)?.metadata;
       for (key, value) in pairs {
         table.insert(key, toml::Value::String(value));
       }
@@ -63,7 +63,7 @@ impl Command {
       title: self.title.clone(),
     };
 
-    let iteration = store::update_iteration(data_dir, &id, patch)?;
+    let iteration = store::update_iteration(layout, &id, patch)?;
 
     let msg = format!("Updated iteration {}", iteration.id);
     println!("{}", SuccessMessage::new(&msg, theme));
@@ -89,7 +89,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_iteration(&ctx.data_dir, &iteration).unwrap();
+      store::write_iteration(&ctx.layout, &iteration).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -102,7 +102,7 @@ mod tests {
 
       cmd.call(&ctx).unwrap();
 
-      let updated = store::read_iteration(&ctx.data_dir, &iteration.id).unwrap();
+      let updated = store::read_iteration(&ctx.layout, &iteration.id).unwrap();
       assert_eq!(updated.metadata.get("team").unwrap().as_str().unwrap(), "backend");
     }
 
@@ -111,7 +111,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_iteration(&ctx.data_dir, &iteration).unwrap();
+      store::write_iteration(&ctx.layout, &iteration).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -124,7 +124,7 @@ mod tests {
 
       cmd.call(&ctx).unwrap();
 
-      let updated = store::read_iteration(&ctx.data_dir, &iteration.id).unwrap();
+      let updated = store::read_iteration(&ctx.layout, &iteration.id).unwrap();
       assert_eq!(updated.status, Status::Completed);
       assert!(updated.completed_at.is_some());
     }
@@ -134,7 +134,7 @@ mod tests {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
       let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_iteration(&ctx.data_dir, &iteration).unwrap();
+      store::write_iteration(&ctx.layout, &iteration).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -147,7 +147,7 @@ mod tests {
 
       cmd.call(&ctx).unwrap();
 
-      let updated = store::read_iteration(&ctx.data_dir, &iteration.id).unwrap();
+      let updated = store::read_iteration(&ctx.layout, &iteration.id).unwrap();
       assert_eq!(updated.title, "New Title");
     }
   }

@@ -26,14 +26,14 @@ pub struct Command {
 impl Command {
   /// Add a link on the source task, and a reciprocal link on the target when both are tasks.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = &ctx.data_dir;
+    let layout = &ctx.layout;
     let theme = &ctx.theme;
-    let id = store::resolve_task_id(data_dir, &self.id, false)?;
+    let id = store::resolve_task_id(layout, &self.id, false)?;
 
     let target_id = if self.artifact {
-      store::resolve_artifact_id(data_dir, &self.target_id, true)?
+      store::resolve_artifact_id(layout, &self.target_id, true)?
     } else {
-      store::resolve_task_id(data_dir, &self.target_id, true)?
+      store::resolve_task_id(layout, &self.target_id, true)?
     };
 
     let ref_path = if self.artifact {
@@ -42,22 +42,22 @@ impl Command {
       format!("tasks/{target_id}")
     };
 
-    let mut task = store::read_task(data_dir, &id)?;
+    let mut task = store::read_task(layout, &id)?;
     task.links.push(Link {
       ref_: ref_path,
       rel: self.rel.clone(),
     });
     task.updated_at = Utc::now();
-    store::write_task(data_dir, &task)?;
+    store::write_task(layout, &task)?;
 
     if !self.artifact {
-      let mut target_task = store::read_task(data_dir, &target_id)?;
+      let mut target_task = store::read_task(layout, &target_id)?;
       target_task.links.push(Link {
         ref_: format!("tasks/{id}"),
         rel: self.rel.inverse(),
       });
       target_task.updated_at = Utc::now();
-      store::write_task(data_dir, &target_task)?;
+      store::write_task(layout, &target_task)?;
     }
 
     let msg = format!("Linked {} --{}--\u{003e} {}", id, self.rel, target_id);
@@ -84,9 +84,9 @@ mod tests {
       let source = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       let target1 = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
       let target2 = make_test_task("nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn");
-      store::write_task(&ctx.data_dir, &source).unwrap();
-      store::write_task(&ctx.data_dir, &target1).unwrap();
-      store::write_task(&ctx.data_dir, &target2).unwrap();
+      store::write_task(&ctx.layout, &source).unwrap();
+      store::write_task(&ctx.layout, &target1).unwrap();
+      store::write_task(&ctx.layout, &target2).unwrap();
 
       let cmd1 = Command {
         id: "zyxw".to_string(),
@@ -104,7 +104,7 @@ mod tests {
       };
       cmd2.call(&ctx).unwrap();
 
-      let loaded = store::read_task(&ctx.data_dir, &source.id).unwrap();
+      let loaded = store::read_task(&ctx.layout, &source.id).unwrap();
       assert_eq!(loaded.links.len(), 2);
       let _ = dir;
     }
@@ -114,8 +114,8 @@ mod tests {
       let (dir, ctx) = setup();
       let source = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       let target = make_test_artifact("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      store::write_task(&ctx.data_dir, &source).unwrap();
-      store::write_artifact(&ctx.data_dir, &target).unwrap();
+      store::write_task(&ctx.layout, &source).unwrap();
+      store::write_artifact(&ctx.layout, &target).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -125,7 +125,7 @@ mod tests {
       };
       cmd.call(&ctx).unwrap();
 
-      let loaded = store::read_task(&ctx.data_dir, &source.id).unwrap();
+      let loaded = store::read_task(&ctx.layout, &source.id).unwrap();
       assert_eq!(loaded.links.len(), 1);
       assert_eq!(loaded.links[0].ref_, "artifacts/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
       let _ = dir;
@@ -136,8 +136,8 @@ mod tests {
       let (dir, ctx) = setup();
       let source = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       let target = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      store::write_task(&ctx.data_dir, &source).unwrap();
-      store::write_task(&ctx.data_dir, &target).unwrap();
+      store::write_task(&ctx.layout, &source).unwrap();
+      store::write_task(&ctx.layout, &target).unwrap();
 
       let cmd = Command {
         id: "zyxw".to_string(),
@@ -147,10 +147,10 @@ mod tests {
       };
       cmd.call(&ctx).unwrap();
 
-      let loaded = store::read_task(&ctx.data_dir, &source.id).unwrap();
+      let loaded = store::read_task(&ctx.layout, &source.id).unwrap();
       assert_eq!(loaded.links[0].rel, RelationshipType::Blocks);
 
-      let loaded_target = store::read_task(&ctx.data_dir, &target.id).unwrap();
+      let loaded_target = store::read_task(&ctx.layout, &target.id).unwrap();
       assert_eq!(loaded_target.links[0].rel, RelationshipType::BlockedBy);
       let _ = dir;
     }

@@ -1,8 +1,9 @@
-use std::path::Path;
-
 use rayon::prelude::*;
 
-use crate::model::{Artifact, ArtifactFilter, Task, TaskFilter};
+use crate::{
+  config::storage::DataLayout,
+  model::{Artifact, ArtifactFilter, Task, TaskFilter},
+};
 
 /// Collected search results across entity types.
 pub struct SearchResults {
@@ -59,20 +60,20 @@ fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
 }
 
 /// Perform a case-insensitive full-text search across tasks and artifacts.
-pub fn search(data_dir: &Path, query: &str, show_all: bool) -> super::Result<SearchResults> {
+pub fn search(layout: &DataLayout, query: &str, show_all: bool) -> super::Result<SearchResults> {
   let query_lower = query.to_lowercase();
 
   let task_filter = TaskFilter {
     all: show_all,
     ..Default::default()
   };
-  let all_tasks = super::list_tasks(data_dir, &task_filter)?;
+  let all_tasks = super::list_tasks(layout, &task_filter)?;
 
   let artifact_filter = ArtifactFilter {
     show_all,
     ..Default::default()
   };
-  let all_artifacts = super::list_artifacts(data_dir, &artifact_filter)?;
+  let all_artifacts = super::list_artifacts(layout, &artifact_filter)?;
 
   let tasks: Vec<Task> = all_tasks
     .into_par_iter()
@@ -139,9 +140,18 @@ mod tests {
         "Notes",
         "This contains a secret keyword",
       );
-      crate::store::write_artifact(dir.path(), &artifact).unwrap();
+      crate::store::write_artifact(
+        &crate::config::storage::DataLayout::new(&crate::config::storage::Settings::default(), dir.path()),
+        &artifact,
+      )
+      .unwrap();
 
-      let results = super::super::search(dir.path(), "secret", false).unwrap();
+      let results = super::super::search(
+        &crate::config::storage::DataLayout::new(&crate::config::storage::Settings::default(), dir.path()),
+        "secret",
+        false,
+      )
+      .unwrap();
       assert_eq!(results.artifacts.len(), 1);
       assert_eq!(results.artifacts[0].title, "Notes");
     }
@@ -150,9 +160,18 @@ mod tests {
     fn it_finds_tasks_by_title() {
       let dir = tempfile::tempdir().unwrap();
       let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Important Feature");
-      crate::store::write_task(dir.path(), &task).unwrap();
+      crate::store::write_task(
+        &crate::config::storage::DataLayout::new(&crate::config::storage::Settings::default(), dir.path()),
+        &task,
+      )
+      .unwrap();
 
-      let results = super::super::search(dir.path(), "important", false).unwrap();
+      let results = super::super::search(
+        &crate::config::storage::DataLayout::new(&crate::config::storage::Settings::default(), dir.path()),
+        "important",
+        false,
+      )
+      .unwrap();
       assert_eq!(results.tasks.len(), 1);
       assert_eq!(results.tasks[0].title, "Important Feature");
     }
@@ -161,9 +180,18 @@ mod tests {
     fn it_is_case_insensitive() {
       let dir = tempfile::tempdir().unwrap();
       let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "UPPERCASE Title");
-      crate::store::write_task(dir.path(), &task).unwrap();
+      crate::store::write_task(
+        &crate::config::storage::DataLayout::new(&crate::config::storage::Settings::default(), dir.path()),
+        &task,
+      )
+      .unwrap();
 
-      let results = super::super::search(dir.path(), "uppercase", false).unwrap();
+      let results = super::super::search(
+        &crate::config::storage::DataLayout::new(&crate::config::storage::Settings::default(), dir.path()),
+        "uppercase",
+        false,
+      )
+      .unwrap();
       assert_eq!(results.tasks.len(), 1);
     }
 
@@ -171,9 +199,18 @@ mod tests {
     fn it_returns_empty_when_no_match() {
       let dir = tempfile::tempdir().unwrap();
       let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Some Task");
-      crate::store::write_task(dir.path(), &task).unwrap();
+      crate::store::write_task(
+        &crate::config::storage::DataLayout::new(&crate::config::storage::Settings::default(), dir.path()),
+        &task,
+      )
+      .unwrap();
 
-      let results = super::super::search(dir.path(), "nonexistent", false).unwrap();
+      let results = super::super::search(
+        &crate::config::storage::DataLayout::new(&crate::config::storage::Settings::default(), dir.path()),
+        "nonexistent",
+        false,
+      )
+      .unwrap();
       assert_eq!(results.tasks.len(), 0);
       assert_eq!(results.artifacts.len(), 0);
     }

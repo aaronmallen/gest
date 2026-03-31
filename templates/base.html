@@ -551,6 +551,35 @@
     }
 
     .rel-pending-item .rel-remove:hover { text-decoration: underline; }
+
+    /* ── markdown preview ─────────────────────────────────────────────── */
+    .md-preview-container {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .md-preview-container label { margin-right: auto; }
+
+    .md-preview-toggle { margin-bottom: 5px; }
+
+    .md-preview-container .form-textarea,
+    .md-preview-container .md-preview {
+      width: 100%;
+    }
+
+    .md-preview {
+      display: none;
+      background: var(--obsidian);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      min-height: 120px;
+      font-size: 13px;
+    }
+
+    .md-preview.active { display: block; }
   </style>
   {% block head %}{% endblock %}
 </head>

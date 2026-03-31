@@ -1,8 +1,40 @@
 // gest — form interaction helpers
 "use strict";
 
+// ── Markdown Preview Toggle ─────────────────────────────────────────
 (function () {
-  // ── Relationships Modal ───────────────────────────────────────────
+  document.querySelectorAll(".md-preview-btn").forEach(function (btn) {
+    var targetId = btn.dataset.target;
+    var textarea = document.getElementById(targetId);
+    var preview = document.getElementById(targetId + "-preview");
+    if (!textarea || !preview) return;
+
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      if (preview.classList.contains("active")) {
+        preview.classList.remove("active");
+        textarea.style.display = "";
+        btn.textContent = "Preview";
+      } else {
+        fetch("/api/render-markdown", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: textarea.value })
+        })
+          .then(function (r) { return r.text(); })
+          .then(function (html) {
+            preview.innerHTML = html;
+            preview.classList.add("active");
+            textarea.style.display = "none";
+            btn.textContent = "Edit";
+          });
+      }
+    });
+  });
+})();
+
+// ── Relationships Modal ─────────────────────────────────────────────
+(function () {
   var modal = document.getElementById("rel-modal");
   if (!modal) return;
 
@@ -15,13 +47,11 @@
   var selectedType = "relates-to";
   var debounceTimer = null;
 
-  // Toggle modal open/close
   toggleBtn.addEventListener("click", function (e) {
     e.preventDefault();
     modal.classList.toggle("open");
   });
 
-  // Type selection
   typeButtons.forEach(function (btn) {
     btn.addEventListener("click", function (e) {
       e.preventDefault();
@@ -31,12 +61,10 @@
     });
   });
 
-  // Set initial active type
   typeButtons.forEach(function (btn) {
     if (btn.dataset.rel === selectedType) btn.classList.add("active");
   });
 
-  // Debounced search
   searchInput.addEventListener("input", function () {
     clearTimeout(debounceTimer);
     var q = searchInput.value.trim();
@@ -66,7 +94,6 @@
   });
 
   function addPendingLink(rel, entityType, id, shortId, title) {
-    // Avoid duplicates
     var ref = (entityType === "task" ? "tasks/" : "artifacts/") + id;
     if (hiddenContainer.querySelector('input[value="' + ref + '"]')) return;
 
@@ -86,7 +113,6 @@
 
     pendingDiv.appendChild(item);
 
-    // Add hidden inputs
     var relInput = document.createElement("input");
     relInput.type = "hidden";
     relInput.name = "link_rel[]";
@@ -112,7 +138,6 @@
     }
   }
 
-  // Pre-populate remove buttons for existing links
   pendingDiv.querySelectorAll(".rel-pending-item").forEach(function (item) {
     var removeBtn = item.querySelector(".rel-remove");
     if (!removeBtn) return;

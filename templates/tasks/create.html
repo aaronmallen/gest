@@ -27,14 +27,16 @@
         {% endif %}
       </div>
 
-      <div class="form-group">
+      <div class="form-group md-preview-container">
         <label for="description">Description</label>
+        <button type="button" class="btn md-preview-btn md-preview-toggle" data-target="description">Preview</button>
         <textarea
           id="description"
           name="description"
           class="form-textarea"
           placeholder="Markdown supported"
         >{{ description }}</textarea>
+        <div id="description-preview" class="md-preview md-content"></div>
       </div>
 
       <div class="form-group">

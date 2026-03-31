@@ -13,13 +13,13 @@ use super::{
   templates::{
     ArtifactCreateTemplate, ArtifactDetailTemplate, ArtifactEditTemplate, ArtifactListTemplate, DashboardTemplate,
     DisplayLink, IterationBoardTemplate, IterationDetailTemplate, IterationListTemplate, PhaseGroup, SearchTemplate,
-    TaskDetailTemplate, TaskListTemplate, TaskRow,
+    TaskCreateTemplate, TaskDetailTemplate, TaskEditTemplate, TaskListTemplate, TaskRow,
   },
 };
 use crate::{
   model::{
-    ArtifactFilter, ArtifactPatch, IterationFilter, NewArtifact, TaskFilter, iteration::Status as IterationStatus,
-    task::Status,
+    ArtifactFilter, ArtifactPatch, IterationFilter, NewArtifact, NewTask, TaskFilter, TaskPatch,
+    iteration::Status as IterationStatus, task::Status,
   },
   store,
 };
@@ -193,6 +193,162 @@ pub async fn task_detail(State(state): State<ServerState>, Path(id_str): Path<St
     display_links,
   }
   .into_response()
+}
+
+/// GET /tasks/new — task create form.
+pub async fn task_create_form() -> Response {
+  TaskCreateTemplate {
+    title: String::new(),
+    description: String::new(),
+    tags: String::new(),
+    priority: String::new(),
+    error: None,
+  }
+  .into_response()
+}
+
+/// Form data for task creation.
+#[derive(serde::Deserialize)]
+pub struct TaskFormData {
+  pub title: String,
+  pub description: String,
+  pub tags: String,
+  pub priority: String,
+}
+
+/// POST /tasks — create a task.
+pub async fn task_create(State(state): State<ServerState>, Form(form): Form<TaskFormData>) -> Response {
+  let title = form.title.trim().to_string();
+  if title.is_empty() {
+    return TaskCreateTemplate {
+      title: form.title,
+      description: form.description,
+      tags: form.tags,
+      priority: form.priority,
+      error: Some("Title is required".to_string()),
+    }
+    .into_response();
+  }
+
+  let tags: Vec<String> = form
+    .tags
+    .split(',')
+    .map(|s| s.trim().to_string())
+    .filter(|s| !s.is_empty())
+    .collect();
+
+  let priority: Option<u8> = if form.priority.trim().is_empty() {
+    None
+  } else {
+    form.priority.trim().parse().ok()
+  };
+
+  let new_task = NewTask {
+    title,
+    description: form.description,
+    tags,
+    priority,
+    ..Default::default()
+  };
+
+  match store::create_task(&state.settings, new_task) {
+    Ok(task) => Redirect::to(&format!("/tasks/{}", task.id)).into_response(),
+    Err(e) => {
+      log::error!("failed to create task: {e}");
+      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
+    }
+  }
+}
+
+/// GET /tasks/:id/edit — task edit form.
+pub async fn task_edit_form(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
+  let id = match store::resolve_task_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response(),
+  };
+
+  let task = match store::read_task(&state.settings, &id) {
+    Ok(t) => t,
+    Err(e) => {
+      log::error!("failed to read task {id}: {e}");
+      return (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response();
+    }
+  };
+
+  let tags = task.tags.join(", ");
+  let priority = task.priority.map(|p| p.to_string()).unwrap_or_default();
+
+  TaskEditTemplate {
+    title: task.title.clone(),
+    description: task.description.clone(),
+    tags,
+    priority,
+    error: None,
+    task,
+  }
+  .into_response()
+}
+
+/// POST /tasks/:id — update a task.
+pub async fn task_update(
+  State(state): State<ServerState>,
+  Path(id_str): Path<String>,
+  Form(form): Form<TaskFormData>,
+) -> Response {
+  let id = match store::resolve_task_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response(),
+  };
+
+  let title = form.title.trim().to_string();
+  if title.is_empty() {
+    let task = match store::read_task(&state.settings, &id) {
+      Ok(t) => t,
+      Err(e) => {
+        log::error!("failed to read task {id}: {e}");
+        return (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response();
+      }
+    };
+
+    return TaskEditTemplate {
+      title: form.title,
+      description: form.description,
+      tags: form.tags,
+      priority: form.priority,
+      error: Some("Title is required".to_string()),
+      task,
+    }
+    .into_response();
+  }
+
+  let tags: Vec<String> = form
+    .tags
+    .split(',')
+    .map(|s| s.trim().to_string())
+    .filter(|s| !s.is_empty())
+    .collect();
+
+  let priority: Option<u8> = if form.priority.trim().is_empty() {
+    None
+  } else {
+    form.priority.trim().parse().ok()
+  };
+
+  let patch = TaskPatch {
+    title: Some(title),
+    description: Some(form.description),
+    tags: Some(tags),
+    priority: Some(priority),
+    ..Default::default()
+  };
+
+  match store::update_task(&state.settings, &id, patch) {
+    Ok(task) => Redirect::to(&format!("/tasks/{}", task.id)).into_response(),
+    Err(e) => {
+      log::error!("failed to update task {id}: {e}");
+      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
+    }
+  }
 }
 
 /// Query parameters for the artifact list endpoint.

@@ -94,6 +94,41 @@ impl IntoResponse for TaskDetailTemplate {
   }
 }
 
+// ── Task Create / Edit ───────────────────────────────────────────────────────
+
+#[derive(Template)]
+#[template(path = "tasks/create.html")]
+pub struct TaskCreateTemplate {
+  pub title: String,
+  pub description: String,
+  pub tags: String,
+  pub priority: String,
+  pub error: Option<String>,
+}
+
+impl IntoResponse for TaskCreateTemplate {
+  fn into_response(self) -> Response {
+    render(&self)
+  }
+}
+
+#[derive(Template)]
+#[template(path = "tasks/edit.html")]
+pub struct TaskEditTemplate {
+  pub task: Task,
+  pub title: String,
+  pub description: String,
+  pub tags: String,
+  pub priority: String,
+  pub error: Option<String>,
+}
+
+impl IntoResponse for TaskEditTemplate {
+  fn into_response(self) -> Response {
+    render(&self)
+  }
+}
+
 // ── Artifacts ────────────────────────────────────────────────────────────────
 
 #[derive(Template)]

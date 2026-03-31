@@ -11,8 +11,10 @@ use super::{assets, handlers, state::ServerState};
 pub fn router(state: ServerState) -> Router {
   Router::new()
     .route("/", get(handlers::dashboard))
-    .route("/tasks", get(handlers::task_list))
-    .route("/tasks/{id}", get(handlers::task_detail))
+    .route("/tasks", get(handlers::task_list).post(handlers::task_create))
+    .route("/tasks/new", get(handlers::task_create_form))
+    .route("/tasks/{id}/edit", get(handlers::task_edit_form))
+    .route("/tasks/{id}", get(handlers::task_detail).post(handlers::task_update))
     .route(
       "/artifacts",
       get(handlers::artifact_list).post(handlers::artifact_create),

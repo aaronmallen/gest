@@ -64,6 +64,41 @@ it with collaborators.
 gest init --local
 ```
 
+## Per-entity directory overrides
+
+By default, all entity types (artifacts, tasks, iterations) are stored under
+the resolved data directory. You can override the storage location for each
+entity type independently using environment variables or config settings.
+
+The resolution precedence for each entity type is:
+
+1. Entity-specific environment variable (e.g. `GEST_ARTIFACT_DIR`)
+2. Entity-specific config setting (e.g. `storage.artifact_dir`)
+3. `<data_dir>/<entity>/` (default fallback)
+
+For example, to keep artifacts in your project's `docs/` directory and tasks in
+`tasks/` while letting iterations use the default:
+
+```toml
+[storage]
+artifact_dir = "./docs"
+task_dir = "./tasks"
+```
+
+This produces the following layout:
+
+```text
+docs/<id>.md
+docs/archive/<id>.md
+tasks/<id>.toml
+tasks/resolved/<id>.toml
+<data_dir>/iterations/<id>.toml
+<data_dir>/iterations/resolved/<id>.toml
+```
+
+`gest init` respects these overrides and creates directories at the resolved
+paths.
+
 ## Configuration settings
 
 ### `[storage]`
@@ -71,6 +106,9 @@ gest init --local
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `data_dir` | string (absolute path) | _(auto-resolved)_ | Override the data directory. Must be an absolute path to an existing directory. |
+| `artifact_dir` | string (path) | `<data_dir>/artifacts` | Override the artifact storage directory. |
+| `iteration_dir` | string (path) | `<data_dir>/iterations` | Override the iteration storage directory. |
+| `task_dir` | string (path) | `<data_dir>/tasks` | Override the task storage directory. |
 
 ### `[log]`
 
@@ -119,6 +157,8 @@ Available fields in the table form:
 ```toml
 [storage]
 data_dir = "/home/user/projects/myapp/.gest"
+artifact_dir = "./docs"
+task_dir = "./tasks"
 
 [log]
 level = "info"
@@ -138,6 +178,9 @@ bold = true
 | --- | --- |
 | `GEST_CONFIG` | Override the path to the global config file. |
 | `GEST_DATA_DIR` | Override the data storage directory (must be an absolute path). |
+| `GEST_ARTIFACT_DIR` | Override the artifact storage directory. |
+| `GEST_ITERATION_DIR` | Override the iteration storage directory. |
+| `GEST_TASK_DIR` | Override the task storage directory. |
 | `GEST_LOG_LEVEL` | Override the log level filter (e.g. `debug`, `trace`). Takes precedence over the config file. |
 | `VISUAL` | Preferred editor for interactive editing (checked before `EDITOR`). |
 | `EDITOR` | Fallback editor for interactive editing. |

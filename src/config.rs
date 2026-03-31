@@ -7,7 +7,7 @@ pub mod colors;
 pub mod env;
 mod loader;
 mod log;
-mod storage;
+pub(crate) mod storage;
 
 use std::path::PathBuf;
 

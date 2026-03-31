@@ -56,20 +56,20 @@ pub fn resolve_blocking_batch(data_dir: &Path, tasks: &[Task]) -> Vec<ResolvedBl
   let mut needed_ids: HashMap<String, Option<Task>> = HashMap::new();
   for task in tasks {
     for link in &task.links {
-      if link.rel == RelationshipType::BlockedBy {
-        if let Some(id_str) = link.ref_.strip_prefix("tasks/") {
-          needed_ids.entry(id_str.to_string()).or_insert(None);
-        }
+      if link.rel == RelationshipType::BlockedBy
+        && let Some(id_str) = link.ref_.strip_prefix("tasks/")
+      {
+        needed_ids.entry(id_str.to_string()).or_insert(None);
       }
     }
   }
 
   // Read each unique referenced task exactly once.
   for (id_str, slot) in &mut needed_ids {
-    if let Ok(id) = id_str.parse::<Id>() {
-      if let Ok(referenced) = read_task(data_dir, &id) {
-        *slot = Some(referenced);
-      }
+    if let Ok(id) = id_str.parse::<Id>()
+      && let Ok(referenced) = read_task(data_dir, &id)
+    {
+      *slot = Some(referenced);
     }
   }
 

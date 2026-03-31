@@ -7,6 +7,7 @@ pub mod colors;
 pub mod env;
 mod loader;
 mod log;
+pub mod serve;
 pub(crate) mod storage;
 
 use std::path::{Path, PathBuf};
@@ -28,12 +29,13 @@ pub enum Error {
   NotADirectory(PathBuf),
 }
 
-/// Top-level configuration, composed of color, log, and storage sections.
+/// Top-level configuration, composed of color, log, serve, and storage sections.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
 pub struct Settings {
   colors: colors::Settings,
   log: log::Settings,
+  serve: serve::Settings,
   storage: storage::Settings,
   #[serde(skip)]
   resolved_artifact_dir: PathBuf,
@@ -69,6 +71,11 @@ impl Settings {
   /// Returns the logging settings.
   pub fn log(&self) -> &log::Settings {
     &self.log
+  }
+
+  /// Returns the web server settings.
+  pub fn serve(&self) -> &serve::Settings {
+    &self.serve
   }
 
   /// Resolve storage paths from the working directory.

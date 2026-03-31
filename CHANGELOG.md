@@ -7,6 +7,28 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [v0.3.2] - 2026-03-31
+
+### Added
+
+- Built-in web server (`gest serve`) with dashboard, task/artifact/iteration views, kanban board, and full-text search
+  (see [#13], [#14], [#15], [#16], [#17], [#18], [#19], [#20], [#21], [#22], [#23])
+- `--port`, `--bind`, and `--no-open` flags on `gest serve` for controlling the local server (see [#15])
+- `[serve]` config section with `port`, `bind_address`, and `open` settings (see [#14])
+
+### Changed
+
+- Cached iteration phase counts to avoid recomputing on each read
+- `resolve_dot_path` now walks by reference instead of cloning, reducing allocations
+- Consolidated shared helpers for store operations, CLI metadata handling, and tag/untag commands
+
+### Fixed
+
+- Multi-word `EDITOR` values (e.g. `code --wait`) are now parsed correctly via shell tokenization
+- Nested metadata `set_nested` is now bounds-checked with a depth limit to prevent stack overflows
+- Version line no longer appears in the `--help` banner
+- `gest search --expand` now shows full content instead of truncated snippets (see [#11])
+
 ## [v0.3.1] - 2026-03-30
 
 ### Added
@@ -94,11 +116,24 @@ Initial release
 [#3]: https://github.com/aaronmallen/gest/issues/3
 [#4]: https://github.com/aaronmallen/gest/issues/4
 [#5]: https://github.com/aaronmallen/gest/issues/5
+[#11]: https://github.com/aaronmallen/gest/issues/11
+[#13]: https://github.com/aaronmallen/gest/issues/13
+[#14]: https://github.com/aaronmallen/gest/issues/14
+[#15]: https://github.com/aaronmallen/gest/issues/15
+[#16]: https://github.com/aaronmallen/gest/issues/16
+[#17]: https://github.com/aaronmallen/gest/issues/17
+[#18]: https://github.com/aaronmallen/gest/issues/18
+[#19]: https://github.com/aaronmallen/gest/issues/19
+[#20]: https://github.com/aaronmallen/gest/issues/20
+[#21]: https://github.com/aaronmallen/gest/issues/21
+[#22]: https://github.com/aaronmallen/gest/issues/22
+[#23]: https://github.com/aaronmallen/gest/issues/23
 
-[Unreleased]: https://github.com/aaronmallen/gest/compare/0.3.1...main
+[Unreleased]: https://github.com/aaronmallen/gest/compare/0.3.2...main
 [v0.2.0]: https://github.com/aaronmallen/gest/compare/0.1.0...0.2.0
 [v0.2.1]: https://github.com/aaronmallen/gest/compare/0.2.0...0.2.1
 [v0.2.2]: https://github.com/aaronmallen/gest/compare/0.2.1...0.2.2
 [v0.2.3]: https://github.com/aaronmallen/gest/compare/0.2.2...0.2.3
 [v0.3.0]: https://github.com/aaronmallen/gest/compare/0.2.3...0.3.0
 [v0.3.1]: https://github.com/aaronmallen/gest/compare/0.3.0...0.3.1
+[v0.3.2]: https://github.com/aaronmallen/gest/compare/0.3.1...0.3.2

@@ -3,6 +3,7 @@
 #![allow(unused_imports)]
 
 mod artifact;
+pub mod artifact_meta;
 mod fs;
 mod iteration;
 pub mod meta;

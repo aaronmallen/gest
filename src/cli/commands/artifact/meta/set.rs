@@ -26,7 +26,7 @@ impl Command {
     let id = store::resolve_artifact_id(config, &self.id, false)?;
     let mut artifact = store::read_artifact(config, &id)?;
 
-    set_dot_path(&mut artifact.metadata, &self.path, &self.value)?;
+    store::artifact_meta::set_dot_path(&mut artifact.metadata, &self.path, &self.value)?;
 
     artifact.updated_at = Utc::now();
     store::write_artifact(config, &artifact)?;
@@ -34,71 +34,6 @@ impl Command {
     let msg = format!("Set {}.{} = {}", id, self.path, self.value);
     println!("{}", SuccessMessage::new(&msg, theme));
     Ok(())
-  }
-}
-
-/// Parse a string into a typed YAML value (integer, float, bool, null, or string).
-fn parse_yaml_value(s: &str) -> yaml_serde::Value {
-  if let Ok(n) = s.parse::<i64>() {
-    return yaml_serde::Value::Number(yaml_serde::Number::from(n));
-  }
-  if let Ok(n) = s.parse::<f64>() {
-    return yaml_serde::Value::Number(yaml_serde::Number::from(n));
-  }
-  match s {
-    "true" => yaml_serde::Value::Bool(true),
-    "false" => yaml_serde::Value::Bool(false),
-    "null" => yaml_serde::Value::Null,
-    _ => yaml_serde::Value::String(s.to_string()),
-  }
-}
-
-/// Maximum number of dot-delimited segments allowed in a key path.
-const MAX_DEPTH: usize = 32;
-
-/// Set a value in a YAML mapping at the given dot-delimited path, creating intermediate mappings as needed.
-fn set_dot_path(mapping: &mut yaml_serde::Mapping, path: &str, value: &str) -> cli::Result<()> {
-  let segments: Vec<&str> = path.split('.').collect();
-
-  if segments.len() > MAX_DEPTH {
-    return Err(cli::Error::generic(format!(
-      "key path exceeds maximum depth of {MAX_DEPTH} segments"
-    )));
-  }
-
-  let yaml_value = parse_yaml_value(value);
-
-  if segments.len() == 1 {
-    mapping.insert(yaml_serde::Value::String(segments[0].to_string()), yaml_value);
-    return Ok(());
-  }
-
-  set_nested(mapping, &segments, yaml_value);
-  Ok(())
-}
-
-/// Recursively insert a value into nested YAML mappings along the given path segments.
-fn set_nested(mapping: &mut yaml_serde::Mapping, segments: &[&str], value: yaml_serde::Value) {
-  let Some((&first, rest)) = segments.split_first() else {
-    return;
-  };
-  let key = yaml_serde::Value::String(first.to_string());
-
-  if rest.is_empty() {
-    mapping.insert(key, value);
-    return;
-  }
-
-  let nested = mapping
-    .entry(key.clone())
-    .or_insert_with(|| yaml_serde::Value::Mapping(yaml_serde::Mapping::new()));
-
-  if let yaml_serde::Value::Mapping(m) = nested {
-    set_nested(m, rest, value);
-  } else {
-    let mut new_mapping = yaml_serde::Mapping::new();
-    set_nested(&mut new_mapping, rest, value);
-    mapping.insert(key, yaml_serde::Value::Mapping(new_mapping));
   }
 }
 
@@ -159,34 +94,6 @@ mod tests {
       } else {
         panic!("Expected mapping for config key");
       }
-    }
-  }
-
-  mod parse_yaml_value {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_falls_back_to_string() {
-      assert_eq!(
-        parse_yaml_value("hello"),
-        yaml_serde::Value::String("hello".to_string())
-      );
-    }
-
-    #[test]
-    fn it_parses_booleans() {
-      assert_eq!(parse_yaml_value("true"), yaml_serde::Value::Bool(true));
-      assert_eq!(parse_yaml_value("false"), yaml_serde::Value::Bool(false));
-    }
-
-    #[test]
-    fn it_parses_integers() {
-      assert_eq!(
-        parse_yaml_value("42"),
-        yaml_serde::Value::Number(yaml_serde::Number::from(42))
-      );
     }
   }
 }

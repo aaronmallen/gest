@@ -4,6 +4,7 @@ pub mod helpers;
 mod commands;
 
 use clap::{ArgAction, Parser, Subcommand};
+use yansi::hyperlink::HyperlinkExt;
 
 use crate::{config::Settings, ui::theme::Theme};
 
@@ -162,7 +163,20 @@ fn long_about() -> String {
     &theme,
   )
   .hide_version();
-  format!("\n{banner}\n\n{}", env!("CARGO_PKG_DESCRIPTION"))
+  let url = "https://gest.aaronmallen.dev";
+  let link = url.link(url).fg(crate::ui::colors::AZURE).underline();
+  format!(
+    "\n{banner}\n\n\
+     {desc}\n\n\
+     {link}\n\n\
+     Gest provides a lightweight, file-based system for organizing the artifacts, specs, ADRs, \
+     and task backlogs that AI coding agents produce. Instead of letting generated context scatter \
+     across chat logs and throwaway files, gest stores it in a structured, version-controlled \
+     directory right inside your repo — so every decision, plan, and backlog item travels with the \
+     code it describes. It includes a local web dashboard for browsing and managing your project's \
+     knowledge base, and a CLI that integrates naturally into agent-driven workflows.",
+    desc = env!("CARGO_PKG_DESCRIPTION"),
+  )
 }
 
 /// Quick pre-parse of verbosity from `std::env::args` so logging is active before full clap parse.

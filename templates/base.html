@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}gest{% endblock %}</title>
+  <style>
+    /* ── reset ─────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── palette ──────────────────────────────────────────────────────── */
+    :root {
+      /* core neutrals */
+      --obsidian:    #0D0E12;
+      --dusk:        #141519;
+      --border:      #30323A;
+      --dim:         #585E6E;
+      --pewter:      #7C8294;
+      --silver:      #C4C8D4;
+
+      /* brand */
+      --azure:       #4EA8E0;
+      --azure-dark:  #3278B0;
+      --azure-light: #7CC4F0;
+
+      /* accents */
+      --amber:       #CC9820;
+      --jade:        #36BE78;
+      --ember:       #D05830;
+      --rose:        #C44878;
+      --error:       #D03838;
+
+      /* font stack */
+      --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'SF Mono', 'Menlo', 'Courier New', monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    /* ── base ─────────────────────────────────────────────────────────── */
+    body {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      background: var(--dusk);
+      color: var(--silver);
+      min-height: 100vh;
+    }
+
+    a { color: var(--azure); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── layout ───────────────────────────────────────────────────────── */
+    .shell {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px 20px;
+    }
+
+    /* ── nav ──────────────────────────────────────────────────────────── */
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+      padding-bottom: 0;
+    }
+
+    .nav-brand {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--azure);
+      letter-spacing: .04em;
+      margin-right: 16px;
+      padding: 8px 0;
+    }
+
+    .nav a {
+      padding: 8px 14px;
+      font-size: 12px;
+      color: var(--pewter);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      letter-spacing: .02em;
+    }
+
+    .nav a:hover { color: var(--silver); text-decoration: none; }
+    .nav a.active { color: var(--silver); border-bottom-color: var(--azure); font-weight: 500; }
+
+    /* ── terminal card ────────────────────────────────────────────────── */
+    .term {
+      background: var(--obsidian);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #1C1E26;
+      margin-bottom: 16px;
+    }
+
+    .term-bar {
+      background: var(--dusk);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      border-bottom: 1px solid #1C1E26;
+    }
+
+    .term-title {
+      font-size: 11px;
+      color: var(--border);
+      font-family: var(--font-mono);
+      margin: 0 auto;
+      letter-spacing: .05em;
+    }
+
+    .term-body {
+      padding: 16px 20px 22px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.85;
+      color: var(--silver);
+      overflow-x: auto;
+    }
+
+    /* ── color utilities ──────────────────────────────────────────────── */
+    .c-azure      { color: var(--azure); }
+    .c-azure-lt   { color: var(--azure-light); }
+    .c-azure-dk   { color: var(--azure-dark); }
+    .c-amber      { color: var(--amber); }
+    .c-jade       { color: var(--jade); }
+    .c-ember      { color: var(--ember); }
+    .c-rose       { color: var(--rose); }
+    .c-error      { color: var(--error); }
+    .c-silver     { color: var(--silver); }
+    .c-pewter     { color: var(--pewter); }
+    .c-dim        { color: var(--dim); }
+    .c-border     { color: var(--border); }
+    .bold         { font-weight: 700; }
+    .italic       { font-style: italic; }
+
+    /* ── status badges ────────────────────────────────────────────────── */
+    .status-open        { color: var(--silver); }
+    .status-in-progress { color: var(--amber); }
+    .status-done        { color: var(--jade); }
+    .status-cancelled   { color: var(--dim); }
+    .status-blocked     { color: var(--error); font-weight: 700; }
+    .status-blocking    { color: var(--amber); font-weight: 700; }
+
+    /* ── tables ───────────────────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      text-align: left;
+      color: var(--pewter);
+      font-weight: 500;
+      font-size: 12px;
+      padding: 6px 12px 6px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 6px 12px 6px 0;
+      vertical-align: middle;
+      border-bottom: 1px solid #1C1E26;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    /* ── separator ────────────────────────────────────────────────────── */
+    .rule {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 16px 0;
+    }
+
+    /* ── section heading ──────────────────────────────────────────────── */
+    .section-heading {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--azure);
+      margin-bottom: 12px;
+    }
+
+    /* ── summary line ─────────────────────────────────────────────────── */
+    .summary {
+      font-size: 12px;
+      color: var(--pewter);
+      margin-bottom: 16px;
+    }
+
+    /* ── id display ───────────────────────────────────────────────────── */
+    .id-prefix { color: var(--azure); font-weight: 700; }
+    .id-rest   { color: var(--pewter); }
+
+    /* ── tags ─────────────────────────────────────────────────────────── */
+    .tag { color: var(--azure); font-style: italic; }
+
+    /* ── priority badge ───────────────────────────────────────────────── */
+    .priority { color: var(--pewter); }
+
+    /* ── markdown rendered content ────────────────────────────────────── */
+    .md-content h1,
+    .md-content h2,
+    .md-content h3,
+    .md-content h4,
+    .md-content h5,
+    .md-content h6 {
+      color: var(--azure);
+      font-weight: 700;
+      margin: 16px 0 8px;
+    }
+
+    .md-content p { margin: 8px 0; }
+    .md-content a { color: var(--azure); text-decoration: underline; }
+    .md-content code { color: var(--ember); }
+
+    .md-content pre {
+      background: #0A0B0E;
+      border-left: 2px solid var(--azure-dark);
+      padding: 10px 20px;
+      margin: 8px 20px;
+      overflow-x: auto;
+    }
+
+    .md-content pre code { color: var(--silver); }
+
+    .md-content blockquote {
+      background: #0A0B0E;
+      border-left: 2px solid var(--dim);
+      padding: 8px 20px;
+      margin: 8px 20px;
+      color: var(--pewter);
+      font-style: italic;
+    }
+
+    .md-content ul,
+    .md-content ol {
+      margin: 8px 0 8px 24px;
+    }
+
+    .md-content table {
+      margin: 8px 0;
+    }
+
+    .md-content table th {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .md-content table td {
+      border-bottom: 1px solid #1C1E26;
+    }
+
+    .md-content input[type="checkbox"] {
+      margin-right: 6px;
+    }
+
+    /* ── search form ──────────────────────────────────────────────────── */
+    .search-input {
+      background: var(--obsidian);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--silver);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 8px 12px;
+      width: 100%;
+      max-width: 400px;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--azure);
+    }
+
+    .search-input::placeholder {
+      color: var(--dim);
+    }
+
+    /* ── kanban board ─────────────────────────────────────────────────── */
+    .kanban {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .kanban-col {
+      background: var(--obsidian);
+      border: 1px solid #1C1E26;
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 200px;
+    }
+
+    .kanban-col-header {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #1C1E26;
+    }
+
+    .kanban-card {
+      background: var(--dusk);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .kanban-card:last-child { margin-bottom: 0; }
+
+    .kanban-card-title {
+      color: var(--silver);
+      margin-bottom: 4px;
+    }
+
+    .kanban-card-meta {
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    /* ── dashboard cards ──────────────────────────────────────────────── */
+    .dash-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .dash-card {
+      background: var(--obsidian);
+      border: 1px solid #1C1E26;
+      border-radius: 8px;
+      padding: 20px;
+      text-decoration: none;
+      transition: border-color 0.15s;
+    }
+
+    .dash-card:hover {
+      border-color: var(--azure-dark);
+      text-decoration: none;
+    }
+
+    .dash-card-count {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--azure);
+      margin-bottom: 4px;
+    }
+
+    .dash-card-label {
+      font-size: 12px;
+      color: var(--pewter);
+      letter-spacing: .04em;
+    }
+
+    /* ── empty state ──────────────────────────────────────────────────── */
+    .empty {
+      color: var(--dim);
+      font-style: italic;
+      padding: 24px 0;
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="shell">
+    <nav class="nav">
+      <span class="nav-brand">gest</span>
+      <a href="/" {% block nav_dashboard %}{% endblock %}>dashboard</a>
+      <a href="/tasks" {% block nav_tasks %}{% endblock %}>tasks</a>
+      <a href="/artifacts" {% block nav_artifacts %}{% endblock %}>artifacts</a>
+      <a href="/iterations" {% block nav_iterations %}{% endblock %}>iterations</a>
+      <a href="/search" {% block nav_search %}{% endblock %}>search</a>
+    </nav>
+
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

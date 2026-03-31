@@ -146,5 +146,5 @@ cargo install gest
 Or use the install script with a pinned version:
 
 ```sh
-GEST_VERSION=0.3.0 curl -fsSL https://raw.githubusercontent.com/aaronmallen/gest/main/script/install.sh | sh
+GEST_VERSION=0.3.0 curl -fsSL https://gest.aaronmallen.dev/install | sh
 ```

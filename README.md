@@ -54,7 +54,7 @@ the resolved configuration and its source files.
 ### Quick Install (macOS and Linux)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/aaronmallen/gest/main/script/install.sh | sh
+curl -fsSL https://gest.aaronmallen.dev/install | sh
 ```
 
 > [!TIP]
@@ -68,7 +68,7 @@ Pin a specific version or change the install directory:
 
 ```sh
 GEST_VERSION=0.0.1 GEST_INSTALL_PATH=/usr/local/bin \
-  curl -fsSL https://raw.githubusercontent.com/aaronmallen/gest/main/script/install.sh | sh
+  curl -fsSL https://gest.aaronmallen.dev/install | sh
 ```
 
 ### Cargo

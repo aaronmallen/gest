@@ -6,7 +6,7 @@ The fastest way to get gest is with the install script, which downloads a pre-bu
 your platform:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/aaronmallen/gest/main/script/install.sh | sh
+curl -fsSL https://gest.aaronmallen.dev/install | sh
 ```
 
 This installs `gest` to `~/.local/bin`. Make sure it is on your `PATH`:
@@ -19,7 +19,7 @@ To pin a specific version or change the install directory:
 
 ```sh
 GEST_VERSION=0.3.0 GEST_INSTALL_PATH=/usr/local/bin \
-  curl -fsSL https://raw.githubusercontent.com/aaronmallen/gest/main/script/install.sh | sh
+  curl -fsSL https://gest.aaronmallen.dev/install | sh
 ```
 
 ## Install via Cargo

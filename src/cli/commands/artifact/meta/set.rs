@@ -53,9 +53,19 @@ fn parse_yaml_value(s: &str) -> yaml_serde::Value {
   }
 }
 
+/// Maximum number of dot-delimited segments allowed in a key path.
+const MAX_DEPTH: usize = 32;
+
 /// Set a value in a YAML mapping at the given dot-delimited path, creating intermediate mappings as needed.
 fn set_dot_path(mapping: &mut yaml_serde::Mapping, path: &str, value: &str) -> cli::Result<()> {
   let segments: Vec<&str> = path.split('.').collect();
+
+  if segments.len() > MAX_DEPTH {
+    return Err(cli::Error::generic(format!(
+      "key path exceeds maximum depth of {MAX_DEPTH} segments"
+    )));
+  }
+
   let yaml_value = parse_yaml_value(value);
 
   if segments.len() == 1 {
@@ -69,9 +79,12 @@ fn set_dot_path(mapping: &mut yaml_serde::Mapping, path: &str, value: &str) -> c
 
 /// Recursively insert a value into nested YAML mappings along the given path segments.
 fn set_nested(mapping: &mut yaml_serde::Mapping, segments: &[&str], value: yaml_serde::Value) {
-  let key = yaml_serde::Value::String(segments[0].to_string());
+  let Some((&first, rest)) = segments.split_first() else {
+    return;
+  };
+  let key = yaml_serde::Value::String(first.to_string());
 
-  if segments.len() == 1 {
+  if rest.is_empty() {
     mapping.insert(key, value);
     return;
   }
@@ -81,10 +94,10 @@ fn set_nested(mapping: &mut yaml_serde::Mapping, segments: &[&str], value: yaml_
     .or_insert_with(|| yaml_serde::Value::Mapping(yaml_serde::Mapping::new()));
 
   if let yaml_serde::Value::Mapping(m) = nested {
-    set_nested(m, &segments[1..], value);
+    set_nested(m, rest, value);
   } else {
     let mut new_mapping = yaml_serde::Mapping::new();
-    set_nested(&mut new_mapping, &segments[1..], value);
+    set_nested(&mut new_mapping, rest, value);
     mapping.insert(key, yaml_serde::Value::Mapping(new_mapping));
   }
 }

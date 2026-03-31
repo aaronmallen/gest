@@ -26,7 +26,7 @@ impl Command {
     let id = store::resolve_task_id(config, &self.id, false)?;
     let mut task = store::read_task(config, &id)?;
 
-    store::meta::set_dot_path(&mut task.metadata, &self.path, &self.value);
+    store::meta::set_dot_path(&mut task.metadata, &self.path, &self.value)?;
 
     task.updated_at = Utc::now();
     store::write_task(config, &task)?;

@@ -53,24 +53,38 @@ pub fn parse_toml_value(s: &str) -> toml::Value {
   }
 }
 
+/// Maximum number of dot-delimited segments allowed in a key path.
+const MAX_DEPTH: usize = 32;
+
 /// Insert a value at a dot-delimited path, creating intermediate tables as needed.
-pub fn set_dot_path(table: &mut toml::Table, path: &str, value: &str) {
+pub fn set_dot_path(table: &mut toml::Table, path: &str, value: &str) -> super::Result<()> {
   let segments: Vec<&str> = path.split('.').collect();
+
+  if segments.len() > MAX_DEPTH {
+    return Err(super::Error::generic(format!(
+      "key path exceeds maximum depth of {MAX_DEPTH} segments"
+    )));
+  }
+
   let toml_value = parse_toml_value(value);
 
   if segments.len() == 1 {
     table.insert(segments[0].to_string(), toml_value);
-    return;
+    return Ok(());
   }
 
   set_nested(table, &segments, toml_value);
+  Ok(())
 }
 
 /// Recursively descend into (or create) nested tables and insert the value at the final segment.
-pub fn set_nested(table: &mut toml::Table, segments: &[&str], value: toml::Value) {
-  let key = segments[0].to_string();
+pub(crate) fn set_nested(table: &mut toml::Table, segments: &[&str], value: toml::Value) {
+  let Some((&first, rest)) = segments.split_first() else {
+    return;
+  };
+  let key = first.to_string();
 
-  if segments.len() == 1 {
+  if rest.is_empty() {
     table.insert(key, value);
     return;
   }
@@ -80,10 +94,10 @@ pub fn set_nested(table: &mut toml::Table, segments: &[&str], value: toml::Value
     .or_insert_with(|| toml::Value::Table(toml::Table::new()));
 
   if let toml::Value::Table(t) = nested {
-    set_nested(t, &segments[1..], value);
+    set_nested(t, rest, value);
   } else {
     let mut new_table = toml::Table::new();
-    set_nested(&mut new_table, &segments[1..], value);
+    set_nested(&mut new_table, rest, value);
     table.insert(key, toml::Value::Table(new_table));
   }
 }

@@ -26,7 +26,7 @@ impl Command {
     let id = store::resolve_iteration_id(config, &self.id, false)?;
     let mut iteration = store::read_iteration(config, &id)?;
 
-    store::meta::set_dot_path(&mut iteration.metadata, &self.path, &self.value);
+    store::meta::set_dot_path(&mut iteration.metadata, &self.path, &self.value)?;
 
     iteration.updated_at = Utc::now();
     store::write_iteration(config, &iteration)?;

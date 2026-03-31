@@ -2,6 +2,7 @@
 
 use axum::{
   Json,
+  body::Bytes,
   extract::{Form, Path, Query, State},
   http::StatusCode,
   response::{Html, IntoResponse, Redirect, Response},
@@ -19,10 +20,27 @@ use super::{
 use crate::{
   model::{
     ArtifactFilter, ArtifactPatch, IterationFilter, NewArtifact, NewTask, TaskFilter, TaskPatch,
-    iteration::Status as IterationStatus, task::Status,
+    iteration::Status as IterationStatus,
+    link::{Link, RelationshipType},
+    task::Status,
   },
   store,
 };
+
+/// Parse parallel `link_rel[]` and `link_ref[]` form fields into `Vec<Link>`.
+fn parse_form_links(rels: &[String], refs: &[String]) -> Vec<Link> {
+  rels
+    .iter()
+    .zip(refs.iter())
+    .filter_map(|(rel, ref_)| {
+      let rel: RelationshipType = rel.parse().ok()?;
+      Some(Link {
+        ref_: ref_.clone(),
+        rel,
+      })
+    })
+    .collect()
+}
 
 /// Render a Markdown string to HTML using GFM extensions.
 fn render_markdown(input: &str) -> String {
@@ -208,16 +226,51 @@ pub async fn task_create_form() -> Response {
 }
 
 /// Form data for task creation.
-#[derive(serde::Deserialize)]
 pub struct TaskFormData {
   pub title: String,
   pub description: String,
   pub tags: String,
   pub priority: String,
+  pub link_rels: Vec<String>,
+  pub link_refs: Vec<String>,
+}
+
+impl TaskFormData {
+  /// Parse from raw URL-encoded form bytes, correctly handling repeated keys.
+  fn from_bytes(bytes: &[u8]) -> Self {
+    let mut title = String::new();
+    let mut description = String::new();
+    let mut tags = String::new();
+    let mut priority = String::new();
+    let mut link_rels = Vec::new();
+    let mut link_refs = Vec::new();
+
+    for (key, value) in form_urlencoded::parse(bytes) {
+      match key.as_ref() {
+        "title" => title = value.into_owned(),
+        "description" => description = value.into_owned(),
+        "tags" => tags = value.into_owned(),
+        "priority" => priority = value.into_owned(),
+        "link_rel[]" => link_rels.push(value.into_owned()),
+        "link_ref[]" => link_refs.push(value.into_owned()),
+        _ => {}
+      }
+    }
+
+    Self {
+      title,
+      description,
+      tags,
+      priority,
+      link_rels,
+      link_refs,
+    }
+  }
 }
 
 /// POST /tasks — create a task.
-pub async fn task_create(State(state): State<ServerState>, Form(form): Form<TaskFormData>) -> Response {
+pub async fn task_create(State(state): State<ServerState>, body: Bytes) -> Response {
+  let form = TaskFormData::from_bytes(&body);
   let title = form.title.trim().to_string();
   if title.is_empty() {
     return TaskCreateTemplate {
@@ -243,11 +296,14 @@ pub async fn task_create(State(state): State<ServerState>, Form(form): Form<Task
     form.priority.trim().parse().ok()
   };
 
+  let links = parse_form_links(&form.link_rels, &form.link_refs);
+
   let new_task = NewTask {
     title,
     description: form.description,
     tags,
     priority,
+    links,
     ..Default::default()
   };
 
@@ -290,11 +346,8 @@ pub async fn task_edit_form(State(state): State<ServerState>, Path(id_str): Path
 }
 
 /// POST /tasks/:id — update a task.
-pub async fn task_update(
-  State(state): State<ServerState>,
-  Path(id_str): Path<String>,
-  Form(form): Form<TaskFormData>,
-) -> Response {
+pub async fn task_update(State(state): State<ServerState>, Path(id_str): Path<String>, body: Bytes) -> Response {
+  let form = TaskFormData::from_bytes(&body);
   let id = match store::resolve_task_id(&state.settings, &id_str, true) {
     Ok(id) => id,
     Err(_) => return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response(),
@@ -342,8 +395,16 @@ pub async fn task_update(
     ..Default::default()
   };
 
+  let links = parse_form_links(&form.link_rels, &form.link_refs);
+
   match store::update_task(&state.settings, &id, patch) {
-    Ok(task) => Redirect::to(&format!("/tasks/{}", task.id)).into_response(),
+    Ok(mut task) => {
+      task.links = links;
+      if let Err(e) = store::write_task(&state.settings, &task) {
+        log::error!("failed to write task links {id}: {e}");
+      }
+      Redirect::to(&format!("/tasks/{}", task.id)).into_response()
+    }
     Err(e) => {
       log::error!("failed to update task {id}: {e}");
       (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()

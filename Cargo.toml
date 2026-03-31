@@ -23,6 +23,7 @@ clap = { features = ["derive"], version = "4" }
 clap_complete = "4"
 clap_mangen = "0.3"
 dir_spec = "0.5"
+form_urlencoded = "1.2.2"
 log = "0.4"
 pulldown-cmark = "0.13"
 rand = "0.10"

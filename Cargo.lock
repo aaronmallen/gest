@@ -863,6 +863,7 @@ dependencies = [
  "clap_complete",
  "clap_mangen",
  "dir_spec",
+ "form_urlencoded",
  "log",
  "pretty_assertions",
  "pulldown-cmark",

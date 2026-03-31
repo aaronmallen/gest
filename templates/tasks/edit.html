@@ -61,7 +61,32 @@
         </select>
       </div>
 
-      <!-- relationships modal placeholder -->
+      <div class="form-group">
+        <button type="button" id="rel-toggle" class="btn">Relationships</button>
+        <div id="rel-modal" class="rel-modal">
+          <div class="rel-types">
+            <button type="button" class="rel-type-btn" data-rel="relates-to">relates to</button>
+            <button type="button" class="rel-type-btn" data-rel="blocks">blocks</button>
+            <button type="button" class="rel-type-btn" data-rel="blocked-by">blocked by</button>
+            <button type="button" class="rel-type-btn" data-rel="parent-of">parent of</button>
+            <button type="button" class="rel-type-btn" data-rel="child-of">child of</button>
+          </div>
+          <input type="text" class="form-input rel-search-input" placeholder="Search tasks and artifacts…">
+          <div class="rel-results"></div>
+          <div class="rel-pending">
+            {% for link in task.links.iter() %}
+            <div class="rel-pending-item">
+              <span class="c-pewter">{{ link.rel }}</span>
+              <span class="c-azure">{{ link.ref_ }}</span>
+              <button type="button" class="rel-remove">&times;</button>
+              <input type="hidden" name="link_rel[]" value="{{ link.rel }}">
+              <input type="hidden" name="link_ref[]" value="{{ link.ref_ }}">
+            </div>
+            {% endfor %}
+          </div>
+          <div class="rel-hidden-inputs"></div>
+        </div>
+      </div>
 
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save Changes</button>

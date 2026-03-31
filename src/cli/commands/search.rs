@@ -43,7 +43,7 @@ impl Command {
       return Ok(());
     }
 
-    let items = build_search_items(&ctx.settings, &results, &ctx.theme);
+    let items = build_search_items(&ctx.settings, &results, &ctx.theme, self.expand);
 
     if self.expand {
       println!("{}", SearchExpandedView::new(&self.query, &items, &ctx.theme));
@@ -56,7 +56,12 @@ impl Command {
 }
 
 /// Convert raw search results into view-layer items with pre-rendered row content.
-fn build_search_items(config: &Settings, results: &store::SearchResults, theme: &Theme) -> Vec<SearchResultItem> {
+fn build_search_items(
+  config: &Settings,
+  results: &store::SearchResults,
+  theme: &Theme,
+  expand: bool,
+) -> Vec<SearchResultItem> {
   let mut items = Vec::with_capacity(results.tasks.len() + results.artifacts.len());
 
   for task in &results.tasks {
@@ -75,6 +80,8 @@ fn build_search_items(config: &Settings, results: &store::SearchResults, theme: 
 
     let snippet = if task.description.is_empty() {
       None
+    } else if expand {
+      Some(task.description.clone())
     } else {
       Some(truncate_snippet(&task.description, 200))
     };
@@ -103,6 +110,8 @@ fn build_search_items(config: &Settings, results: &store::SearchResults, theme: 
 
     let snippet = if artifact.body.is_empty() {
       None
+    } else if expand {
+      Some(artifact.body.clone())
     } else {
       Some(truncate_snippet(&artifact.body, 200))
     };

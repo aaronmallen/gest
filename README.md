@@ -26,7 +26,7 @@ Use `gest init --local` to store data inside the repo (`.gest/`) instead of the 
 
 ## Documentation
 
-Full documentation is available at https://gest.aaronmallen.dev.
+Full documentation is available at <https://gest.aaronmallen.dev>.
 
 ## Commands
 

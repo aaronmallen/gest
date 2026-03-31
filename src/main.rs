@@ -2,6 +2,7 @@ mod cli;
 mod config;
 mod logger;
 mod model;
+mod server;
 mod store;
 #[cfg(test)]
 mod test_helpers;

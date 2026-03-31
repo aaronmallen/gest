@@ -16,7 +16,6 @@ pkg-url = "{repo}/releases/download/v{version}/{name}-v{version}-{target}.tar.gz
 
 [dependencies]
 askama = "0.15"
-askama-derive-axum = "0.1"
 axum = "0.8"
 chrono = { features = ["serde"], version = "0.4" }
 clap = { features = ["derive"], version = "4" }
@@ -39,7 +38,6 @@ terminal_size = "0.4"
 thiserror = "2"
 tokio = { features = ["macros", "rt-multi-thread", "net"], version = "1" }
 toml = "1"
-tower-http = { features = ["set-header"], version = "0.6" }
 typed-env = "0.3"
 unicode-width = "0.2"
 yaml_serde = "0.10"

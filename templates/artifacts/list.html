@@ -20,7 +20,7 @@
         <tr>
           <th>ID</th>
           <th>Title</th>
-          <th>Kind</th>
+          <th>Type</th>
           <th>Tags</th>
           <th></th>
         </tr>
@@ -29,13 +29,13 @@
         {% for a in artifacts %}
         <tr{% if a.archived_at.is_some() %} class="c-dim"{% endif %}>
           <td>
-            <a href="/artifacts/{{ a.id.short() }}">
-              <span class="id-prefix">{{ a.id.short() }}</span><span class="id-rest">{{ a.id.to_string()[8..] }}</span>
+            <a href="/artifacts/{{ a.id }}">
+              <span class="id-prefix">{{ a.id.short() }}</span>
             </a>
           </td>
           <td>{{ a.title }}</td>
           <td class="c-pewter">{% match a.kind %}{% when Some with (k) %}{{ k }}{% when None %}{% endmatch %}</td>
-          <td>{% for t in a.tags %}<span class="tag">#{{ t }}</span>{% if !loop.last %} {% endif %}{% endfor %}</td>
+          <td>{% for t in a.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
           <td>{% if a.archived_at.is_some() %}<span class="c-dim">[archived]</span>{% endif %}</td>
         </tr>
         {% endfor %}

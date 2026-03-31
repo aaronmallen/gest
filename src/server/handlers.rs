@@ -87,13 +87,10 @@ pub async fn task_list(State(state): State<ServerState>) -> Response {
     .iter()
     .zip(blockings)
     .map(|(task, blocking)| {
-      let full_id = task.id.to_string();
-      let id_rest = full_id[task.id.short().len()..].to_owned();
       let is_blocked = !blocking.blocked_by_ids.is_empty();
       TaskRow {
         task: task.clone(),
         blocking,
-        id_rest,
         is_blocked,
       }
     })
@@ -110,7 +107,9 @@ pub async fn task_list(State(state): State<ServerState>) -> Response {
 pub async fn task_detail(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
   let id = match store::resolve_task_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response();
+    }
   };
 
   let task = match store::read_task(&state.settings, &id) {
@@ -122,15 +121,15 @@ pub async fn task_detail(State(state): State<ServerState>, Path(id_str): Path<St
   };
 
   let blocking = store::resolve_blocking(&state.settings, &task);
-  let full_id = task.id.to_string();
-  let id_rest = full_id[task.id.short().len()..].to_owned();
   let is_blocked = !blocking.blocked_by_ids.is_empty();
+
+  let description_html = render_markdown(&task.description);
 
   TaskDetailTemplate {
     task,
     blocking,
-    id_rest,
     is_blocked,
+    description_html,
   }
   .into_response()
 }
@@ -162,7 +161,9 @@ pub async fn artifact_list(State(state): State<ServerState>) -> Response {
 pub async fn artifact_detail(State(state): State<ServerState>, Path(id): Path<String>) -> Response {
   let resolved = match store::resolve_artifact_id(&state.settings, &id, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
+    }
   };
 
   match store::read_artifact(&state.settings, &resolved) {
@@ -212,7 +213,9 @@ pub async fn iteration_list(State(state): State<ServerState>) -> Response {
 pub async fn iteration_detail(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
   let id = match store::resolve_iteration_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response();
+    }
   };
 
   let iteration = match store::read_iteration(&state.settings, &id) {
@@ -224,8 +227,6 @@ pub async fn iteration_detail(State(state): State<ServerState>, Path(id_str): Pa
   };
 
   let tasks = store::read_iteration_tasks(&state.settings, &iteration);
-  let full_id = iteration.id.to_string();
-  let id_rest = full_id[iteration.id.short().len()..].to_owned();
 
   // Group tasks by phase
   let mut phase_map: std::collections::BTreeMap<u16, Vec<crate::model::Task>> = std::collections::BTreeMap::new();
@@ -243,7 +244,6 @@ pub async fn iteration_detail(State(state): State<ServerState>, Path(id_str): Pa
 
   IterationDetailTemplate {
     iteration,
-    id_rest,
     tasks,
     phases,
   }
@@ -254,7 +254,9 @@ pub async fn iteration_detail(State(state): State<ServerState>, Path(id_str): Pa
 pub async fn iteration_board(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
   let id = match store::resolve_iteration_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response();
+    }
   };
 
   let iteration = match store::read_iteration(&state.settings, &id) {

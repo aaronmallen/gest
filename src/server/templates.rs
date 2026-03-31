@@ -52,7 +52,6 @@ impl IntoResponse for DashboardTemplate {
 pub struct TaskRow {
   pub task: Task,
   pub blocking: ResolvedBlocking,
-  pub id_rest: String,
   pub is_blocked: bool,
 }
 
@@ -74,8 +73,8 @@ impl IntoResponse for TaskListTemplate {
 pub struct TaskDetailTemplate {
   pub task: Task,
   pub blocking: ResolvedBlocking,
-  pub id_rest: String,
   pub is_blocked: bool,
+  pub description_html: String,
 }
 
 impl IntoResponse for TaskDetailTemplate {
@@ -135,7 +134,6 @@ pub struct PhaseGroup {
 #[template(path = "iterations/detail.html")]
 pub struct IterationDetailTemplate {
   pub iteration: Iteration,
-  pub id_rest: String,
   pub tasks: Vec<Task>,
   pub phases: Vec<PhaseGroup>,
 }

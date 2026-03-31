@@ -30,8 +30,8 @@
         {% for it in iterations %}
         <tr>
           <td>
-            <a href="/iterations/{{ it.id.short() }}">
-              <span class="id-prefix">{{ it.id.short() }}</span><span class="id-rest">{{ it.id.to_string()[8..] }}</span>
+            <a href="/iterations/{{ it.id }}">
+              <span class="id-prefix">{{ it.id.short() }}</span>
             </a>
           </td>
           <td>{{ it.title }}</td>
@@ -47,7 +47,7 @@
           </td>
           <td class="c-pewter">{{ it.tasks.len() }}</td>
           <td class="c-pewter">{% match it.phase_count %}{% when Some with (n) %}{{ n }}{% when None %}—{% endmatch %}</td>
-          <td>{% for t in it.tags %}<span class="tag">#{{ t }}</span>{% if !loop.last %} {% endif %}{% endfor %}</td>
+          <td>{% for t in it.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
         </tr>
         {% endfor %}
       </tbody>

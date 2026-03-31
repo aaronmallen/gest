@@ -47,8 +47,8 @@
             {% endif %}
           </td>
           <td>
-            <a href="/tasks/{{ row.task.id.short() }}">
-              <span class="id-prefix">{{ row.task.id.short() }}</span><span class="id-rest">{{ row.id_rest }}</span>
+            <a href="/tasks/{{ row.task.id }}">
+              <span class="id-prefix">{{ row.task.id.short() }}</span>
             </a>
           </td>
           <td>
@@ -85,14 +85,14 @@
           </td>
           <td class="c-dim">
             {% if row.is_blocked %}
-              blocked by {{ row.blocking.blocked_by_ids.join(", ") }}
+              blocked by {% for bid in row.blocking.blocked_by_ids.iter() %}<a href="/tasks/{{ bid }}"><span class="c-azure">{{ bid[..8] }}</span></a>{% if !loop.last %}, {% endif %}{% endfor %}
             {% else if row.blocking.is_blocking %}
               blocking others
             {% endif %}
           </td>
           <td>
             {% for tag in row.task.tags.iter() %}
-              <span class="tag">#{{ tag }}</span>{{ " " }}
+              <a href="/search?q=tag:{{ tag }}" class="tag">#{{ tag }}</a>{{ " " }}
             {% endfor %}
           </td>
         </tr>

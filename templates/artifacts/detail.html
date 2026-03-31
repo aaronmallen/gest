@@ -12,7 +12,7 @@
   </div>
   <div class="term-body">
     <div style="margin-bottom: 12px;">
-      <span class="id-prefix">{{ artifact.id.short() }}</span><span class="id-rest">{{ artifact.id.to_string()[8..] }}</span>
+      <span class="id-prefix">{{ artifact.id.short() }}</span>
     </div>
 
     <table>
@@ -24,7 +24,7 @@
         {% match artifact.kind %}
         {% when Some with (k) %}
         <tr>
-          <td class="c-pewter">kind</td>
+          <td class="c-pewter">type</td>
           <td>{{ k }}</td>
         </tr>
         {% when None %}
@@ -32,7 +32,7 @@
         {% if !artifact.tags.is_empty() %}
         <tr>
           <td class="c-pewter">tags</td>
-          <td>{% for t in artifact.tags %}<span class="tag">#{{ t }}</span>{% if !loop.last %} {% endif %}{% endfor %}</td>
+          <td>{% for t in artifact.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
         </tr>
         {% endif %}
         <tr>

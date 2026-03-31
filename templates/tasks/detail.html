@@ -16,7 +16,7 @@
         <tr>
           <td class="c-pewter" style="width:120px">ID</td>
           <td>
-            <span class="id-prefix">{{ task.id.short() }}</span><span class="id-rest">{{ id_rest }}</span>
+            <span class="id-prefix">{{ task.id.short() }}</span>
           </td>
         </tr>
         <tr>
@@ -72,7 +72,7 @@
           <td class="c-pewter">Tags</td>
           <td>
             {% for tag in task.tags.iter() %}
-              <span class="tag">#{{ tag }}</span>{{ " " }}
+              <a href="/search?q=tag:{{ tag }}" class="tag">#{{ tag }}</a>{{ " " }}
             {% endfor %}
           </td>
         </tr>
@@ -91,7 +91,9 @@
     {% if !task.description.is_empty() %}
     <hr class="rule">
     <div class="section-heading">Description</div>
-    <div style="white-space: pre-wrap;">{{ task.description }}</div>
+    <div class="md-content">
+      {{ description_html|safe }}
+    </div>
     {% endif %}
 
     {% if !task.links.is_empty() %}
@@ -113,7 +115,7 @@
     <hr class="rule">
     <div class="section-heading" style="color: var(--error);">Blocked by</div>
     {% for bid in blocking.blocked_by_ids.iter() %}
-      <a href="/tasks/{{ bid }}"><span class="c-azure">{{ bid }}</span></a>{{ " " }}
+      <a href="/tasks/{{ bid }}"><span class="c-azure">{{ bid[..8] }}</span></a>{{ " " }}
     {% endfor %}
     {% endif %}
 

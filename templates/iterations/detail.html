@@ -7,7 +7,7 @@
 <div class="summary">
   <a href="/iterations">← iterations</a>
   &nbsp;·&nbsp;
-  <a href="/iterations/{{ iteration.id.short() }}/board">kanban board →</a>
+  <a href="/iterations/{{ iteration.id }}/board">kanban board →</a>
 </div>
 
 <div class="term">
@@ -20,7 +20,7 @@
         <tr>
           <td class="c-pewter" style="width:120px">ID</td>
           <td>
-            <span class="id-prefix">{{ iteration.id.short() }}</span><span class="id-rest">{{ id_rest }}</span>
+            <span class="id-prefix">{{ iteration.id.short() }}</span>
           </td>
         </tr>
         <tr>
@@ -55,7 +55,7 @@
         {% if !iteration.tags.is_empty() %}
         <tr>
           <td class="c-pewter">Tags</td>
-          <td>{% for t in iteration.tags %}<span class="tag">#{{ t }}</span>{% if !loop.last %} {% endif %}{% endfor %}</td>
+          <td>{% for t in iteration.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
         </tr>
         {% endif %}
         <tr>
@@ -98,7 +98,7 @@
               {% endmatch %}
             </td>
             <td style="width: 100px;">
-              <a href="/tasks/{{ task.id.short() }}">
+              <a href="/tasks/{{ task.id }}">
                 <span class="id-prefix">{{ task.id.short() }}</span>
               </a>
             </td>

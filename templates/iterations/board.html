@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="summary">
-  <a href="/iterations/{{ iteration.id.short() }}">← {{ iteration.title }}</a>
+  <a href="/iterations/{{ iteration.id }}">← {{ iteration.title }}</a>
 </div>
 
 <div class="section-heading">Kanban Board</div>
@@ -16,10 +16,10 @@
     {% for task in open_tasks %}
     <div class="kanban-card">
       <div class="kanban-card-title">
-        <a href="/tasks/{{ task.id.short() }}">{{ task.title }}</a>
+        <a href="/tasks/{{ task.id }}">{{ task.title }}</a>
       </div>
       <div class="kanban-card-meta">
-        <span class="id-prefix">{{ task.id.short() }}</span>
+        <a href="/tasks/{{ task.id }}"><span class="id-prefix">{{ task.id.short() }}</span></a>
         {% match task.priority %}
           {% when Some with (p) %} · <span class="priority">P{{ p }}</span>{% when None %}
         {% endmatch %}
@@ -39,10 +39,10 @@
     {% for task in in_progress_tasks %}
     <div class="kanban-card">
       <div class="kanban-card-title">
-        <a href="/tasks/{{ task.id.short() }}">{{ task.title }}</a>
+        <a href="/tasks/{{ task.id }}">{{ task.title }}</a>
       </div>
       <div class="kanban-card-meta">
-        <span class="id-prefix">{{ task.id.short() }}</span>
+        <a href="/tasks/{{ task.id }}"><span class="id-prefix">{{ task.id.short() }}</span></a>
         {% match task.priority %}
           {% when Some with (p) %} · <span class="priority">P{{ p }}</span>{% when None %}
         {% endmatch %}
@@ -62,10 +62,10 @@
     {% for task in done_tasks %}
     <div class="kanban-card">
       <div class="kanban-card-title">
-        <a href="/tasks/{{ task.id.short() }}">{{ task.title }}</a>
+        <a href="/tasks/{{ task.id }}">{{ task.title }}</a>
       </div>
       <div class="kanban-card-meta">
-        <span class="id-prefix">{{ task.id.short() }}</span>
+        <a href="/tasks/{{ task.id }}"><span class="id-prefix">{{ task.id.short() }}</span></a>
         {% match task.priority %}
           {% when Some with (p) %} · <span class="priority">P{{ p }}</span>{% when None %}
         {% endmatch %}
@@ -80,10 +80,10 @@
     {% for task in cancelled_tasks %}
     <div class="kanban-card">
       <div class="kanban-card-title">
-        <a href="/tasks/{{ task.id.short() }}">{{ task.title }}</a>
+        <a href="/tasks/{{ task.id }}">{{ task.title }}</a>
       </div>
       <div class="kanban-card-meta">
-        <span class="id-prefix">{{ task.id.short() }}</span>
+        <a href="/tasks/{{ task.id }}"><span class="id-prefix">{{ task.id.short() }}</span></a>
       </div>
     </div>
     {% endfor %}

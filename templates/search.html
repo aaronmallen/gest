@@ -17,8 +17,33 @@
 <p class="empty">No results found.</p>
 {% endif %}
 
-{% if !tasks.is_empty() %}
+{% if !artifacts.is_empty() %}
 <div style="margin-bottom: 24px;">
+  <div class="c-azure bold" style="margin-bottom: 8px;">Artifacts ({{ artifacts.len() }})</div>
+  <div class="term">
+    <div class="term-body">
+      <table>
+        <tbody>
+          {% for a in artifacts %}
+          <tr{% if a.archived_at.is_some() %} class="c-dim"{% endif %}>
+            <td style="width: 100px;">
+              <a href="/artifacts/{{ a.id }}">
+                <span class="id-prefix">{{ a.id.short() }}</span>
+              </a>
+            </td>
+            <td>{{ a.title }}</td>
+            <td>{% for t in a.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if !tasks.is_empty() %}
+<div>
   <div class="c-azure bold" style="margin-bottom: 8px;">Tasks ({{ tasks.len() }})</div>
   <div class="term">
     <div class="term-body">
@@ -35,7 +60,7 @@
               {% endmatch %}
             </td>
             <td style="width: 100px;">
-              <a href="/tasks/{{ task.id.short() }}">
+              <a href="/tasks/{{ task.id }}">
                 <span class="id-prefix">{{ task.id.short() }}</span>
               </a>
             </td>
@@ -48,31 +73,6 @@
                 {% when TaskStatus::Cancelled %}<span class="status-cancelled">cancelled</span>
               {% endmatch %}
             </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{% if !artifacts.is_empty() %}
-<div>
-  <div class="c-azure bold" style="margin-bottom: 8px;">Artifacts ({{ artifacts.len() }})</div>
-  <div class="term">
-    <div class="term-body">
-      <table>
-        <tbody>
-          {% for a in artifacts %}
-          <tr{% if a.archived_at.is_some() %} class="c-dim"{% endif %}>
-            <td style="width: 100px;">
-              <a href="/artifacts/{{ a.id.short() }}">
-                <span class="id-prefix">{{ a.id.short() }}</span>
-              </a>
-            </td>
-            <td>{{ a.title }}</td>
-            <td>{% for t in a.tags %}<span class="tag">#{{ t }}</span>{% if !loop.last %} {% endif %}{% endfor %}</td>
           </tr>
           {% endfor %}
         </tbody>

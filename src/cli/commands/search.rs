@@ -86,14 +86,9 @@ fn build_search_items(
       Some(truncate_snippet(&task.description, 200))
     };
 
-    let short_id = if id_str.len() > 8 {
-      id_str[..8].to_string()
-    } else {
-      id_str.clone()
-    };
     items.push(SearchResultItem {
       entity_type: EntityType::Task,
-      id: short_id,
+      id: task.id.short(),
       row_content,
       snippet,
     });
@@ -116,14 +111,9 @@ fn build_search_items(
       Some(truncate_snippet(&artifact.body, 200))
     };
 
-    let short_id = if id_str.len() > 8 {
-      id_str[..8].to_string()
-    } else {
-      id_str.clone()
-    };
     items.push(SearchResultItem {
       entity_type: EntityType::Artifact,
-      id: short_id,
+      id: artifact.id.short(),
       row_content,
       snippet,
     });

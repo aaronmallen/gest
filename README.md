@@ -37,6 +37,7 @@ Full documentation is available at <https://gest.aaronmallen.dev>.
 | `gest artifact`     | Create, list, show, update, tag, archive, and manage artifacts |
 | `gest iteration`    | Manage iterations (group tasks into phased execution plans)    |
 | `gest search`       | Search across tasks and artifacts                              |
+| `gest serve`        | Start a local web dashboard for browsing and managing entities |
 | `gest config`       | View and modify configuration                                  |
 | `gest generate`     | Generate shell completions and man pages                       |
 | `gest self-update`  | Update gest to the latest GitHub release                       |

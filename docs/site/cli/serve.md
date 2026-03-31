@@ -1,7 +1,7 @@
 # gest serve
 
-Start a local web server for browsing gest entities in a browser. The server provides a read-only web UI with a
-dashboard, task/artifact/iteration views, a kanban board, and full-text search.
+Start a local web server for browsing gest entities in a browser. The server provides a web UI with a dashboard,
+task/artifact/iteration views, a kanban board, and full-text search.
 
 ## Usage
 

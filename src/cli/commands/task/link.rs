@@ -105,6 +105,7 @@ mod tests {
       cmd2.call(&ctx).unwrap();
 
       let loaded = store::read_task(&ctx.settings, &source.id).unwrap();
+
       assert_eq!(loaded.links.len(), 2);
       let _ = dir;
     }
@@ -148,6 +149,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let loaded = store::read_task(&ctx.settings, &source.id).unwrap();
+
       assert_eq!(loaded.links[0].rel, RelationshipType::Blocks);
 
       let loaded_target = store::read_task(&ctx.settings, &target.id).unwrap();

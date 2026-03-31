@@ -1,5 +1,8 @@
 //! Shared YAML metadata helpers for reading and writing dot-delimited key paths on artifacts.
 
+/// Maximum number of dot-delimited segments allowed in a key path.
+const MAX_DEPTH: usize = 32;
+
 /// Walk a dot-delimited path through nested YAML mappings, returning a reference to the leaf value.
 pub fn resolve_dot_path<'a>(root: &'a yaml_serde::Value, path: &str) -> Option<&'a yaml_serde::Value> {
   path
@@ -45,9 +48,6 @@ pub fn parse_yaml_value(s: &str) -> yaml_serde::Value {
     _ => yaml_serde::Value::String(s.to_string()),
   }
 }
-
-/// Maximum number of dot-delimited segments allowed in a key path.
-const MAX_DEPTH: usize = 32;
 
 /// Set a value in a YAML mapping at the given dot-delimited path, creating intermediate mappings as needed.
 pub fn set_dot_path(mapping: &mut yaml_serde::Mapping, path: &str, value: &str) -> super::Result<()> {
@@ -99,7 +99,7 @@ pub(crate) fn set_nested(mapping: &mut yaml_serde::Mapping, segments: &[&str], v
 mod tests {
   use super::*;
 
-  mod resolve_dot_path_tests {
+  mod resolve_dot_path {
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -142,7 +142,7 @@ mod tests {
     }
   }
 
-  mod parse_yaml_value_tests {
+  mod parse_yaml_value {
     use pretty_assertions::assert_eq;
 
     use super::*;

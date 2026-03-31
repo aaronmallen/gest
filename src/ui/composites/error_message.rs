@@ -50,6 +50,7 @@ mod tests {
     let theme = theme();
     let msg = ErrorMessage::new("something went wrong", &theme);
     let rendered = format!("{msg}");
+
     assert!(rendered.contains('\u{2717}'));
     assert!(rendered.contains("something went wrong"));
   }

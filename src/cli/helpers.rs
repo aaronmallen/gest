@@ -146,6 +146,7 @@ mod tests {
     fn it_errors_on_missing_equals() {
       let pairs = vec!["invalid".to_string()];
       let result = split_key_value_pairs(&pairs);
+
       assert!(result.is_err());
     }
 
@@ -153,6 +154,7 @@ mod tests {
     fn it_handles_empty_list() {
       let pairs: Vec<String> = vec![];
       let result = split_key_value_pairs(&pairs).unwrap();
+
       assert!(result.is_empty());
     }
 
@@ -160,6 +162,7 @@ mod tests {
     fn it_handles_empty_value() {
       let pairs = vec!["key=".to_string()];
       let result = split_key_value_pairs(&pairs).unwrap();
+
       assert_eq!(result, vec![("key".to_string(), String::new())]);
     }
 
@@ -167,6 +170,7 @@ mod tests {
     fn it_handles_value_with_equals_sign() {
       let pairs = vec!["key=val=ue".to_string()];
       let result = split_key_value_pairs(&pairs).unwrap();
+
       assert_eq!(result, vec![("key".to_string(), "val=ue".to_string())]);
     }
 
@@ -174,6 +178,7 @@ mod tests {
     fn it_parses_key_value_pairs() {
       let pairs = vec!["foo=bar".to_string(), "baz=qux".to_string()];
       let result = split_key_value_pairs(&pairs).unwrap();
+
       assert_eq!(
         result,
         vec![

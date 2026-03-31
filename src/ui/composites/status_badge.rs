@@ -30,12 +30,6 @@ impl<'a> StatusBadge<'a> {
     }
   }
 
-  /// Switch to icon-only mode, hiding the label text.
-  pub fn icon_only(mut self) -> Self {
-    self.show_text = false;
-    self
-  }
-
   fn glyph(&self) -> char {
     match self.status {
       "open" => '\u{25CB}',
@@ -104,21 +98,9 @@ mod tests {
       let t = theme();
       let badge = StatusBadge::new("done", &t);
       let out = render(&badge);
+
       assert!(out.contains('\u{25CF}'), "should contain done icon");
       assert!(out.contains("done"), "should contain label text");
-    }
-  }
-
-  mod icon_only {
-    use super::*;
-
-    #[test]
-    fn it_renders_only_the_glyph() {
-      let t = theme();
-      let badge = StatusBadge::new("done", &t).icon_only();
-      let out = render(&badge);
-      assert!(out.contains('\u{25CF}'), "should contain done icon");
-      assert!(!out.contains("done"), "should not contain label text");
     }
   }
 
@@ -129,6 +111,7 @@ mod tests {
     fn it_renders_open() {
       let t = theme();
       let out = render(&StatusBadge::new("open", &t));
+
       assert!(out.contains('\u{25CB}'), "should contain open icon");
       assert!(out.contains("open"), "should contain open label");
     }
@@ -137,6 +120,7 @@ mod tests {
     fn it_renders_in_progress() {
       let t = theme();
       let out = render(&StatusBadge::new("in-progress", &t));
+
       assert!(out.contains('\u{25D0}'), "should contain in-progress icon");
       assert!(out.contains("in progress"), "should contain spaced label");
     }
@@ -145,6 +129,7 @@ mod tests {
     fn it_renders_done() {
       let t = theme();
       let out = render(&StatusBadge::new("done", &t));
+
       assert!(out.contains('\u{25CF}'), "should contain done icon");
       assert!(out.contains("done"), "should contain done label");
     }
@@ -153,6 +138,7 @@ mod tests {
     fn it_renders_cancelled() {
       let t = theme();
       let out = render(&StatusBadge::new("cancelled", &t));
+
       assert!(out.contains('\u{2298}'), "should contain cancelled icon");
       assert!(out.contains("cancelled"), "should contain cancelled label");
     }
@@ -161,6 +147,7 @@ mod tests {
     fn it_renders_blocked() {
       let t = theme();
       let out = render(&StatusBadge::new("blocked", &t));
+
       assert!(out.contains('\u{2297}'), "should contain blocked icon");
       assert!(out.contains("blocked"), "should contain blocked label");
     }
@@ -169,6 +156,7 @@ mod tests {
     fn it_falls_back_to_open_for_unknown_status() {
       let t = theme();
       let out = render(&StatusBadge::new("mystery", &t));
+
       assert!(out.contains('\u{25CB}'), "should use open icon for unknown status");
       assert!(out.contains("mystery"), "should use raw status as label");
     }

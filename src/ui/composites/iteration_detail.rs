@@ -10,15 +10,6 @@ use crate::ui::{
 /// Fixed padding width for field labels.
 const LABEL_PAD: usize = 8;
 
-/// Aggregated task status counts for an iteration summary.
-pub struct TaskCounts {
-  pub blocked: usize,
-  pub done: usize,
-  pub in_progress: usize,
-  pub open: usize,
-  pub total: usize,
-}
-
 /// Renders the full detail view for a single iteration, including title, phase count, and task breakdown.
 pub struct IterationDetail<'a> {
   counts: TaskCounts,
@@ -107,6 +98,15 @@ impl Display for IterationDetail<'_> {
   }
 }
 
+/// Aggregated task status counts for an iteration summary.
+pub struct TaskCounts {
+  pub blocked: usize,
+  pub done: usize,
+  pub in_progress: usize,
+  pub open: usize,
+  pub total: usize,
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -141,6 +141,7 @@ mod tests {
       let detail = IterationDetail::new("q1ebvmxp", "Q1 LLM Benchmark Evaluation", 3, sample_counts(), &theme);
       let output = render(&detail);
       let lines: Vec<&str> = output.lines().collect();
+
       assert_eq!(lines[1], "", "second line should be blank");
     }
 
@@ -150,6 +151,7 @@ mod tests {
       let detail = IterationDetail::new("q1ebvmxp", "Q1 LLM Benchmark Evaluation", 3, sample_counts(), &theme);
       let output = render(&detail);
       let line_count = output.lines().count();
+
       assert_eq!(
         line_count, 5,
         "should render exactly 5 lines (id, blank, title, phases, tasks)"
@@ -162,6 +164,7 @@ mod tests {
       let detail = IterationDetail::new("q1ebvmxp", "Q1 LLM Benchmark Evaluation", 3, sample_counts(), &theme);
       let output = render(&detail);
       let first_line = output.lines().next().unwrap();
+
       assert!(first_line.contains("q1ebvmxp"), "first line should contain the id");
     }
 
@@ -170,6 +173,7 @@ mod tests {
       let theme = theme();
       let detail = IterationDetail::new("q1ebvmxp", "Q1 LLM Benchmark Evaluation", 3, sample_counts(), &theme);
       let output = render(&detail);
+
       assert!(output.contains("phases"), "should contain phases label");
       assert!(output.contains('3'), "should contain phase count");
     }
@@ -180,6 +184,7 @@ mod tests {
       let detail = IterationDetail::new("q1ebvmxp", "Q1 LLM Benchmark Evaluation", 3, sample_counts(), &theme);
       let output = render(&detail);
       let task_line = output.lines().last().unwrap();
+
       assert!(task_line.contains(" · "), "task counts should be separated by ' · '");
     }
 
@@ -188,6 +193,7 @@ mod tests {
       let theme = theme();
       let detail = IterationDetail::new("q1ebvmxp", "Q1 LLM Benchmark Evaluation", 3, sample_counts(), &theme);
       let output = render(&detail);
+
       assert!(output.contains("tasks"), "should contain tasks label");
       assert!(output.contains("7"), "should contain total count");
       assert!(output.contains("2 done"), "should contain done count");
@@ -201,6 +207,7 @@ mod tests {
       let theme = theme();
       let detail = IterationDetail::new("q1ebvmxp", "Q1 LLM Benchmark Evaluation", 3, sample_counts(), &theme);
       let output = render(&detail);
+
       assert!(output.contains("title"), "should contain title label");
       assert!(
         output.contains("Q1 LLM Benchmark Evaluation"),
@@ -220,6 +227,7 @@ mod tests {
       };
       let detail = IterationDetail::new("zerotest", "Empty Iteration", 0, counts, &theme);
       let output = render(&detail);
+
       assert!(output.contains("0 done"));
       assert!(output.contains("0 in progress"));
       assert!(output.contains("0 open"));

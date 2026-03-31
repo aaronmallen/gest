@@ -26,6 +26,7 @@ mod tests {
   #[test]
   fn it_defaults_to_no_level() {
     let settings = Settings::default();
+
     assert_eq!(settings.level(), None);
   }
 
@@ -33,6 +34,7 @@ mod tests {
   fn it_deserializes_level() {
     let toml_str = r#"level = "debug""#;
     let settings: Settings = toml::from_str(toml_str).unwrap();
+
     assert_eq!(settings.level(), Some("debug"));
   }
 
@@ -40,6 +42,7 @@ mod tests {
   fn it_omits_none_level_on_serialize() {
     let settings = Settings::default();
     let serialized = toml::to_string(&settings).unwrap();
+
     assert!(!serialized.contains("level"));
   }
 }

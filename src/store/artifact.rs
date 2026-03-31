@@ -1,7 +1,4 @@
-use std::{
-  fs,
-  path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 use chrono::Utc;
 
@@ -31,17 +28,6 @@ pub fn archive_artifact(config: &Settings, id: &Id) -> super::Result<()> {
   )?;
 
   Ok(())
-}
-
-/// Return the on-disk path for an artifact, preferring the archive if no active file exists.
-pub fn artifact_path(config: &Settings, id: &Id) -> PathBuf {
-  let active = config.artifact_dir().join(format!("{id}.md"));
-  let archived = config.artifact_dir().join(format!("archive/{id}.md"));
-  if archived.exists() && !active.exists() {
-    archived
-  } else {
-    active
-  }
 }
 
 /// Persist a new artifact and return the fully-populated record.
@@ -249,6 +235,7 @@ mod tests {
 
       let filter = ArtifactFilter::default();
       let artifacts = crate::store::list_artifacts(&make_config(dir.path()), &filter).unwrap();
+
       assert_eq!(artifacts.len(), 0);
     }
 
@@ -279,6 +266,7 @@ mod tests {
 
       let filter = ArtifactFilter::default();
       let artifacts = crate::store::list_artifacts(&make_config(dir.path()), &filter).unwrap();
+
       assert_eq!(artifacts.len(), 2);
     }
 
@@ -296,6 +284,7 @@ mod tests {
         ..Default::default()
       };
       let artifacts = crate::store::list_artifacts(&make_config(dir.path()), &filter).unwrap();
+
       assert_eq!(artifacts.len(), 1);
       assert_eq!(artifacts[0].title, "Archived");
     }
@@ -334,6 +323,7 @@ mod tests {
       crate::store::archive_artifact(&make_config(dir.path()), &artifact.id).unwrap();
 
       let result = crate::store::resolve_artifact_id(&make_config(dir.path()), "zyxw", false);
+
       assert!(result.is_err());
       let err = result.unwrap_err().to_string();
       assert!(err.contains("not found"), "Expected not found error, got: {err}");
@@ -348,6 +338,7 @@ mod tests {
       crate::store::archive_artifact(&make_config(dir.path()), &artifact.id).unwrap();
 
       let resolved = crate::store::resolve_artifact_id(&make_config(dir.path()), "zyxw", true).unwrap();
+
       assert_eq!(resolved.to_string(), "zyxwvutsrqponmlkzyxwvutsrqponmlk");
     }
 
@@ -361,6 +352,7 @@ mod tests {
       crate::store::archive_artifact(&make_config(dir.path()), &to_archive.id).unwrap();
 
       let resolved = crate::store::resolve_artifact_id(&make_config(dir.path()), "zyxw", true).unwrap();
+
       assert_eq!(resolved.to_string(), "zyxwvutsrqponmlkzyxwvutsrqponmlk");
     }
   }

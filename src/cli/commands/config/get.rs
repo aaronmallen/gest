@@ -54,6 +54,7 @@ mod tests {
     fn it_errors_on_unknown_key() {
       let settings = Settings::default();
       let result = resolve_key(&settings, "nonexistent.key");
+
       assert!(result.is_err());
     }
 
@@ -61,6 +62,7 @@ mod tests {
     fn it_resolves_top_level_section() {
       let settings = Settings::default();
       let value = resolve_key(&settings, "storage").unwrap();
+
       assert!(value.contains('{'));
     }
   }

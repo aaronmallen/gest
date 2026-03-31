@@ -144,6 +144,7 @@ mod tests {
         let theme = theme();
         let expanded = SearchResultExpanded::new("task", "hpvrlbme", "row content here", &theme);
         let out = render(&expanded);
+
         assert!(out.contains("task hpvrlbme"), "separator should have type and id");
         assert!(out.contains('\u{254C}'), "should use dashed character");
         assert!(out.contains("row content here"), "should contain row content");
@@ -155,6 +156,7 @@ mod tests {
         let snippet = "Line one of the description.\nLine two continues here.";
         let expanded = SearchResultExpanded::new("task", "abcdefgh", "row", &theme).snippet(Some(snippet));
         let out = render(&expanded);
+
         assert!(out.contains("  Line one"), "first snippet line indented");
         assert!(out.contains("  Line two"), "second snippet line indented");
       }
@@ -165,6 +167,7 @@ mod tests {
         let expanded = SearchResultExpanded::new("task", "hpvrlbme", "row line", &theme)
           .snippet(Some("Defines the canonical probe schema."));
         let out = render(&expanded);
+
         assert!(
           out.contains("Defines the canonical probe schema."),
           "should contain snippet text"
@@ -177,6 +180,7 @@ mod tests {
         let theme = theme();
         let expanded = SearchResultExpanded::new("artifact", "fsahdqlt", "artifact row", &theme);
         let out = render(&expanded);
+
         assert!(out.contains("artifact fsahdqlt"), "separator label correct");
         assert!(out.contains("artifact row"), "row content present");
       }
@@ -194,6 +198,7 @@ mod tests {
         let theme = theme();
         let row = SearchResultRow::new("task", "nfkbqmrx  openai streaming adapter", &theme);
         let out = render(&row);
+
         assert!(out.contains("task"), "should contain type label");
         assert!(
           out.contains("nfkbqmrx  openai streaming adapter"),
@@ -206,6 +211,7 @@ mod tests {
         let theme = theme();
         let row = SearchResultRow::new("task", "content-here", &theme);
         let out = render(&row);
+
         assert!(out.starts_with("task      "), "should pad type label");
       }
 
@@ -214,6 +220,7 @@ mod tests {
         let theme = theme();
         let row = SearchResultRow::new("artifact", "fsahdqlt  probe-schema-v2", &theme);
         let out = render(&row);
+
         assert!(out.contains("artifact"), "should contain artifact label");
         assert!(out.contains("fsahdqlt"), "should contain artifact id");
       }
@@ -231,6 +238,7 @@ mod tests {
         let theme = theme();
         let summary = SearchSummary::new(3, "schema", &theme);
         let out = render(&summary);
+
         assert!(out.contains("3 results for"), "should show count");
         assert!(out.contains("\"schema\""), "should show quoted query");
         assert!(!out.contains("broadening"), "no hint for non-zero count");
@@ -241,6 +249,7 @@ mod tests {
         let theme = theme();
         let summary = SearchSummary::new(1, "auth", &theme);
         let out = render(&summary);
+
         assert!(out.contains("1 result for"), "should use singular");
         assert!(!out.contains("results"), "should not use plural");
       }
@@ -250,6 +259,7 @@ mod tests {
         let theme = theme();
         let summary = SearchSummary::new(0, "auth", &theme);
         let out = render(&summary);
+
         assert!(out.contains("0 results for"), "should show zero count");
         assert!(out.contains("try broadening your query"), "should show hint");
       }

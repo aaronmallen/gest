@@ -46,25 +46,6 @@ pub struct Settings {
 }
 
 impl Settings {
-  /// Resolve storage paths from the working directory.
-  ///
-  /// Must be called before accessing `data_dir`, `artifact_dir`, `task_dir`,
-  /// or `iteration_dir`. Resolves the base data directory and all per-entity
-  /// directories according to env var / config / fallback precedence.
-  pub fn resolve_storage(&mut self, cwd: PathBuf) -> Result<(), Error> {
-    let data_dir = self.storage.resolve_data_dir(cwd)?;
-    self.resolve_storage_at(data_dir);
-    Ok(())
-  }
-
-  /// Set storage paths for an already-known data directory, skipping discovery.
-  pub fn resolve_storage_at(&mut self, data_dir: PathBuf) {
-    self.resolved_data_dir = data_dir;
-    self.resolved_artifact_dir = self.storage.resolve_artifact_dir(&self.resolved_data_dir);
-    self.resolved_iteration_dir = self.storage.resolve_iteration_dir(&self.resolved_data_dir);
-    self.resolved_task_dir = self.storage.resolve_task_dir(&self.resolved_data_dir);
-  }
-
   /// The resolved artifact storage directory.
   pub fn artifact_dir(&self) -> &Path {
     &self.resolved_artifact_dir
@@ -88,6 +69,25 @@ impl Settings {
   /// Returns the logging settings.
   pub fn log(&self) -> &log::Settings {
     &self.log
+  }
+
+  /// Resolve storage paths from the working directory.
+  ///
+  /// Must be called before accessing `data_dir`, `artifact_dir`, `task_dir`,
+  /// or `iteration_dir`. Resolves the base data directory and all per-entity
+  /// directories according to env var / config / fallback precedence.
+  pub fn resolve_storage(&mut self, cwd: PathBuf) -> Result<(), Error> {
+    let data_dir = self.storage.resolve_data_dir(cwd)?;
+    self.resolve_storage_at(data_dir);
+    Ok(())
+  }
+
+  /// Set storage paths for an already-known data directory, skipping discovery.
+  pub fn resolve_storage_at(&mut self, data_dir: PathBuf) {
+    self.resolved_data_dir = data_dir;
+    self.resolved_artifact_dir = self.storage.resolve_artifact_dir(&self.resolved_data_dir);
+    self.resolved_iteration_dir = self.storage.resolve_iteration_dir(&self.resolved_data_dir);
+    self.resolved_task_dir = self.storage.resolve_task_dir(&self.resolved_data_dir);
   }
 
   /// Returns the data storage settings.

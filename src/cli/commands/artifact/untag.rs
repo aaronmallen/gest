@@ -56,6 +56,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let loaded = store::read_artifact(&ctx.settings, &artifact.id).unwrap();
+
       assert_eq!(loaded.tags, vec!["spec".to_string()]);
     }
 
@@ -74,6 +75,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let loaded = store::read_artifact(&ctx.settings, &artifact.id).unwrap();
+
       assert_eq!(loaded.tags, vec!["keep".to_string()]);
     }
   }

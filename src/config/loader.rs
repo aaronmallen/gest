@@ -161,10 +161,12 @@ mod tests {
 
   mod load {
     use pretty_assertions::assert_eq;
-    use temp_env::with_var_unset;
+    use temp_env::with_vars_unset;
     use tempfile::TempDir;
 
     use super::*;
+
+    const UNSET_VARS: [&str; 2] = ["GEST_CONFIG", "GEST_DATA_DIR"];
 
     #[test]
     fn it_loads_config_from_dot_config_gest_toml() {
@@ -178,7 +180,7 @@ mod tests {
       )
       .unwrap();
 
-      with_var_unset("GEST_CONFIG", || {
+      with_vars_unset(UNSET_VARS, || {
         let settings = load(tmp.path()).unwrap();
         assert_eq!(
           settings.storage().resolve_data_dir(tmp.path().into()).unwrap(),
@@ -199,7 +201,7 @@ mod tests {
       )
       .unwrap();
 
-      with_var_unset("GEST_CONFIG", || {
+      with_vars_unset(UNSET_VARS, || {
         let settings = load(tmp.path()).unwrap();
         assert_eq!(
           settings.storage().resolve_data_dir(tmp.path().into()).unwrap(),
@@ -219,7 +221,7 @@ mod tests {
       )
       .unwrap();
 
-      with_var_unset("GEST_CONFIG", || {
+      with_vars_unset(UNSET_VARS, || {
         let settings = load(tmp.path()).unwrap();
         assert_eq!(
           settings.storage().resolve_data_dir(tmp.path().into()).unwrap(),
@@ -232,7 +234,7 @@ mod tests {
     fn it_loads_default_settings_when_no_config_exists() {
       let tmp = TempDir::new().unwrap();
 
-      with_var_unset("GEST_CONFIG", || {
+      with_vars_unset(UNSET_VARS, || {
         let settings = load(tmp.path()).unwrap();
         assert_eq!(settings, Settings::default());
       })
@@ -259,7 +261,7 @@ mod tests {
       )
       .unwrap();
 
-      with_var_unset("GEST_CONFIG", || {
+      with_vars_unset(UNSET_VARS, || {
         let settings = load(&child).unwrap();
         assert_eq!(settings.storage().resolve_data_dir(child.clone()).unwrap(), child_dir);
       })
@@ -288,6 +290,7 @@ mod tests {
       std::fs::write(tmp.path().join(".gest.toml"), "[storage]\ndata_dir = \"/second\"").unwrap();
 
       let value = load_first_match(tmp.path(), CONFIG_NAMES).unwrap();
+
       assert_eq!(value["storage"]["data_dir"], Value::String("/first".into()));
     }
   }
@@ -332,6 +335,7 @@ mod tests {
       std::fs::write(&path, "[storage]\ndata_dir = \"/tmp/gest\"").unwrap();
 
       let value = read_toml(&path).unwrap();
+
       assert_eq!(value["storage"]["data_dir"], Value::String("/tmp/gest".into()));
     }
 

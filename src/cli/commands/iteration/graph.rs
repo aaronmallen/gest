@@ -25,7 +25,6 @@ struct TaskRow {
   is_blocking: bool,
   priority: Option<u8>,
   status: String,
-  tags: Vec<String>,
   title: String,
 }
 
@@ -55,7 +54,6 @@ impl Command {
         is_blocking,
         priority: task.priority,
         status: status_str.to_string(),
-        tags: task.tags,
         title: task.title,
       });
     }
@@ -73,7 +71,6 @@ impl Command {
             id: &t.id,
             title: &t.title,
             priority: t.priority,
-            tags: &t.tags,
             is_blocking: t.is_blocking,
             blocked_by: t.blocked_by.as_deref(),
           })

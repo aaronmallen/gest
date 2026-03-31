@@ -28,6 +28,16 @@ impl Display for Badge {
 mod tests {
   use super::*;
 
+  mod new {
+    use super::*;
+
+    #[test]
+    fn it_accepts_string_and_str() {
+      let _from_str = Badge::new("ok", Style::default());
+      let _from_string = Badge::new(String::from("ok"), Style::default());
+    }
+  }
+
   mod display {
     use super::*;
 
@@ -36,16 +46,6 @@ mod tests {
       let badge = Badge::new("● done", Style::new().bold());
       let rendered = format!("{badge}");
       assert!(rendered.contains("● done"));
-    }
-  }
-
-  mod new {
-    use super::*;
-
-    #[test]
-    fn it_accepts_string_and_str() {
-      let _from_str = Badge::new("ok", Style::default());
-      let _from_string = Badge::new(String::from("ok"), Style::default());
     }
   }
 }

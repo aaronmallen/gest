@@ -429,6 +429,7 @@ mod tests {
     let settings = crate::config::Settings::default();
     let from_cfg = Theme::from_config(&settings);
     let default = Theme::default();
+
     assert_eq!(format!("{:?}", from_cfg.emphasis), format!("{:?}", default.emphasis));
     assert_eq!(format!("{:?}", from_cfg.log_error), format!("{:?}", default.log_error));
   }
@@ -459,6 +460,7 @@ mod tests {
   fn it_uses_inline_rgb_for_banner_gradient_start() {
     let theme = Theme::default();
     let expected = Style::new().fg(Color::Rgb(24, 178, 155));
+
     assert_eq!(format!("{:?}", theme.banner_gradient_start), format!("{:?}", expected),);
   }
 }

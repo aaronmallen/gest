@@ -38,6 +38,7 @@ mod tests {
     let theme = theme();
     let empty = EmptyList::new("artifacts", &theme);
     let rendered = format!("{empty}");
+
     assert!(rendered.contains("no artifacts found"));
   }
 
@@ -46,6 +47,7 @@ mod tests {
     let theme = theme();
     let empty = EmptyList::new("tasks", &theme);
     let rendered = format!("{empty}");
+
     assert!(rendered.contains("no tasks found"));
   }
 }

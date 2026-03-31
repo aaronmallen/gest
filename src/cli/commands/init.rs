@@ -69,6 +69,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn it_accepts_optional_config_path() {
+      let tmp = tempfile::tempdir().unwrap();
+      let base = tmp.path().join(".gest");
+
+      init_at(&base, &default_storage(), Some(".gest/config.toml"), &Theme::default()).unwrap();
+
+      assert!(base.join("tasks").is_dir());
+      assert!(base.join("tasks/resolved").is_dir());
+    }
+
+    #[test]
     fn it_creates_directory_structure() {
       let tmp = tempfile::tempdir().unwrap();
       let base = tmp.path().join("data");
@@ -107,17 +118,6 @@ mod tests {
 
       assert!(base.join("tasks").is_dir());
       assert!(base.join("artifacts").is_dir());
-    }
-
-    #[test]
-    fn it_accepts_optional_config_path() {
-      let tmp = tempfile::tempdir().unwrap();
-      let base = tmp.path().join(".gest");
-
-      init_at(&base, &default_storage(), Some(".gest/config.toml"), &Theme::default()).unwrap();
-
-      assert!(base.join("tasks").is_dir());
-      assert!(base.join("tasks/resolved").is_dir());
     }
   }
 }

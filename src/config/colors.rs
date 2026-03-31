@@ -394,6 +394,39 @@ underline = true
     }
   }
 
+  mod settings {
+    use super::*;
+
+    #[test]
+    fn it_defaults_to_empty() {
+      let settings = Settings::default();
+
+      assert!(settings.is_empty());
+    }
+
+    #[test]
+    fn it_deserializes_from_config_section() {
+      let toml_str = r##"
+[colors]
+emphasis = "#9448C7"
+"log.error" = "red"
+"##;
+
+      #[derive(Deserialize)]
+      struct TestConfig {
+        #[serde(default)]
+        colors: Settings,
+      }
+
+      let config: TestConfig = toml::from_str(toml_str).unwrap();
+
+      assert!(!config.colors.is_empty());
+
+      let entries: Vec<_> = config.colors.iter().collect();
+      assert_eq!(entries.len(), 2);
+    }
+  }
+
   mod parse_color {
     use pretty_assertions::assert_eq;
 
@@ -453,37 +486,6 @@ underline = true
       let result = parse_color("chartreuse");
 
       assert!(result.is_err());
-    }
-  }
-
-  mod settings {
-    use super::*;
-
-    #[test]
-    fn it_defaults_to_empty() {
-      let settings = Settings::default();
-      assert!(settings.is_empty());
-    }
-
-    #[test]
-    fn it_deserializes_from_config_section() {
-      let toml_str = r##"
-[colors]
-emphasis = "#9448C7"
-"log.error" = "red"
-"##;
-
-      #[derive(Deserialize)]
-      struct TestConfig {
-        #[serde(default)]
-        colors: Settings,
-      }
-
-      let config: TestConfig = toml::from_str(toml_str).unwrap();
-      assert!(!config.colors.is_empty());
-
-      let entries: Vec<_> = config.colors.iter().collect();
-      assert_eq!(entries.len(), 2);
     }
   }
 }

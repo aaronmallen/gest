@@ -62,6 +62,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let loaded = store::read_artifact(&ctx.settings, &artifact.id).unwrap();
+
       assert_eq!(
         loaded.metadata.get(yaml_serde::Value::String("priority".to_string())),
         Some(&yaml_serde::Value::String("high".to_string()))
@@ -85,6 +86,7 @@ mod tests {
       let loaded = store::read_artifact(&ctx.settings, &artifact.id).unwrap();
       let config_key = yaml_serde::Value::String("config".to_string());
       let config_val = loaded.metadata.get(config_key).unwrap();
+
       if let yaml_serde::Value::Mapping(m) = config_val {
         let timeout_key = yaml_serde::Value::String("timeout".to_string());
         assert_eq!(

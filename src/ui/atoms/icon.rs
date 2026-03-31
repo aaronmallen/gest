@@ -21,11 +21,6 @@ impl Icon {
     Self::new('!', theme.indicator_blocking)
   }
 
-  /// Cross-mark icon for errors.
-  pub fn error(theme: &Theme) -> Self {
-    Self::new('\u{2717}', theme.error)
-  }
-
   /// Create an icon from an arbitrary character and style.
   pub fn new(ch: char, style: Style) -> Self {
     Self {
@@ -48,11 +43,6 @@ impl Icon {
       "cancelled" => Self::new('\u{2298}', theme.task_list_icon_cancelled),
       _ => Self::new('\u{25CB}', theme.task_list_icon_open),
     }
-  }
-
-  /// Check-mark icon for success messages.
-  pub fn success(theme: &Theme) -> Self {
-    Self::new('\u{2713}', theme.message_success_icon)
   }
 }
 
@@ -85,28 +75,6 @@ mod tests {
       let theme = Theme::default();
       let icon = Icon::blocking(&theme);
       assert_eq!(icon.ch, '!');
-    }
-  }
-
-  mod display {
-    use super::*;
-
-    #[test]
-    fn it_renders_correct_character() {
-      let icon = Icon::new('X', Style::default());
-      let rendered = format!("{icon}");
-      assert!(rendered.contains('X'));
-    }
-  }
-
-  mod error {
-    use super::*;
-
-    #[test]
-    fn it_returns_correct_icon() {
-      let theme = Theme::default();
-      let icon = Icon::error(&theme);
-      assert_eq!(icon.ch, '\u{2717}');
     }
   }
 
@@ -160,14 +128,14 @@ mod tests {
     }
   }
 
-  mod success {
+  mod display {
     use super::*;
 
     #[test]
-    fn it_returns_correct_icon() {
-      let theme = Theme::default();
-      let icon = Icon::success(&theme);
-      assert_eq!(icon.ch, '\u{2713}');
+    fn it_renders_correct_character() {
+      let icon = Icon::new('X', Style::default());
+      let rendered = format!("{icon}");
+      assert!(rendered.contains('X'));
     }
   }
 }

@@ -253,6 +253,7 @@ mod tests {
     let t = theme();
     let detail = TaskDetail::new("nfkbqmrx", "adapter", "in-progress", &t);
     let out = render(&detail);
+
     assert!(out.contains('\u{25D0}'), "should contain in-progress icon");
   }
 
@@ -261,6 +262,7 @@ mod tests {
     let t = theme();
     let detail = TaskDetail::new("nfkbqmrx", "adapter", "open", &t);
     let out = render(&detail);
+
     assert!(!out.contains("description"), "should not contain description header");
   }
 
@@ -269,6 +271,7 @@ mod tests {
     let t = theme();
     let detail = TaskDetail::new("nfkbqmrx", "adapter", "open", &t).assigned(Some("claude-code"));
     let out = render(&detail);
+
     assert!(out.contains("claude-code"));
   }
 
@@ -277,6 +280,7 @@ mod tests {
     let t = theme();
     let detail = TaskDetail::new("nfkbqmrx", "adapter", "open", &t).body(Some("## heading\n\nSome body text."));
     let out = render(&detail);
+
     assert!(out.contains("description"), "should contain section header");
     assert!(out.contains("heading"), "should contain rendered heading");
     assert!(out.contains("Some body text."), "should contain body text");
@@ -295,6 +299,7 @@ mod tests {
       .body(Some("## openai streaming adapter\n\nImplement the adapter."));
 
     let out = render(&detail);
+
     assert!(!out.is_empty());
   }
 
@@ -304,6 +309,7 @@ mod tests {
     let detail = TaskDetail::new("nfkbqmrx", "openai streaming adapter", "in-progress", &t);
     let out = render(&detail);
     let first_line = out.lines().next().unwrap();
+
     assert!(
       first_line.contains("nf") && first_line.contains("kbqmrx"),
       "first line should contain id parts, got: {first_line}",
@@ -315,6 +321,7 @@ mod tests {
     let t = theme();
     let detail = TaskDetail::new("nfkbqmrx", "adapter", "open", &t).links(vec![("blocked-by", "hpvrlbme")]);
     let out = render(&detail);
+
     assert!(out.contains("blocked-by"));
     assert!(out.contains("hpvrlbme"));
   }
@@ -325,6 +332,7 @@ mod tests {
     let detail = TaskDetail::new("nfkbqmrx", "adapter", "open", &t)
       .links(vec![("blocked-by", "hpvrlbme"), ("blocks", "abcd1234")]);
     let out = render(&detail);
+
     assert!(out.contains("blocked-by"));
     assert!(out.contains("hpvrlbme"));
     assert!(out.contains("blocks"));
@@ -337,6 +345,7 @@ mod tests {
     let detail =
       TaskDetail::new("nfkbqmrx", "adapter", "in-progress", &t).phase(Some((2, Some("core implementation"))));
     let out = render(&detail);
+
     assert!(out.contains("2"), "should contain phase number");
     assert!(out.contains("core implementation"), "should contain phase name");
     assert!(out.contains("\u{00B7}"), "should contain middle dot separator");
@@ -347,6 +356,7 @@ mod tests {
     let t = theme();
     let detail = TaskDetail::new("nfkbqmrx", "adapter", "open", &t).phase(Some((3, None)));
     let out = render(&detail);
+
     assert!(out.contains('3'));
     assert!(!out.contains("\u{00B7}"));
   }
@@ -356,6 +366,7 @@ mod tests {
     let t = theme();
     let detail = TaskDetail::new("nfkbqmrx", "adapter", "open", &t).priority(Some(1));
     let out = render(&detail);
+
     assert!(out.contains("P1"));
   }
 
@@ -365,6 +376,7 @@ mod tests {
     let tags = vec!["adapter".to_string(), "core".to_string()];
     let detail = TaskDetail::new("nfkbqmrx", "adapter", "open", &t).tags(&tags);
     let out = render(&detail);
+
     assert!(out.contains("#adapter"));
     assert!(out.contains("#core"));
   }
@@ -374,6 +386,7 @@ mod tests {
     let t = theme();
     let detail = TaskDetail::new("nfkbqmrx", "openai streaming adapter", "in-progress", &t);
     let out = render(&detail);
+
     assert!(out.contains("openai streaming adapter"));
     assert!(out.contains("in progress"));
   }

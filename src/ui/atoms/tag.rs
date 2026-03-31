@@ -54,32 +54,43 @@ impl Display for Tags {
 mod tests {
   use super::*;
 
-  mod tag_display {
+  mod tag {
     use super::*;
 
-    #[test]
-    fn it_renders_hash_name() {
-      yansi::disable();
-      let tag = Tag::new("urgent", Style::default());
-      assert_eq!(tag.to_string(), "#urgent");
+    mod display {
+      use super::*;
+
+      #[test]
+      fn it_renders_hash_name() {
+        yansi::disable();
+        let tag = Tag::new("urgent", Style::default());
+
+        assert_eq!(tag.to_string(), "#urgent");
+      }
     }
   }
 
-  mod tags_display {
+  mod tags {
     use super::*;
 
-    #[test]
-    fn it_renders_empty_string_for_no_tags() {
-      let tags = Tags::new(&[], Style::default());
-      assert_eq!(tags.to_string(), "");
-    }
+    mod display {
+      use super::*;
 
-    #[test]
-    fn it_renders_multiple_space_separated() {
-      yansi::disable();
-      let names = vec!["bug".to_string(), "ui".to_string(), "v2".to_string()];
-      let tags = Tags::new(&names, Style::default());
-      assert_eq!(tags.to_string(), "#bug  #ui  #v2");
+      #[test]
+      fn it_renders_empty_string_for_no_tags() {
+        let tags = Tags::new(&[], Style::default());
+
+        assert_eq!(tags.to_string(), "");
+      }
+
+      #[test]
+      fn it_renders_multiple_space_separated() {
+        yansi::disable();
+        let names = vec!["bug".to_string(), "ui".to_string(), "v2".to_string()];
+        let tags = Tags::new(&names, Style::default());
+
+        assert_eq!(tags.to_string(), "#bug  #ui  #v2");
+      }
     }
   }
 }

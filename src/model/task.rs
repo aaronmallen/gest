@@ -8,9 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use super::{id::Id, link::Link};
 
-/// Canonical display ordering for task statuses.
-pub const STATUS_ORDER: &[Status] = &[Status::Open, Status::InProgress, Status::Done, Status::Cancelled];
-
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct NewTask {
   #[serde(default)]

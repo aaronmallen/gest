@@ -307,6 +307,7 @@ mod tests {
 
     let pos_with = line_with.find("has-kind").unwrap();
     let pos_without = line_without.find("no-kind").unwrap();
+
     assert_eq!(pos_with, pos_without, "titles should align when kinds differ");
   }
 }

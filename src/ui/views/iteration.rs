@@ -191,7 +191,7 @@ mod tests {
             id: "cdrzjvwk",
             title: "sqlite storage backend",
             priority: Some(0),
-            tags: &[],
+
             is_blocking: false,
             blocked_by: None,
           }],
@@ -204,7 +204,7 @@ mod tests {
             id: "rwlkbpjq",
             title: "CI pipeline integration",
             priority: Some(2),
-            tags: &[],
+
             is_blocking: false,
             blocked_by: None,
           }],

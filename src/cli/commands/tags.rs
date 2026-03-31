@@ -8,7 +8,22 @@ use crate::{
   ui::composites::success_message::SuccessMessage,
 };
 
+/// Append tags from `to_add` into `tags`, skipping duplicates.
+pub fn apply_tags(tags: &mut Vec<String>, to_add: &[String]) {
+  for tag in to_add {
+    if !tags.contains(tag) {
+      tags.push(tag.clone());
+    }
+  }
+}
+
+/// Remove all entries in `to_remove` from `tags`.
+pub fn remove_tags(tags: &mut Vec<String>, to_remove: &[String]) {
+  tags.retain(|t| !to_remove.contains(t));
+}
+
 /// Generic helper for the tag command flow: resolve ID, read entity, apply tags, write entity.
+#[allow(clippy::too_many_arguments)]
 pub fn tag_entity<E>(
   ctx: &AppContext,
   id_prefix: &str,
@@ -35,6 +50,7 @@ pub fn tag_entity<E>(
 }
 
 /// Generic helper for the untag command flow: resolve ID, read entity, remove tags, write entity.
+#[allow(clippy::too_many_arguments)]
 pub fn untag_entity<E>(
   ctx: &AppContext,
   id_prefix: &str,
@@ -60,20 +76,6 @@ pub fn untag_entity<E>(
   Ok(())
 }
 
-/// Append tags from `to_add` into `tags`, skipping duplicates.
-pub fn apply_tags(tags: &mut Vec<String>, to_add: &[String]) {
-  for tag in to_add {
-    if !tags.contains(tag) {
-      tags.push(tag.clone());
-    }
-  }
-}
-
-/// Remove all entries in `to_remove` from `tags`.
-pub fn remove_tags(tags: &mut Vec<String>, to_remove: &[String]) {
-  tags.retain(|t| !to_remove.contains(t));
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -87,6 +89,7 @@ mod tests {
     fn it_adds_new_tags() {
       let mut tags = vec!["a".to_string()];
       apply_tags(&mut tags, &["b".to_string(), "c".to_string()]);
+
       assert_eq!(tags, vec!["a", "b", "c"]);
     }
 
@@ -94,6 +97,7 @@ mod tests {
     fn it_skips_duplicates() {
       let mut tags = vec!["a".to_string(), "b".to_string()];
       apply_tags(&mut tags, &["b".to_string(), "c".to_string()]);
+
       assert_eq!(tags, vec!["a", "b", "c"]);
     }
   }
@@ -107,6 +111,7 @@ mod tests {
     fn it_filters_matching_tags() {
       let mut tags = vec!["a".to_string(), "b".to_string(), "c".to_string()];
       remove_tags(&mut tags, &["b".to_string()]);
+
       assert_eq!(tags, vec!["a", "c"]);
     }
 
@@ -114,6 +119,7 @@ mod tests {
     fn it_ignores_absent_tags() {
       let mut tags = vec!["a".to_string()];
       remove_tags(&mut tags, &["z".to_string()]);
+
       assert_eq!(tags, vec!["a"]);
     }
   }

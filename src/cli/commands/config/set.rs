@@ -150,6 +150,7 @@ mod tests {
     fn it_preserves_sibling_keys() {
       let mut val: toml::Value = toml::from_str("[log]\nlevel = \"warn\"\nother = \"val\"").unwrap();
       set_dot_path(&mut val, "log.level", "debug").unwrap();
+
       assert_eq!(val["log"]["level"].as_str().unwrap(), "debug");
       assert_eq!(val["log"]["other"].as_str().unwrap(), "val");
     }
@@ -158,6 +159,7 @@ mod tests {
     fn it_sets_a_nested_key() {
       let mut val = toml::Value::Table(toml::Table::new());
       set_dot_path(&mut val, "log.level", "debug").unwrap();
+
       assert_eq!(val["log"]["level"].as_str().unwrap(), "debug");
     }
 
@@ -165,6 +167,7 @@ mod tests {
     fn it_sets_a_top_level_key() {
       let mut val = toml::Value::Table(toml::Table::new());
       set_dot_path(&mut val, "key", "value").unwrap();
+
       assert_eq!(val["key"].as_str().unwrap(), "value");
     }
   }

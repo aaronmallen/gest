@@ -90,6 +90,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let updated = store::read_artifact(&ctx.settings, &artifact.id).unwrap();
+
       assert_eq!(updated.body, "New body");
     }
 
@@ -112,6 +113,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let updated = store::read_artifact(&ctx.settings, &artifact.id).unwrap();
+
       assert_eq!(updated.tags, vec!["new", "tags"]);
     }
 
@@ -135,6 +137,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let updated = store::read_artifact(&ctx.settings, &artifact.id).unwrap();
+
       assert_eq!(updated.title, "New Title");
       assert_eq!(updated.body, "Original body");
     }

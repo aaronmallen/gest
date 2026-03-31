@@ -86,6 +86,7 @@ mod tests {
     fn it_uses_dashed_char() {
       let s = Separator::dashed("task id", Style::default()).width(25);
       let out = render(s);
+
       assert!(out.starts_with("╌╌ task id "));
       assert!(out.contains('╌'));
       assert!(!out.contains('─'));
@@ -99,6 +100,7 @@ mod tests {
     fn it_fills_remaining_width() {
       let s = Separator::labeled("hi", Style::default()).width(20);
       let out = render(s);
+
       assert_eq!(utils::display_width(&out), 20);
     }
 
@@ -106,6 +108,7 @@ mod tests {
     fn it_includes_label_text() {
       let s = Separator::labeled("description", Style::default()).width(30);
       let out = render(s);
+
       assert!(out.starts_with("── description "));
       assert_eq!(utils::display_width(&out), 30);
     }
@@ -124,6 +127,7 @@ mod tests {
     fn it_fills_width() {
       let s = Separator::rule(Style::default()).width(10);
       let out = render(s);
+
       assert_eq!(out, "──────────");
     }
 
@@ -131,6 +135,7 @@ mod tests {
     fn it_respects_explicit_width() {
       let s = Separator::rule(Style::default()).width(5);
       let out = render(s);
+
       assert_eq!(out, "─────");
     }
   }

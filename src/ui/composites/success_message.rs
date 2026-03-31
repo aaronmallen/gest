@@ -7,13 +7,6 @@ use crate::ui::{
   theme::Theme,
 };
 
-/// A label-value pair in a success message, optionally pre-styled.
-struct Field {
-  label: String,
-  styled: bool,
-  value: String,
-}
-
 /// Renders a success message with a checkmark icon, optional entity ID, and optional key-value fields.
 pub struct SuccessMessage<'a> {
   action: String,
@@ -32,12 +25,6 @@ impl<'a> SuccessMessage<'a> {
     }
   }
 
-  /// Sets the entity ID to display after the action label.
-  pub fn id(mut self, id: &'a str) -> Self {
-    self.id = Some(id);
-    self
-  }
-
   /// Appends a label-value pair to render below the action line.
   pub fn field(mut self, label: impl Into<String>, value: impl Into<String>) -> Self {
     self.fields.push(Field {
@@ -45,6 +32,12 @@ impl<'a> SuccessMessage<'a> {
       styled: false,
       value: value.into(),
     });
+    self
+  }
+
+  /// Sets the entity ID to display after the action label.
+  pub fn id(mut self, id: &'a str) -> Self {
+    self.id = Some(id);
     self
   }
 
@@ -57,6 +50,13 @@ impl<'a> SuccessMessage<'a> {
     });
     self
   }
+}
+
+/// A label-value pair in a success message, optionally pre-styled.
+struct Field {
+  label: String,
+  styled: bool,
+  value: String,
 }
 
 impl Display for SuccessMessage<'_> {

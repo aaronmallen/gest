@@ -39,8 +39,8 @@ impl Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub use artifact::{
-  archive_artifact, artifact_path, create_artifact, list_artifacts, read_artifact, resolve_artifact_id,
-  update_artifact, write_artifact,
+  archive_artifact, create_artifact, list_artifacts, read_artifact, resolve_artifact_id, update_artifact,
+  write_artifact,
 };
 pub use fs::ensure_dirs;
 pub use iteration::{

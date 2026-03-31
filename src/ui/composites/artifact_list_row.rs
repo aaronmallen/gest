@@ -117,6 +117,15 @@ mod tests {
   }
 
   #[test]
+  fn it_omits_kind_column_when_pad_is_zero() {
+    yansi::disable();
+    let theme = theme();
+    let row = ArtifactListRow::new("aaaaaaaa", "no kind", &[], &theme);
+
+    assert_eq!(row.kind_badge_width(), 0, "width should be zero with no kind");
+  }
+
+  #[test]
   fn it_renders_archived_row_with_badge() {
     yansi::disable();
     let theme = theme();
@@ -129,6 +138,31 @@ mod tests {
     assert!(rendered.contains("#spec"));
     assert!(rendered.contains("#backend"));
     assert!(rendered.contains("[archived]"));
+  }
+
+  #[test]
+  fn it_renders_kind_badge() {
+    yansi::disable();
+    let theme = theme();
+    let row = ArtifactListRow::new("abcdefgh", "my-spec", &[], &theme).kind(Some("spec"));
+    let rendered = row.to_string();
+
+    assert!(rendered.contains("spec"));
+    assert!(rendered.contains("my-spec"));
+  }
+
+  #[test]
+  fn it_renders_normal_row_with_id_title_and_tags() {
+    yansi::disable();
+    let theme = theme();
+    let tags = vec!["schema".to_string()];
+    let row = ArtifactListRow::new("fsahdqlt", "probe-schema-v2", &tags, &theme);
+    let rendered = row.to_string();
+
+    assert!(rendered.contains("fsahdqlt"));
+    assert!(rendered.contains("probe-schema-v2"));
+    assert!(rendered.contains("#schema"));
+    assert!(!rendered.contains("[archived]"));
   }
 
   #[test]
@@ -158,31 +192,6 @@ mod tests {
   }
 
   #[test]
-  fn it_renders_normal_row_with_id_title_and_tags() {
-    yansi::disable();
-    let theme = theme();
-    let tags = vec!["schema".to_string()];
-    let row = ArtifactListRow::new("fsahdqlt", "probe-schema-v2", &tags, &theme);
-    let rendered = row.to_string();
-
-    assert!(rendered.contains("fsahdqlt"));
-    assert!(rendered.contains("probe-schema-v2"));
-    assert!(rendered.contains("#schema"));
-    assert!(!rendered.contains("[archived]"));
-  }
-
-  #[test]
-  fn it_renders_kind_badge() {
-    yansi::disable();
-    let theme = theme();
-    let row = ArtifactListRow::new("abcdefgh", "my-spec", &[], &theme).kind(Some("spec"));
-    let rendered = row.to_string();
-
-    assert!(rendered.contains("spec"));
-    assert!(rendered.contains("my-spec"));
-  }
-
-  #[test]
   fn it_reserves_kind_slot_when_padded() {
     yansi::disable();
     let theme = theme();
@@ -202,14 +211,5 @@ mod tests {
       title_pos_with, title_pos_without,
       "titles should align when kind_pad is set"
     );
-  }
-
-  #[test]
-  fn it_omits_kind_column_when_pad_is_zero() {
-    yansi::disable();
-    let theme = theme();
-    let row = ArtifactListRow::new("aaaaaaaa", "no kind", &[], &theme);
-
-    assert_eq!(row.kind_badge_width(), 0, "width should be zero with no kind");
   }
 }

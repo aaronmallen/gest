@@ -76,6 +76,7 @@ mod tests {
     let t = theme();
     let indicators = Indicators::new(&t).blocked_by(vec!["hpvrlbme"]);
     let output = render(&indicators);
+
     assert!(output.contains("blocked-by"));
     assert!(output.contains("hpvrlbme"));
   }
@@ -85,6 +86,7 @@ mod tests {
     let t = theme();
     let indicators = Indicators::new(&t).blocking(true);
     let output = render(&indicators);
+
     assert!(output.contains("! blocking"));
     assert!(!output.contains("blocked-by"));
   }
@@ -94,6 +96,7 @@ mod tests {
     let t = theme();
     let indicators = Indicators::new(&t).blocked_by(vec!["abc12345"]).blocking(true);
     let output = render(&indicators);
+
     assert!(output.contains("blocked-by"));
     assert!(output.contains("abc12345"));
     assert!(output.contains("! blocking"));
@@ -104,6 +107,7 @@ mod tests {
     let t = theme();
     let indicators = Indicators::new(&t);
     let output = render(&indicators);
+
     assert_eq!(output, "");
   }
 }

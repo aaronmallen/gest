@@ -13,14 +13,10 @@ use crate::ui::{
 /// Max display width for task titles in graph rows.
 const TITLE_PAD: usize = 35;
 
-/// Data for a single task rendered inside the iteration graph.
-pub struct TaskData<'a> {
-  pub blocked_by: Option<&'a str>,
-  pub id: &'a str,
-  pub is_blocking: bool,
-  pub priority: Option<u8>,
-  pub status: &'a str,
-  pub tags: &'a [String],
+/// Renders an iteration as a phased dependency graph with branching box-drawing connectors.
+pub struct IterationGraph<'a> {
+  pub phases: Vec<PhaseData<'a>>,
+  pub theme: &'a Theme,
   pub title: &'a str,
 }
 
@@ -31,10 +27,13 @@ pub struct PhaseData<'a> {
   pub tasks: Vec<TaskData<'a>>,
 }
 
-/// Renders an iteration as a phased dependency graph with branching box-drawing connectors.
-pub struct IterationGraph<'a> {
-  pub phases: Vec<PhaseData<'a>>,
-  pub theme: &'a Theme,
+/// Data for a single task rendered inside the iteration graph.
+pub struct TaskData<'a> {
+  pub blocked_by: Option<&'a str>,
+  pub id: &'a str,
+  pub is_blocking: bool,
+  pub priority: Option<u8>,
+  pub status: &'a str,
   pub title: &'a str,
 }
 
@@ -268,7 +267,7 @@ mod tests {
               id: "cdrzjvwk",
               title: "sqlite storage backend",
               priority: Some(0),
-              tags: &[],
+
               is_blocking: false,
               blocked_by: None,
             },
@@ -277,7 +276,7 @@ mod tests {
               id: "hpvrlbme",
               title: "finalize probe schema v2",
               priority: Some(0),
-              tags: &[],
+
               is_blocking: false,
               blocked_by: None,
             },
@@ -292,7 +291,7 @@ mod tests {
               id: "nfkbqmrx",
               title: "openai streaming adapter",
               priority: Some(1),
-              tags: &[],
+
               is_blocking: false,
               blocked_by: None,
             },
@@ -301,7 +300,7 @@ mod tests {
               id: "mxdtqrbn",
               title: "context window handling",
               priority: Some(1),
-              tags: &[],
+
               is_blocking: false,
               blocked_by: Some("hpvrlbme"),
             },
@@ -310,7 +309,7 @@ mod tests {
               id: "qtsdwcaz",
               title: "probe dedup by content hash",
               priority: Some(2),
-              tags: &[],
+
               is_blocking: false,
               blocked_by: None,
             },
@@ -325,7 +324,7 @@ mod tests {
               id: "rwlkbpjq",
               title: "CI pipeline integration",
               priority: Some(2),
-              tags: &[],
+
               is_blocking: false,
               blocked_by: None,
             },
@@ -334,7 +333,7 @@ mod tests {
               id: "zvhqtxmn",
               title: "integration test suite",
               priority: Some(2),
-              tags: &[],
+
               is_blocking: false,
               blocked_by: None,
             },
@@ -358,7 +357,7 @@ mod tests {
           id: "abcd1234",
           title: "the only task",
           priority: None,
-          tags: &[],
+
           is_blocking: false,
           blocked_by: None,
         }],
@@ -366,6 +365,7 @@ mod tests {
       theme: &t,
     };
     let output = render(&graph);
+
     assert!(!output.contains('\u{256E}'), "should not have ╮ for single-task phase");
     assert!(!output.contains('\u{256F}'), "should not have ╯ for single-task phase");
     assert!(output.contains("abcd1234"));
@@ -376,6 +376,7 @@ mod tests {
     let t = theme();
     let graph = sample_graph(&t);
     let output = render(&graph);
+
     assert!(output.contains("\u{251C}\u{2500}\u{256E}"), "should have ├─╮");
   }
 
@@ -384,6 +385,7 @@ mod tests {
     let t = theme();
     let graph = sample_graph(&t);
     let output = render(&graph);
+
     assert!(
       output.contains("\u{251C}\u{2500}\u{256E}\u{2500}\u{256E}"),
       "should have ├─╮─╮"
@@ -397,6 +399,7 @@ mod tests {
     let output = render(&graph);
     let lines: Vec<&str> = output.lines().collect();
     let continuation_lines: Vec<&&str> = lines.iter().filter(|l| l.trim() == "\u{2502}").collect();
+
     assert!(
       continuation_lines.len() >= 2,
       "should have continuation lines between phases, found {}",
@@ -409,6 +412,7 @@ mod tests {
     let t = theme();
     let graph = sample_graph(&t);
     let output = render(&graph);
+
     assert!(output.contains("Phase 1"), "should contain Phase 1");
     assert!(output.contains("Phase 2"), "should contain Phase 2");
     assert!(output.contains("Phase 3"), "should contain Phase 3");
@@ -430,7 +434,7 @@ mod tests {
           id: "testtest",
           title: "a task",
           priority: None,
-          tags: &[],
+
           is_blocking: false,
           blocked_by: None,
         }],
@@ -438,6 +442,7 @@ mod tests {
       theme: &t,
     };
     let output = render(&graph);
+
     assert!(output.contains("Phase 1"), "should still show Phase N");
     assert!(output.contains("\u{2500}\u{2500}"), "should still show separator");
   }
@@ -447,6 +452,7 @@ mod tests {
     let t = theme();
     let graph = sample_graph(&t);
     let output = render(&graph);
+
     assert!(output.contains("cdrzjvwk"));
     assert!(output.contains("hpvrlbme"));
     assert!(output.contains("nfkbqmrx"));
@@ -461,6 +467,7 @@ mod tests {
     let t = theme();
     let graph = sample_graph(&t);
     let output = render(&graph);
+
     assert!(output.contains('\u{2297}'), "should use blocked icon ⊗");
   }
 
@@ -469,6 +476,7 @@ mod tests {
     let t = theme();
     let graph = sample_graph(&t);
     let output = render(&graph);
+
     assert!(output.contains("3 phases"), "should contain phase count");
     assert!(output.contains("7 tasks"), "should contain task count");
   }
@@ -479,6 +487,7 @@ mod tests {
     let graph = sample_graph(&t);
     let output = render(&graph);
     let has_pipe_in_task_line = output.lines().any(|l| l.contains('\u{2502}') && l.contains("cdrzjvwk"));
+
     assert!(has_pipe_in_task_line, "task rows should have │ for non-active columns");
   }
 
@@ -488,6 +497,7 @@ mod tests {
     let graph = sample_graph(&t);
     let output = render(&graph);
     let first_line = output.lines().next().unwrap();
+
     assert!(
       first_line.contains("Q1 LLM Benchmark Evaluation"),
       "first line should contain the title"
@@ -499,6 +509,7 @@ mod tests {
     let t = theme();
     let graph = sample_graph(&t);
     let output = render(&graph);
+
     assert!(output.contains("\u{2570}\u{2500}\u{256F}"), "last phase should use ╰─╯");
   }
 
@@ -515,7 +526,7 @@ mod tests {
           id: "xxxxxxxx",
           title: "only task",
           priority: None,
-          tags: &[],
+
           is_blocking: false,
           blocked_by: None,
         }],
@@ -523,6 +534,7 @@ mod tests {
       theme: &t,
     };
     let output = render(&graph);
+
     assert!(output.contains("1 phase"), "should use singular 'phase'");
     assert!(output.contains("1 task"), "should use singular 'task'");
     assert!(!output.contains("1 phases"), "should not use plural for 1");
@@ -542,7 +554,7 @@ mod tests {
             id: "aaaaaaaa",
             title: "has priority",
             priority: Some(1),
-            tags: &[],
+
             is_blocking: false,
             blocked_by: None,
           },
@@ -551,7 +563,7 @@ mod tests {
             id: "bbbbbbbb",
             title: "no priority",
             priority: None,
-            tags: &[],
+
             is_blocking: false,
             blocked_by: None,
           },
@@ -574,6 +586,7 @@ mod tests {
     let t = theme();
     let graph = sample_graph(&t);
     let output = render(&graph);
+
     assert!(
       output.contains("\u{251C}\u{2500}\u{256F}"),
       "non-last phase should use ├─╯"

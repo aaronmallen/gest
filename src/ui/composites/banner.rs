@@ -163,6 +163,7 @@ mod tests {
     let start = Color::Rgb(0, 0, 0);
     let end = Color::Rgb(100, 200, 50);
     let result = lerp_color(start, end, 0.5);
+
     assert_eq!(result, Color::Rgb(50, 100, 25));
   }
 
@@ -171,6 +172,7 @@ mod tests {
     let start = Color::Rgb(24, 178, 155);
     let end = Color::Rgb(68, 169, 211);
     let result = lerp_color(start, end, 1.0);
+
     assert_eq!(result, Color::Rgb(68, 169, 211));
   }
 
@@ -179,6 +181,7 @@ mod tests {
     let start = Color::Rgb(24, 178, 155);
     let end = Color::Rgb(68, 169, 211);
     let result = lerp_color(start, end, 0.0);
+
     assert_eq!(result, Color::Rgb(24, 178, 155));
   }
 
@@ -246,6 +249,7 @@ mod tests {
     let start = Color::Red;
     let end = Color::Blue;
     let result = lerp_color(start, end, 0.5);
+
     assert_eq!(result, Color::Red);
   }
 
@@ -254,6 +258,7 @@ mod tests {
     let has_shadow = ASCII_ART
       .iter()
       .any(|row| row.chars().any(|ch| SHADOW_CHARS.contains(&ch)));
+
     assert!(has_shadow, "ASCII art should contain shadow characters");
   }
 }

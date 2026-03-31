@@ -55,6 +55,7 @@ mod tests {
 
       let filter = ArtifactFilter::default();
       let artifacts = store::list_artifacts(&ctx.settings, &filter).unwrap();
+
       assert_eq!(artifacts.len(), 0);
 
       let filter = ArtifactFilter {

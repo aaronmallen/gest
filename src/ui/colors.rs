@@ -20,9 +20,6 @@ pub const BORDER: Color = Color::Rgb(48, 50, 58);
 /// De-emphasized foreground.
 pub const DIM: Color = Color::Rgb(88, 94, 110);
 
-/// Very dark background tone.
-pub const DUSK: Color = Color::Rgb(20, 21, 25);
-
 /// Warm orange accent.
 pub const EMBER: Color = Color::Rgb(208, 88, 48);
 
@@ -31,9 +28,6 @@ pub const ERROR: Color = Color::Rgb(208, 56, 56);
 
 /// Semantic success green.
 pub const JADE: Color = Color::Rgb(54, 190, 120);
-
-/// Near-black background.
-pub const OBSIDIAN: Color = Color::Rgb(13, 14, 18);
 
 /// Mid-tone neutral for secondary text.
 pub const PEWTER: Color = Color::Rgb(124, 130, 148);
@@ -65,8 +59,6 @@ mod tests {
 
   #[test]
   fn it_verifies_core_neutrals() {
-    assert_rgb(OBSIDIAN, 13, 14, 18);
-    assert_rgb(DUSK, 20, 21, 25);
     assert_rgb(BORDER, 48, 50, 58);
     assert_rgb(DIM, 88, 94, 110);
     assert_rgb(PEWTER, 124, 130, 148);

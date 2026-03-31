@@ -88,6 +88,7 @@ mod tests {
     fn it_errors_on_nonzero_exit() {
       let tmp = tempfile::NamedTempFile::new().unwrap();
       let result = open_editor_with("false", tmp.path());
+
       assert!(result.is_err());
     }
 
@@ -95,6 +96,7 @@ mod tests {
     fn it_succeeds_with_true_editor() {
       let tmp = tempfile::NamedTempFile::new().unwrap();
       let result = open_editor_with("true", tmp.path());
+
       assert!(result.is_ok());
     }
   }

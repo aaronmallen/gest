@@ -50,6 +50,7 @@ mod tests {
         path: "nonexistent".to_string(),
       };
       let result = cmd.call(&ctx);
+
       assert!(result.is_err());
     }
 

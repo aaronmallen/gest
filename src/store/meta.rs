@@ -1,5 +1,8 @@
 //! Shared TOML metadata helpers for reading and writing dot-delimited key paths.
 
+/// Maximum number of dot-delimited segments allowed in a key path.
+const MAX_DEPTH: usize = 32;
+
 /// Walk a dot-delimited path through nested TOML tables, returning a reference to the leaf value.
 pub fn resolve_dot_path<'a>(root: &'a toml::Value, path: &str) -> Option<&'a toml::Value> {
   path
@@ -42,9 +45,6 @@ pub fn parse_toml_value(s: &str) -> toml::Value {
     _ => toml::Value::String(s.to_string()),
   }
 }
-
-/// Maximum number of dot-delimited segments allowed in a key path.
-const MAX_DEPTH: usize = 32;
 
 /// Insert a value at a dot-delimited path, creating intermediate tables as needed.
 pub fn set_dot_path(table: &mut toml::Table, path: &str, value: &str) -> super::Result<()> {
@@ -96,7 +96,7 @@ pub(crate) fn set_nested(table: &mut toml::Table, segments: &[&str], value: toml
 mod tests {
   use super::*;
 
-  mod resolve_dot_path_tests {
+  mod resolve_dot_path {
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -130,7 +130,7 @@ mod tests {
     }
   }
 
-  mod parse_toml_value_tests {
+  mod parse_toml_value {
     use pretty_assertions::assert_eq;
 
     use super::*;

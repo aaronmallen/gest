@@ -71,6 +71,32 @@ impl FromStr for RelationshipType {
 mod tests {
   use super::*;
 
+  mod roundtrip {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn it_serializes_ref_field_correctly() {
+      let link = Link {
+        ref_: "https://example.com".to_string(),
+        rel: RelationshipType::RelatesTo,
+      };
+      let toml_str = toml::to_string(&link).unwrap();
+      assert!(
+        toml_str.contains("ref = "),
+        "Expected 'ref =' in TOML output, got: {toml_str}"
+      );
+      assert!(
+        !toml_str.contains("ref_"),
+        "Should not contain 'ref_' in TOML output, got: {toml_str}"
+      );
+
+      let roundtripped: Link = toml::from_str(&toml_str).unwrap();
+      assert_eq!(link, roundtripped);
+    }
+  }
+
   mod relationship_type {
     use super::*;
 
@@ -134,32 +160,6 @@ mod tests {
         assert_eq!(RelationshipType::ParentOf.inverse(), RelationshipType::ChildOf);
         assert_eq!(RelationshipType::RelatesTo.inverse(), RelationshipType::RelatesTo);
       }
-    }
-  }
-
-  mod roundtrip {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_serializes_ref_field_correctly() {
-      let link = Link {
-        ref_: "https://example.com".to_string(),
-        rel: RelationshipType::RelatesTo,
-      };
-      let toml_str = toml::to_string(&link).unwrap();
-      assert!(
-        toml_str.contains("ref = "),
-        "Expected 'ref =' in TOML output, got: {toml_str}"
-      );
-      assert!(
-        !toml_str.contains("ref_"),
-        "Should not contain 'ref_' in TOML output, got: {toml_str}"
-      );
-
-      let roundtripped: Link = toml::from_str(&toml_str).unwrap();
-      assert_eq!(link, roundtripped);
     }
   }
 }

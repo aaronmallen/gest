@@ -127,6 +127,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let updated = store::read_task(&ctx.settings, &task.id).unwrap();
+
       assert_eq!(updated.metadata.get("priority").unwrap().as_str().unwrap(), "low");
       assert_eq!(updated.metadata.get("team").unwrap().as_str().unwrap(), "backend");
     }
@@ -153,6 +154,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let updated = store::read_task(&ctx.settings, &task.id).unwrap();
+
       assert_eq!(updated.links.len(), 1);
       assert_eq!(updated.links[0].rel, RelationshipType::RelatesTo);
       assert_eq!(updated.metadata.get("priority").unwrap().as_str().unwrap(), "low");
@@ -180,6 +182,7 @@ mod tests {
       cmd.call(&ctx).unwrap();
 
       let updated = store::read_task(&ctx.settings, &task.id).unwrap();
+
       assert_eq!(updated.title, "New Title");
       assert_eq!(updated.description, "Original description");
       assert_eq!(updated.status, Status::Open);

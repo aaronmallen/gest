@@ -322,6 +322,7 @@ mod tests {
 
       let filter = IterationFilter::default();
       let iterations = crate::store::list_iterations(&make_config(dir.path()), &filter).unwrap();
+
       assert_eq!(iterations.len(), 0);
     }
 
@@ -357,6 +358,7 @@ mod tests {
         ..Default::default()
       };
       let iterations = crate::store::list_iterations(&make_config(dir.path()), &filter).unwrap();
+
       assert_eq!(iterations.len(), 1);
       assert_eq!(iterations[0].title, "Tagged");
     }
@@ -373,6 +375,7 @@ mod tests {
         ..Default::default()
       };
       let iterations = crate::store::list_iterations(&make_config(dir.path()), &filter).unwrap();
+
       assert_eq!(iterations.len(), 1);
     }
 
@@ -386,6 +389,7 @@ mod tests {
 
       let filter = IterationFilter::default();
       let iterations = crate::store::list_iterations(&make_config(dir.path()), &filter).unwrap();
+
       assert_eq!(iterations.len(), 2);
     }
   }
@@ -458,6 +462,7 @@ mod tests {
       };
 
       let updated = crate::store::update_iteration(&make_config(dir.path()), &iteration.id, patch).unwrap();
+
       assert!(updated.completed_at.is_some());
       assert!(crate::store::is_iteration_resolved(
         &make_config(dir.path()),
@@ -478,6 +483,7 @@ mod tests {
       };
 
       let updated = crate::store::update_iteration(&make_config(dir.path()), &iteration.id, patch).unwrap();
+
       assert!(updated.completed_at.is_none());
       assert!(!crate::store::is_iteration_resolved(
         &make_config(dir.path()),
@@ -497,6 +503,7 @@ mod tests {
       };
 
       let updated = crate::store::update_iteration(&make_config(dir.path()), &iteration.id, patch).unwrap();
+
       assert_eq!(updated.title, "New Title");
     }
   }

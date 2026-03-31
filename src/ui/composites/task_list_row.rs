@@ -55,6 +55,26 @@ impl<'a> TaskListRow<'a> {
     self
   }
 
+  /// Returns the rendered blocking info string for this row.
+  pub fn blocking_info_string(&self) -> String {
+    let blocked_by = self.blocked_by.into_iter().collect();
+    Indicators::new(self.theme)
+      .blocking(self.blocking)
+      .blocked_by(blocked_by)
+      .to_string()
+  }
+
+  /// Returns the display width of the blocking info for this row.
+  pub fn blocking_info_width(&self) -> usize {
+    utils::display_width(&self.blocking_info_string())
+  }
+
+  /// Sets minimum display width for the blocking info column.
+  pub fn blocking_pad(mut self, w: usize) -> Self {
+    self.blocking_pad = w;
+    self
+  }
+
   /// Sets the task priority level for the badge.
   pub fn priority(mut self, p: Option<u8>) -> Self {
     self.priority = p;
@@ -74,16 +94,20 @@ impl<'a> TaskListRow<'a> {
     utils::display_width(&self.priority_badge_string())
   }
 
-  /// Sets minimum display width for the blocking info column.
-  pub fn blocking_pad(mut self, w: usize) -> Self {
-    self.blocking_pad = w;
-    self
-  }
-
   /// Sets minimum display width for the priority badge column.
   pub fn priority_pad(mut self, w: usize) -> Self {
     self.priority_pad = w;
     self
+  }
+
+  /// Returns the rendered status badge string for this row.
+  pub fn status_badge_string(&self) -> String {
+    self.status_badge().to_string()
+  }
+
+  /// Returns the display width of the status badge for this row.
+  pub fn status_badge_width(&self) -> usize {
+    utils::display_width(&self.status_badge_string())
   }
 
   /// Sets minimum display width for the status badge column.
@@ -96,30 +120,6 @@ impl<'a> TaskListRow<'a> {
   pub fn tags(mut self, t: &'a [String]) -> Self {
     self.tags = t;
     self
-  }
-
-  /// Returns the rendered blocking info string for this row.
-  pub fn blocking_info_string(&self) -> String {
-    let blocked_by = self.blocked_by.into_iter().collect();
-    Indicators::new(self.theme)
-      .blocking(self.blocking)
-      .blocked_by(blocked_by)
-      .to_string()
-  }
-
-  /// Returns the display width of the blocking info for this row.
-  pub fn blocking_info_width(&self) -> usize {
-    utils::display_width(&self.blocking_info_string())
-  }
-
-  /// Returns the rendered status badge string for this row.
-  pub fn status_badge_string(&self) -> String {
-    self.status_badge().to_string()
-  }
-
-  /// Returns the display width of the status badge for this row.
-  pub fn status_badge_width(&self) -> usize {
-    utils::display_width(&self.status_badge_string())
   }
 
   fn leading_icon(&self) -> Icon {
@@ -229,6 +229,16 @@ mod tests {
   }
 
   #[test]
+  fn it_omits_priority_column_when_pad_is_zero() {
+    let theme = theme();
+    let row = TaskListRow::new("open", "aaaaaaaa", "no priority", &theme);
+    let output = render(&row);
+
+    assert_eq!(row.priority_badge_width(), 0, "width should be zero with no priority");
+    assert!(!output.contains("  [P"), "should not contain priority column");
+  }
+
+  #[test]
   fn it_renders_blocked_row_with_blocked_by() {
     let theme = theme();
     let row = TaskListRow::new("open", "mxdtqrbn", "ctx window", &theme).blocked_by(Some("hpvrlbme"));
@@ -294,16 +304,6 @@ mod tests {
       title_pos_with, title_pos_without,
       "titles should align when priority_pad is set"
     );
-  }
-
-  #[test]
-  fn it_omits_priority_column_when_pad_is_zero() {
-    let theme = theme();
-    let row = TaskListRow::new("open", "aaaaaaaa", "no priority", &theme);
-    let output = render(&row);
-
-    assert_eq!(row.priority_badge_width(), 0, "width should be zero with no priority");
-    assert!(!output.contains("  [P"), "should not contain priority column");
   }
 
   #[test]

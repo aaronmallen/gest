@@ -8,9 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use super::{id::Id, link::Link};
 
-/// Canonical display ordering for iteration statuses.
-pub const STATUS_ORDER: &[Status] = &[Status::Active, Status::Completed, Status::Failed];
-
 /// A time-boxed planning container that groups related tasks.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Iteration {

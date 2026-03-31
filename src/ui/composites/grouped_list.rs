@@ -22,12 +22,6 @@ impl<'a> GroupedList<'a> {
     }
   }
 
-  /// Appends a single display item as a row.
-  pub fn row(mut self, item: impl Display) -> Self {
-    self.rows.push(item.to_string());
-    self
-  }
-
   /// Appends multiple display items as rows.
   pub fn rows(mut self, items: impl IntoIterator<Item = impl Display>) -> Self {
     for item in items {
@@ -71,6 +65,7 @@ mod tests {
     let t = theme();
     let list = GroupedList::new("tasks", "2 tasks", &t).rows(["one", "two"]);
     let output = list.to_string();
+
     assert!(output.contains("one"));
     assert!(output.contains("two"));
   }
@@ -80,16 +75,16 @@ mod tests {
     let t = theme();
     let list = GroupedList::new("iterations", "1 iteration", &t);
     let output = list.to_string();
+
     assert_eq!(output, "iterations  1 iteration");
   }
 
   #[test]
   fn it_renders_heading_and_rows() {
     let t = theme();
-    let list = GroupedList::new("artifacts", "3 artifacts", &t)
-      .row("row-a")
-      .row("row-b");
+    let list = GroupedList::new("artifacts", "3 artifacts", &t).rows(["row-a", "row-b"]);
     let output = list.to_string();
+
     assert!(output.contains("artifacts"));
     assert!(output.contains("3 artifacts"));
     assert!(output.contains("\n\nrow-a"));
@@ -101,6 +96,7 @@ mod tests {
     let t = theme();
     let list = GroupedList::new("tasks", "7 tasks  \u{00b7}  2 done", &t);
     let output = list.to_string();
+
     assert!(output.starts_with("tasks"));
     assert!(output.contains("7 tasks"));
     assert!(output.contains("\u{00b7}"));

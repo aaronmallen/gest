@@ -4,7 +4,7 @@ use yansi::Paint;
 
 use crate::ui::{
   atoms::{label::Label, value::Value},
-  composites::{banner::Banner, success_message::SuccessMessage},
+  composites::success_message::SuccessMessage,
   theme::Theme,
 };
 
@@ -149,25 +149,6 @@ impl Display for InitView<'_> {
   }
 }
 
-/// Renders the version banner with build metadata.
-pub struct VersionView<'a> {
-  banner: Banner<'a>,
-}
-
-impl<'a> VersionView<'a> {
-  pub fn new(banner: Banner<'a>) -> Self {
-    Self {
-      banner,
-    }
-  }
-}
-
-impl Display for VersionView<'_> {
-  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", self.banner)
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -289,26 +270,6 @@ mod tests {
         assert!(rendered.contains("initialized gest"));
         assert!(rendered.contains("/home/user/.local/share/gest/abc123"));
         assert!(!rendered.contains("config"));
-      }
-    }
-  }
-
-  mod version_view {
-    use super::*;
-
-    mod display {
-      use super::*;
-
-      #[test]
-      fn it_renders_banner() {
-        let theme = theme();
-        let banner = Banner::new("0.2.3", "macos-aarch64", "2026-03-29", "a1b2c3d", "aaronmallen", &theme);
-        let view = VersionView::new(banner);
-        let rendered = format!("{view}");
-
-        assert!(rendered.contains("v0.2.3"));
-        assert!(rendered.contains("macos-aarch64"));
-        assert!(rendered.contains("aaronmallen"));
       }
     }
   }

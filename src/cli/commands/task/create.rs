@@ -114,6 +114,7 @@ mod tests {
 
       let filter = crate::model::TaskFilter::default();
       let tasks = store::list_tasks(&ctx.settings, &filter).unwrap();
+
       assert_eq!(tasks.len(), 1);
 
       let task = &tasks[0];
@@ -148,6 +149,7 @@ mod tests {
 
       let filter = crate::model::TaskFilter::default();
       let tasks = store::list_tasks(&ctx.settings, &filter).unwrap();
+
       assert_eq!(tasks.len(), 1);
       assert_eq!(tasks[0].title, "My Task");
       assert_eq!(tasks[0].status, Status::Open);

@@ -63,6 +63,7 @@ mod tests {
     let theme = theme();
     let row = IterationListRow::new("q1ebvmxp", "Q1 LLM Benchmark", 3, 7, &theme);
     let rendered = format!("{row}");
+
     assert!(rendered.contains("q1"));
     assert!(rendered.contains("ebvmxp"));
   }
@@ -72,6 +73,7 @@ mod tests {
     let theme = theme();
     let row = IterationListRow::new("q1ebvmxp", "Q1 LLM Benchmark", 3, 7, &theme);
     let rendered = format!("{row}");
+
     assert!(rendered.contains("3 phases"));
     assert!(rendered.contains("7 tasks"));
     assert!(rendered.contains("·"));
@@ -82,6 +84,7 @@ mod tests {
     let theme = theme();
     let row = IterationListRow::new("abcdefgh", "Solo Run", 1, 1, &theme);
     let rendered = format!("{row}");
+
     assert!(rendered.contains("1 phase"));
     assert!(rendered.contains("1 task"));
     assert!(!rendered.contains("phases"));
@@ -93,6 +96,7 @@ mod tests {
     let theme = theme();
     let row = IterationListRow::new("q1ebvmxp", "Q1 LLM Benchmark", 3, 7, &theme);
     let rendered = format!("{row}");
+
     assert!(rendered.contains("Q1 LLM Benchmark"));
   }
 
@@ -101,6 +105,7 @@ mod tests {
     let theme = theme();
     let row = IterationListRow::new("zerotest", "Empty Iteration", 0, 0, &theme);
     let rendered = format!("{row}");
+
     assert!(rendered.contains("0 phases"));
     assert!(rendered.contains("0 tasks"));
   }

@@ -20,12 +20,6 @@ impl<'a> Id<'a> {
       theme,
     }
   }
-
-  /// Override the number of highlighted prefix characters (clamped to value length).
-  pub fn prefix_len(mut self, len: usize) -> Self {
-    self.prefix_len = len;
-    self
-  }
 }
 
 impl Display for Id<'_> {
@@ -59,6 +53,7 @@ mod tests {
       let theme = theme();
       let id = Id::new("xqnuktro", &theme);
       let rendered = format!("{id}");
+
       assert!(rendered.contains("xq"));
       assert!(rendered.contains("nuktro"));
     }
@@ -79,30 +74,10 @@ mod tests {
       let theme = theme();
       let id = Id::new("abc", &theme);
       let rendered = format!("{id}");
+
       assert!(rendered.contains("ab"));
       assert!(rendered.contains("c"));
       assert!(!rendered.contains(' '));
-    }
-  }
-
-  mod prefix_len {
-    use super::*;
-
-    #[test]
-    fn it_clamps_to_value_length() {
-      let theme = theme();
-      let id = Id::new("ab", &theme).prefix_len(10);
-      let rendered = format!("{id}");
-      assert!(rendered.contains("ab"));
-    }
-
-    #[test]
-    fn it_uses_custom_prefix_length() {
-      let theme = theme();
-      let id = Id::new("abcdefgh", &theme).prefix_len(4);
-      let rendered = format!("{id}");
-      assert!(rendered.contains("abcd"));
-      assert!(rendered.contains("efgh"));
     }
   }
 }

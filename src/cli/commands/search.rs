@@ -278,6 +278,7 @@ mod tests {
     #[test]
     fn it_keeps_short_text() {
       let result = super::truncate_snippet("short text", 200);
+
       assert_eq!(result, "short text");
     }
 
@@ -285,6 +286,7 @@ mod tests {
     fn it_limits_to_three_lines() {
       let text = "line one\nline two\nline three\nline four\nline five";
       let result = super::truncate_snippet(text, 200);
+
       assert_eq!(result, "line one\nline two\nline three");
     }
 
@@ -292,6 +294,7 @@ mod tests {
     fn it_truncates_long_text() {
       let long_text = "a".repeat(300);
       let result = super::truncate_snippet(&long_text, 200);
+
       assert!(result.ends_with("..."));
       assert_eq!(result.chars().count(), 203);
     }

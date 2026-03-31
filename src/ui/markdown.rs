@@ -151,85 +151,93 @@ mod tests {
     render(md, &plain_theme(), width)
   }
 
-  #[test]
-  fn it_breaks_long_lines_with_word_wrap() {
-    let result = word_wrap("one two three four five", 10);
-    assert!(result.contains('\n'), "expected line break, got: {result}");
+  mod render {
+    use super::*;
+
+    #[test]
+    fn it_renders_blockquote_with_border() {
+      let md = "> This is a quote.";
+      let out = render_plain(md, 80);
+      assert!(out.contains("> This is a quote."), "got: {out}");
+    }
+
+    #[test]
+    fn it_renders_code_block_with_left_border() {
+      let md = "```\nlet x = 1;\nlet y = 2;\n```";
+      let out = render_plain(md, 80);
+      assert!(out.contains("\u{2502} let x = 1;"), "got: {out}");
+      assert!(out.contains("\u{2502} let y = 2;"), "got: {out}");
+    }
+
+    #[test]
+    fn it_renders_emphasis() {
+      let md = "This is *italic* text";
+      let out = render_plain(md, 80);
+      assert!(out.contains("italic"), "got: {out}");
+    }
+
+    #[test]
+    fn it_renders_heading_text() {
+      let out = render_plain("## openai streaming adapter", 80);
+      assert!(out.contains("openai streaming adapter"), "got: {out}");
+    }
+
+    #[test]
+    fn it_renders_horizontal_rule() {
+      let out = render_plain("---", 20);
+      let expected: String = std::iter::repeat_n('\u{2500}', 20).collect();
+      assert!(out.contains(&expected), "got: {out}");
+    }
+
+    #[test]
+    fn it_renders_inline_code() {
+      let out = render_plain("Call `complete()` here", 80);
+      assert!(out.contains("complete()"), "got: {out}");
+    }
+
+    #[test]
+    fn it_renders_link_text() {
+      let md = "[click](https://example.com)";
+      let out = render_plain(md, 80);
+      assert!(out.contains("click"), "got: {out}");
+    }
+
+    #[test]
+    fn it_renders_strong() {
+      let md = "This is **bold** text";
+      let out = render_plain(md, 80);
+      assert!(out.contains("bold"), "got: {out}");
+    }
+
+    #[test]
+    fn it_returns_empty_for_empty_input() {
+      let out = render_plain("", 80);
+      assert!(out.is_empty(), "got: {out}");
+    }
+
+    #[test]
+    fn it_separates_multiple_paragraphs() {
+      let md = "First paragraph.\n\nSecond paragraph.";
+      let out = render_plain(md, 80);
+      assert!(out.contains("First paragraph."));
+      assert!(out.contains("Second paragraph."));
+      assert!(out.contains("\n\n"));
+    }
   }
 
-  #[test]
-  fn it_renders_blockquote_with_border() {
-    let md = "> This is a quote.";
-    let out = render_plain(md, 80);
-    assert!(out.contains("> This is a quote."), "got: {out}");
-  }
+  mod word_wrap {
+    use super::*;
 
-  #[test]
-  fn it_renders_code_block_with_left_border() {
-    let md = "```\nlet x = 1;\nlet y = 2;\n```";
-    let out = render_plain(md, 80);
-    assert!(out.contains("\u{2502} let x = 1;"), "got: {out}");
-    assert!(out.contains("\u{2502} let y = 2;"), "got: {out}");
-  }
+    #[test]
+    fn it_breaks_long_lines() {
+      let result = word_wrap("one two three four five", 10);
+      assert!(result.contains('\n'), "expected line break, got: {result}");
+    }
 
-  #[test]
-  fn it_renders_emphasis() {
-    let md = "This is *italic* text";
-    let out = render_plain(md, 80);
-    assert!(out.contains("italic"), "got: {out}");
-  }
-
-  #[test]
-  fn it_renders_heading_text() {
-    let out = render_plain("## openai streaming adapter", 80);
-    assert!(out.contains("openai streaming adapter"), "got: {out}");
-  }
-
-  #[test]
-  fn it_renders_horizontal_rule() {
-    let out = render_plain("---", 20);
-    let expected: String = std::iter::repeat_n('\u{2500}', 20).collect();
-    assert!(out.contains(&expected), "got: {out}");
-  }
-
-  #[test]
-  fn it_renders_inline_code() {
-    let out = render_plain("Call `complete()` here", 80);
-    assert!(out.contains("complete()"), "got: {out}");
-  }
-
-  #[test]
-  fn it_renders_link_text() {
-    let md = "[click](https://example.com)";
-    let out = render_plain(md, 80);
-    assert!(out.contains("click"), "got: {out}");
-  }
-
-  #[test]
-  fn it_renders_strong() {
-    let md = "This is **bold** text";
-    let out = render_plain(md, 80);
-    assert!(out.contains("bold"), "got: {out}");
-  }
-
-  #[test]
-  fn it_returns_empty_for_empty_input() {
-    let out = render_plain("", 80);
-    assert!(out.is_empty(), "got: {out}");
-  }
-
-  #[test]
-  fn it_returns_original_when_word_wrap_width_is_zero() {
-    let result = word_wrap("hello world", 0);
-    assert_eq!(result, "hello world");
-  }
-
-  #[test]
-  fn it_separates_multiple_paragraphs() {
-    let md = "First paragraph.\n\nSecond paragraph.";
-    let out = render_plain(md, 80);
-    assert!(out.contains("First paragraph."));
-    assert!(out.contains("Second paragraph."));
-    assert!(out.contains("\n\n"));
+    #[test]
+    fn it_returns_original_when_width_is_zero() {
+      let result = word_wrap("hello world", 0);
+      assert_eq!(result, "hello world");
+    }
   }
 }

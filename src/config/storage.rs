@@ -159,6 +159,114 @@ fn walk_up_dir(start: &Path, names: &[&str]) -> Option<PathBuf> {
 mod tests {
   use super::*;
 
+  mod settings {
+    use super::*;
+
+    mod data_dir {
+      use pretty_assertions::assert_eq;
+      use temp_env::{with_var, with_var_unset};
+      use tempfile::TempDir;
+
+      use super::*;
+
+      #[test]
+      fn it_falls_back_to_config_when_env_is_set_to_a_non_absolute_path() {
+        let tmp_from_env = TempDir::new().unwrap();
+        let tmp_from_config = TempDir::new().unwrap();
+        let path = tmp_from_env.path().to_str().unwrap().strip_prefix("/").unwrap();
+
+        with_var("GEST_DATA_DIR", Some(path), || {
+          let settings = Settings {
+            data_dir: Some(tmp_from_config.path().to_path_buf()),
+            ..Default::default()
+          };
+
+          assert_eq!(
+            settings.resolve_data_dir(std::env::current_dir().unwrap()).unwrap(),
+            tmp_from_config.path().to_path_buf()
+          );
+        })
+      }
+
+      #[test]
+      fn it_falls_back_to_global_data_dir_when_no_local_gest_dir_exists() {
+        let tmp = TempDir::new().unwrap();
+
+        with_var_unset("GEST_DATA_DIR", || {
+          let settings = Settings::default();
+          let result = settings.resolve_data_dir(tmp.path().to_path_buf()).unwrap();
+          let expected = dir_spec::data_home()
+            .map(|p| p.join("gest").join(super::path_hash(tmp.path())))
+            .unwrap();
+
+          assert_eq!(result, expected);
+        })
+      }
+
+      #[test]
+      fn it_falls_back_to_local_data_dir_when_config_is_set_to_a_non_absolute_path() {
+        let tmp = TempDir::new().unwrap();
+        let rel_path = tmp.path().to_str().unwrap().strip_prefix("/").unwrap();
+        let gest_path = tmp.path().join(".gest");
+        std::fs::create_dir_all(&gest_path).unwrap();
+
+        with_var_unset("GEST_DATA_DIR", || {
+          let settings = Settings {
+            data_dir: Some(PathBuf::from(rel_path)),
+            ..Default::default()
+          };
+
+          assert_eq!(
+            settings.resolve_data_dir(tmp.path().to_path_buf()).unwrap(),
+            gest_path.to_path_buf()
+          );
+        })
+      }
+
+      #[test]
+      fn it_returns_an_error_when_config_is_set_to_a_file_and_env_is_unset() {
+        let tmp = TempDir::new().unwrap();
+        let filepath = tmp.path().join("gest");
+        std::fs::write(&filepath, "").unwrap();
+
+        with_var_unset("GEST_DATA_DIR", || {
+          let settings = Settings {
+            data_dir: Some(filepath),
+            ..Default::default()
+          };
+
+          assert!(settings.resolve_data_dir(std::env::current_dir().unwrap()).is_err());
+        })
+      }
+
+      #[test]
+      fn it_returns_an_error_when_env_is_set_to_a_file() {
+        let tmp = TempDir::new().unwrap();
+        let filepath = tmp.path().join("gest");
+        std::fs::write(&filepath, "").unwrap();
+
+        with_var("GEST_DATA_DIR", Some(filepath.to_str().unwrap()), || {
+          let settings = Settings::default();
+
+          assert!(settings.resolve_data_dir(std::env::current_dir().unwrap()).is_err());
+        })
+      }
+
+      #[test]
+      fn it_returns_path_from_env_when_set() {
+        let tmp = TempDir::new().unwrap();
+        with_var("GEST_DATA_DIR", Some(tmp.path().to_str().unwrap()), || {
+          let settings = Settings::default();
+
+          assert_eq!(
+            settings.resolve_data_dir(std::env::current_dir().unwrap()).unwrap(),
+            tmp.path().to_path_buf()
+          );
+        })
+      }
+    }
+  }
+
   mod resolve_entity_dirs {
     use pretty_assertions::assert_eq;
     use temp_env::with_vars;
@@ -269,114 +377,6 @@ mod tests {
           assert_eq!(settings.resolve_iteration_dir(&data_dir), env_iter);
         },
       );
-    }
-  }
-
-  mod settings {
-    use super::*;
-
-    mod data_dir {
-      use pretty_assertions::assert_eq;
-      use temp_env::{with_var, with_var_unset};
-      use tempfile::TempDir;
-
-      use super::*;
-
-      #[test]
-      fn it_falls_back_to_config_when_env_is_set_to_a_non_absolute_path() {
-        let tmp_from_env = TempDir::new().unwrap();
-        let tmp_from_config = TempDir::new().unwrap();
-        let path = tmp_from_env.path().to_str().unwrap().strip_prefix("/").unwrap();
-
-        with_var("GEST_DATA_DIR", Some(path), || {
-          let settings = Settings {
-            data_dir: Some(tmp_from_config.path().to_path_buf()),
-            ..Default::default()
-          };
-
-          assert_eq!(
-            settings.resolve_data_dir(std::env::current_dir().unwrap()).unwrap(),
-            tmp_from_config.path().to_path_buf()
-          );
-        })
-      }
-
-      #[test]
-      fn it_falls_back_to_global_data_dir_when_no_local_gest_dir_exists() {
-        let tmp = TempDir::new().unwrap();
-
-        with_var_unset("GEST_DATA_DIR", || {
-          let settings = Settings::default();
-          let result = settings.resolve_data_dir(tmp.path().to_path_buf()).unwrap();
-          let expected = dir_spec::data_home()
-            .map(|p| p.join("gest").join(super::path_hash(tmp.path())))
-            .unwrap();
-
-          assert_eq!(result, expected);
-        })
-      }
-
-      #[test]
-      fn it_falls_back_to_local_data_dir_when_config_is_set_to_a_non_absolute_path() {
-        let tmp = TempDir::new().unwrap();
-        let rel_path = tmp.path().to_str().unwrap().strip_prefix("/").unwrap();
-        let gest_path = tmp.path().join(".gest");
-        std::fs::create_dir_all(&gest_path).unwrap();
-
-        with_var_unset("GEST_DATA_DIR", || {
-          let settings = Settings {
-            data_dir: Some(PathBuf::from(rel_path)),
-            ..Default::default()
-          };
-
-          assert_eq!(
-            settings.resolve_data_dir(tmp.path().to_path_buf()).unwrap(),
-            gest_path.to_path_buf()
-          );
-        })
-      }
-
-      #[test]
-      fn it_returns_an_error_when_config_is_set_to_a_file_and_env_is_unset() {
-        let tmp = TempDir::new().unwrap();
-        let filepath = tmp.path().join("gest");
-        std::fs::write(&filepath, "").unwrap();
-
-        with_var_unset("GEST_DATA_DIR", || {
-          let settings = Settings {
-            data_dir: Some(filepath),
-            ..Default::default()
-          };
-
-          assert!(settings.resolve_data_dir(std::env::current_dir().unwrap()).is_err());
-        })
-      }
-
-      #[test]
-      fn it_returns_an_error_when_env_is_set_to_a_file() {
-        let tmp = TempDir::new().unwrap();
-        let filepath = tmp.path().join("gest");
-        std::fs::write(&filepath, "").unwrap();
-
-        with_var("GEST_DATA_DIR", Some(filepath.to_str().unwrap()), || {
-          let settings = Settings::default();
-
-          assert!(settings.resolve_data_dir(std::env::current_dir().unwrap()).is_err());
-        })
-      }
-
-      #[test]
-      fn it_returns_path_from_env_when_set() {
-        let tmp = TempDir::new().unwrap();
-        with_var("GEST_DATA_DIR", Some(tmp.path().to_str().unwrap()), || {
-          let settings = Settings::default();
-
-          assert_eq!(
-            settings.resolve_data_dir(std::env::current_dir().unwrap()).unwrap(),
-            tmp.path().to_path_buf()
-          );
-        })
-      }
     }
   }
 }

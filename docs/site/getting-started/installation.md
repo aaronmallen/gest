@@ -60,7 +60,7 @@ gest version
 You should see output similar to:
 
 ```text
-v0.3.0 macos ( revision )
+v0.3.4 macos-aarch64 (2026-03-31 revision 9644667)
 ```
 
 The `version` command also checks for available updates. To update an existing install, run:

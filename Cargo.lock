@@ -853,7 +853,7 @@ dependencies = [
 
 [[package]]
 name = "gest"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "askama 0.15.6",
  "askama-derive-axum",

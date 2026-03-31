@@ -7,6 +7,24 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [v0.3.3] - 2026-03-31
+
+### Added
+
+- Task and artifact create/edit forms in the web UI with markdown preview, relationship management, and inline search
+- Dashboard status cards now link to filtered task views
+- Navigation buttons (new/edit) on list and detail pages
+
+### Changed
+
+- Short ID prefixes are now displayed with clickable links, tags are clickable, and artifact type label is used
+  consistently across the web UI
+
+### Fixed
+
+- Store write functions now respect entity location (active vs. archive/resolved), preventing duplicates on mutation
+- CLI flags (`--version`, `--verbose`) and shell completion variants now have help text (see [#24])
+
 ## [v0.3.2] - 2026-03-31
 
 ### Added
@@ -128,8 +146,9 @@ Initial release
 [#21]: https://github.com/aaronmallen/gest/issues/21
 [#22]: https://github.com/aaronmallen/gest/issues/22
 [#23]: https://github.com/aaronmallen/gest/issues/23
+[#24]: https://github.com/aaronmallen/gest/issues/24
 
-[Unreleased]: https://github.com/aaronmallen/gest/compare/0.3.2...main
+[Unreleased]: https://github.com/aaronmallen/gest/compare/0.3.3...main
 [v0.2.0]: https://github.com/aaronmallen/gest/compare/0.1.0...0.2.0
 [v0.2.1]: https://github.com/aaronmallen/gest/compare/0.2.0...0.2.1
 [v0.2.2]: https://github.com/aaronmallen/gest/compare/0.2.1...0.2.2
@@ -137,3 +156,4 @@ Initial release
 [v0.3.0]: https://github.com/aaronmallen/gest/compare/0.2.3...0.3.0
 [v0.3.1]: https://github.com/aaronmallen/gest/compare/0.3.0...0.3.1
 [v0.3.2]: https://github.com/aaronmallen/gest/compare/0.3.1...0.3.2
+[v0.3.3]: https://github.com/aaronmallen/gest/compare/0.3.2...0.3.3

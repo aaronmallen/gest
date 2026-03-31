@@ -100,6 +100,7 @@ enum Command {
   Iteration(commands::iteration::Command),
   Search(commands::search::Command),
   SelfUpdate(commands::self_update::Command),
+  Serve(commands::serve::Command),
   Task(commands::task::Command),
   Version(commands::version::Command),
 }
@@ -114,6 +115,7 @@ impl Command {
       Self::Iteration(cmd) => cmd.call(ctx),
       Self::Search(cmd) => cmd.call(ctx),
       Self::SelfUpdate(cmd) => cmd.call(ctx),
+      Self::Serve(cmd) => cmd.call(ctx),
       Self::Task(cmd) => cmd.call(ctx),
       Self::Version(cmd) => cmd.call(ctx),
     }

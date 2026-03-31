@@ -25,6 +25,7 @@ pub struct Banner<'a> {
   date: &'a str,
   platform: &'a str,
   revision: &'a str,
+  show_version: bool,
   theme: &'a Theme,
   update_version: Option<String>,
   version: &'a str,
@@ -44,10 +45,17 @@ impl<'a> Banner<'a> {
       platform,
       date,
       revision,
+      show_version: true,
       author,
       update_version: None,
       theme,
     }
+  }
+
+  /// Hide the version line from the banner output.
+  pub fn hide_version(mut self) -> Self {
+    self.show_version = false;
+    self
   }
 
   /// Enables a notice that a newer version is available.
@@ -93,14 +101,16 @@ impl Display for Banner<'_> {
       self.author.paint(self.theme.banner_author_name),
     )?;
 
-    write!(
-      f,
-      "\n{} {} ({} revision {})",
-      format!("v{}", self.version).paint(self.theme.banner_version),
-      self.platform.paint(self.theme.banner_version),
-      self.date.paint(self.theme.banner_version_date),
-      self.revision.paint(self.theme.banner_version_revision),
-    )?;
+    if self.show_version {
+      write!(
+        f,
+        "\n{} {} ({} revision {})",
+        format!("v{}", self.version).paint(self.theme.banner_version),
+        self.platform.paint(self.theme.banner_version),
+        self.date.paint(self.theme.banner_version_date),
+        self.revision.paint(self.theme.banner_version_revision),
+      )?;
+    }
 
     if let Some(ref update_ver) = self.update_version {
       write!(

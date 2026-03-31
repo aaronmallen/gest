@@ -156,7 +156,8 @@ fn long_about() -> String {
     "",
     "aaronmallen",
     &theme,
-  );
+  )
+  .hide_version();
   format!("\n{banner}\n\n{}", env!("CARGO_PKG_DESCRIPTION"))
 }
 

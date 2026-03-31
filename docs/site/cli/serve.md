@@ -1,7 +1,11 @@
 # gest serve
 
-Start a local web server for browsing gest entities in a browser. The server provides a web UI with a dashboard,
-task/artifact/iteration views, a kanban board, and full-text search.
+Start the built-in web dashboard for browsing and managing your project's tasks, artifacts, and iterations. While
+agents interact with gest through the CLI and `--json` output, the dashboard gives humans a visual overview of
+everything that's happening — especially useful when multiple agents are working in parallel across an iteration.
+
+The dashboard provides a status overview, filterable task and artifact lists with rendered Markdown, iteration detail
+views with tasks grouped by phase, a kanban board for tracking progress, and full-text search across all entities.
 
 ## Usage
 

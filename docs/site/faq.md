@@ -13,8 +13,10 @@ Gest is designed for fast, local, developer-centric tracking -- not team-wide pr
 
 - **No server or network required.** Everything lives on disk as plain files.
 - **Optimized for AI workflows.** Tasks and artifacts map to the outputs that AI agents produce during development.
+- **Parallel execution.** Phased iterations with dependency tracking let agents work concurrently across workspaces.
+- **Built-in web dashboard.** `gest serve` gives you a visual overview, kanban boards, and full-text search
+  — no external tools needed.
 - **Scriptable.** JSON output (`--json`) on search and list commands makes it easy to integrate with other tools.
-- **Lightweight.** No accounts, no web UI, no configuration ceremony.
 
 Gest complements issue trackers rather than replacing them. Use `gest` for in-flight
 development work and promote items to GitHub Issues when they need broader visibility.
@@ -114,6 +116,14 @@ For a **local store**, your VCS handles it -- just commit the `.gest/` directory
 
 For the **global store**, back up `~/.local/share/gest/`. Since it is plain files, any backup
 tool (rsync, Time Machine, etc.) works.
+
+## Does gest have a web UI?
+
+Yes. Run `gest serve` to start a local web dashboard at `http://localhost:2300`. It provides a
+status overview, task and artifact views with rendered Markdown, iteration detail with tasks
+grouped by phase, a kanban board for tracking progress, and full-text search. The dashboard
+reads and writes the same plain-file store the CLI uses — no separate database or sync layer.
+See [gest serve](/cli/serve) for options.
 
 ## What are iterations and when should I use them?
 

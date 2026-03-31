@@ -68,24 +68,43 @@ developers can pick up independent tasks concurrently, each in its own workspace
 
 ## What makes it work
 
-The parallelization story depends on three design choices:
+The parallelization story depends on two things built into gest's data model:
 
-**Plain files.** Tasks are TOML. Artifacts are Markdown with YAML frontmatter. There is no
-database to synchronize, no migrations to run, no server to keep alive. Each file is an
-independent unit keyed by a unique ID.
+**Phased tasks.** Every task has an optional `phase` field -- a numeric label that groups tasks
+for concurrent execution. Tasks in the same phase have no ordering dependency on each other
+and can be dispatched to separate agents or workspaces simultaneously. Lower phases execute
+first, higher phases wait. This is the core mechanism that turns a flat task list into a
+parallel execution plan.
 
-**VCS-native.** The `.gest/` directory is just another directory in your repo. When you create
-a branch or workspace for parallel work, the task state comes along automatically. Merges work
-through your normal VCS workflow -- because files are keyed by unique IDs, merge conflicts are
-rare and only happen when two workers edit the same task concurrently.
+**Iterations with dependency tracking.** An iteration groups related tasks and overlays
+`blocked-by` / `blocks` relationships between them. The `gest iteration graph` command
+visualizes exactly which tasks can run now, which are waiting, and what the critical path
+looks like. Agents read this graph, pick up unblocked tasks, and mark them done -- the
+remaining work automatically unblocks.
 
-**Zero infrastructure.** There is nothing to install beyond the `gest` binary. No Docker
-containers, no cloud services, no configuration ceremony. This makes it practical to spin up
-parallel workspaces on the fly -- each one gets a complete copy of the task state for free.
+Together, phases and iterations give you a structured way to go from "here are 15 tasks" to
+"here are 3 waves of concurrent work with explicit dependencies between them."
 
-These properties are not features for their own sake. They are what make lightweight parallel
-execution viable. A system that requires a central database or network coordination adds
-friction to every workspace you create. Plain files eliminate that friction.
+## A dashboard for humans
+
+Agents interact with gest through the CLI and JSON output. Humans need something more visual.
+`gest serve` starts a local web dashboard where you can browse and manage everything gest
+tracks:
+
+- **Status overview** — entity counts and status breakdown at a glance.
+- **Task and artifact views** — filter, search, and inspect with rendered Markdown.
+- **Iteration detail** — tasks grouped by phase with dependency visualization.
+- **Kanban board** — columns mapped to task status for tracking iteration progress.
+- **Full-text search** — find anything across tasks and artifacts without memorizing IDs.
+
+The dashboard is read/write — you can update tasks, change statuses, and manage iterations
+directly from the browser. It runs entirely local, requires no setup beyond `gest serve`, and
+works against the same plain-file store the CLI uses. There is no separate database or sync
+layer.
+
+This matters because parallel agent execution generates a lot of state. When three agents are
+working concurrently on phase 1 of an iteration, you want a place to see at a glance what's
+in progress, what's blocked, and what's done — without switching between terminal windows.
 
 ## Fits your existing stack
 

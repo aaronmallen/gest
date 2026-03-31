@@ -9,14 +9,19 @@ Manage agent-generated artifacts and task backlogs alongside your project.
 > [!WARNING]
 > Gest is in early development. Commands, file formats, and configuration may change without notice between releases.
 
-Gest is a CLI tool for tracking tasks and artifacts generated during AI-assisted development. Data is stored as plain
-files — TOML for tasks, Markdown with YAML frontmatter for artifacts — and can live inside your repo (`.gest/`) or in an
-external data directory.
+Gest is a lightweight task and artifact tracker built for AI-assisted development. It structures agent-generated work
+into **phased iterations with dependency tracking**, so independent tasks can be dispatched to separate agents
+concurrently — turning sequential, single-context-window workflows into parallel execution pipelines.
+
+Data is stored as plain files — TOML for tasks, Markdown with YAML frontmatter for artifacts — right inside your repo.
+No database, no server, no accounts.
+
+Full documentation is available at <https://gest.aaronmallen.dev>.
 
 ## Quick Start
 
 ```sh
-gest init                                    # initialize global store
+gest init # initialize global store
 gest task create "Implement auth middleware"
 gest artifact create --source auth-spec.md
 gest search "auth"
@@ -24,9 +29,46 @@ gest search "auth"
 
 Use `gest init --local` to store data inside the repo (`.gest/`) instead of the global data directory.
 
-## Documentation
+## Parallel Execution
 
-Full documentation is available at <https://gest.aaronmallen.dev>.
+The core problem gest solves: an AI agent produces a plan with 15-20 tasks, and you execute them one at a time in one
+context window. That's slow. Gest lets you decompose work into **phased iterations** where tasks in the same phase run
+concurrently:
+
+```sh
+# Phase 1 tasks run in parallel — no dependencies between them
+gest task create "Add export data types" --phase 1
+gest task create "Add CSV formatter" --phase 1
+gest task create "Add JSON formatter" --phase 1
+
+# Phase 2 waits for Phase 1
+gest task create "Wire up CLI command" --phase 2
+
+# Group into an iteration and visualize the plan
+gest iteration create "Implement export command"
+gest iteration add <iteration-id> <task-id>   # repeat for each task
+gest iteration graph <iteration-id>
+```
+
+The iteration graph shows exactly which tasks can run now and which are waiting. Agents read the graph, pick up
+unblocked tasks, and mark them done — the remaining work automatically unblocks.
+
+## Web Dashboard
+
+Gest includes a built-in web dashboard for browsing and managing your project's tasks, artifacts, and iterations
+without leaving the browser. Run `gest serve` to start it:
+
+```sh
+gest serve                    # opens http://localhost:2300
+```
+
+The dashboard provides:
+
+- **Status overview** — entity counts and status breakdown at a glance
+- **Task and artifact views** — filter, search, and inspect with rendered Markdown
+- **Iteration detail** — tasks grouped by phase with dependency visualization
+- **Kanban board** — drag-and-drop columns mapped to task status
+- **Full-text search** — find anything across tasks and artifacts
 
 ## Commands
 
@@ -37,7 +79,7 @@ Full documentation is available at <https://gest.aaronmallen.dev>.
 | `gest artifact`     | Create, list, show, update, tag, archive, and manage artifacts |
 | `gest iteration`    | Manage iterations (group tasks into phased execution plans)    |
 | `gest search`       | Search across tasks and artifacts                              |
-| `gest serve`        | Start a local web dashboard for browsing and managing entities |
+| `gest serve`        | Start the web dashboard for browsing and managing entities     |
 | `gest config`       | View and modify configuration                                  |
 | `gest generate`     | Generate shell completions and man pages                       |
 | `gest self-update`  | Update gest to the latest GitHub release                       |

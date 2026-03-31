@@ -110,6 +110,14 @@ paths.
 | `iteration_dir` | string (path) | `<data_dir>/iterations` | Override the iteration storage directory. |
 | `task_dir` | string (path) | `<data_dir>/tasks` | Override the task storage directory. |
 
+### `[serve]`
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `bind_address` | string (IP address) | `"127.0.0.1"` | IP address the web server binds to. |
+| `port` | integer | `2300` | Port the web server listens on. |
+| `open` | boolean | `true` | Whether to automatically open the browser when the server starts. |
+
 ### `[log]`
 
 | Key | Type | Default | Description |
@@ -159,6 +167,10 @@ Available fields in the table form:
 data_dir = "/home/user/projects/myapp/.gest"
 artifact_dir = "./docs"
 task_dir = "./tasks"
+
+[serve]
+port = 8080
+open = false
 
 [log]
 level = "info"

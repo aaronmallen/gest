@@ -1,4 +1,4 @@
-use std::io::IsTerminal;
+use std::{fmt::Display, io::IsTerminal, str::FromStr};
 
 /// Open `$EDITOR` with a temporary file and return the content, or fall back to an empty string.
 ///
@@ -26,6 +26,20 @@ pub fn read_from_editor(
   }
 
   Ok(String::new())
+}
+
+/// Parse an optional status string into a typed status value.
+///
+/// Returns `Ok(None)` when the input is `None`, `Ok(Some(status))` on a valid parse,
+/// or a `cli::Error` when the string is not a recognised status.
+pub fn parse_optional_status<T>(raw: Option<&str>) -> crate::cli::Result<Option<T>>
+where
+  T: FromStr,
+  T::Err: Display,
+{
+  raw
+    .map(|s| s.parse::<T>().map_err(|e| crate::cli::Error::generic(e.to_string())))
+    .transpose()
 }
 
 /// Split a comma-separated string into trimmed, non-empty tag strings.

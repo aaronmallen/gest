@@ -36,11 +36,7 @@ impl Command {
     let theme = &ctx.theme;
     let id = store::resolve_iteration_id(config, &self.id, true)?;
 
-    let status = self
-      .status
-      .as_deref()
-      .map(|s| s.parse::<Status>().map_err(cli::Error::generic))
-      .transpose()?;
+    let status = crate::cli::helpers::parse_optional_status::<Status>(self.status.as_deref())?;
 
     let metadata = {
       let existing = store::read_iteration(config, &id)?.metadata;

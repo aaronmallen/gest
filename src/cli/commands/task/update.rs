@@ -47,11 +47,7 @@ impl Command {
 
     let description = self.description.clone();
 
-    let status = self
-      .status
-      .as_deref()
-      .map(|s| s.parse::<Status>().map_err(cli::Error::generic))
-      .transpose()?;
+    let status = crate::cli::helpers::parse_optional_status::<Status>(self.status.as_deref())?;
 
     let metadata = {
       let existing = store::read_task(config, &id)?.metadata;

@@ -33,10 +33,7 @@ impl Command {
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
     let config = &ctx.settings;
     let theme = &ctx.theme;
-    let status = match &self.status {
-      Some(s) => Some(s.parse::<Status>().map_err(cli::Error::generic)?),
-      None => None,
-    };
+    let status = crate::cli::helpers::parse_optional_status::<Status>(self.status.as_deref())?;
 
     let filter = TaskFilter {
       all: self.show_all,

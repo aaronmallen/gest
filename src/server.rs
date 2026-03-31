@@ -1,5 +1,6 @@
 //! Built-in web server for browsing gest entities in a browser.
 
+mod assets;
 mod handlers;
 mod routes;
 mod state;

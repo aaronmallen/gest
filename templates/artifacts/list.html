@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}artifacts — gest{% endblock %}
+{% block nav_artifacts %}class="active"{% endblock %}
+
+{% block content %}
+<div class="section-heading">Artifacts</div>
+<div class="summary">{{ artifacts.len() }} artifact{% if artifacts.len() != 1 %}s{% endif %}</div>
+
+{% if artifacts.is_empty() %}
+<p class="empty">No artifacts found.</p>
+{% else %}
+<div class="term">
+  <div class="term-bar">
+<span class="term-title">gest artifact list</span>
+  </div>
+  <div class="term-body">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Title</th>
+          <th>Kind</th>
+          <th>Tags</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in artifacts %}
+        <tr{% if a.archived_at.is_some() %} class="c-dim"{% endif %}>
+          <td>
+            <a href="/artifacts/{{ a.id.short() }}">
+              <span class="id-prefix">{{ a.id.short() }}</span><span class="id-rest">{{ a.id.to_string()[8..] }}</span>
+            </a>
+          </td>
+          <td>{{ a.title }}</td>
+          <td class="c-pewter">{% match a.kind %}{% when Some with (k) %}{{ k }}{% when None %}{% endmatch %}</td>
+          <td>{% for t in a.tags %}<span class="tag">#{{ t }}</span>{% if !loop.last %} {% endif %}{% endfor %}</td>
+          <td>{% if a.archived_at.is_some() %}<span class="c-dim">[archived]</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

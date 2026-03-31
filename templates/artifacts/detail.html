@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}{{ artifact.title }} — gest{% endblock %}
+{% block nav_artifacts %}class="active"{% endblock %}
+
+{% block content %}
+<div class="summary"><a href="/artifacts">← artifacts</a></div>
+
+<div class="term">
+  <div class="term-bar">
+<span class="term-title">gest artifact show {{ artifact.id.short() }}</span>
+  </div>
+  <div class="term-body">
+    <div style="margin-bottom: 12px;">
+      <span class="id-prefix">{{ artifact.id.short() }}</span><span class="id-rest">{{ artifact.id.to_string()[8..] }}</span>
+    </div>
+
+    <table>
+      <tbody>
+        <tr>
+          <td class="c-pewter" style="width:120px">title</td>
+          <td>{{ artifact.title }}</td>
+        </tr>
+        {% match artifact.kind %}
+        {% when Some with (k) %}
+        <tr>
+          <td class="c-pewter">kind</td>
+          <td>{{ k }}</td>
+        </tr>
+        {% when None %}
+        {% endmatch %}
+        {% if !artifact.tags.is_empty() %}
+        <tr>
+          <td class="c-pewter">tags</td>
+          <td>{% for t in artifact.tags %}<span class="tag">#{{ t }}</span>{% if !loop.last %} {% endif %}{% endfor %}</td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td class="c-pewter">created</td>
+          <td>{{ artifact.created_at.format("%Y-%m-%d %H:%M") }}</td>
+        </tr>
+        <tr>
+          <td class="c-pewter">updated</td>
+          <td>{{ artifact.updated_at.format("%Y-%m-%d %H:%M") }}</td>
+        </tr>
+        {% if artifact.archived_at.is_some() %}
+        <tr>
+          <td class="c-pewter">archived</td>
+          <td class="c-dim">{% match artifact.archived_at %}{% when Some with (dt) %}{{ dt.format("%Y-%m-%d %H:%M") }}{% when None %}{% endmatch %}</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+
+    <hr class="rule">
+
+    <div class="md-content">
+      {{ body_html|safe }}
+    </div>
+  </div>
+</div>
+{% endblock %}

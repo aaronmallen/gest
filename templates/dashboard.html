@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}gest — dashboard{% endblock %}
+{% block nav_dashboard %}class="active"{% endblock %}
+{% block content %}
+<div class="dash-grid">
+  <a href="/tasks" class="dash-card">
+    <div class="dash-card-count">{{ task_count }}</div>
+    <div class="dash-card-label">tasks</div>
+  </a>
+  <a href="/artifacts" class="dash-card">
+    <div class="dash-card-count">{{ artifact_count }}</div>
+    <div class="dash-card-label">artifacts</div>
+  </a>
+  <a href="/iterations" class="dash-card">
+    <div class="dash-card-count">{{ iteration_count }}</div>
+    <div class="dash-card-label">iterations</div>
+  </a>
+</div>
+
+<div class="section-heading">tasks by status</div>
+<div class="dash-grid">
+  <div class="dash-card">
+    <div class="dash-card-count status-open">{{ open_count }}</div>
+    <div class="dash-card-label">open</div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-count status-in-progress">{{ in_progress_count }}</div>
+    <div class="dash-card-label">in progress</div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-count status-done">{{ done_count }}</div>
+    <div class="dash-card-label">done</div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-count status-cancelled">{{ cancelled_count }}</div>
+    <div class="dash-card-label">cancelled</div>
+  </div>
+</div>
+{% endblock %}

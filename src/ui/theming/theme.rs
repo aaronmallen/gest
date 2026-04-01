@@ -249,9 +249,15 @@ impl Default for Theme {
 }
 
 impl Theme {
-  /// Build a theme by applying user color overrides from config on top of defaults.
+  /// Build a theme by applying palette cascades and token overrides from config.
+  ///
+  /// Resolution order:
+  /// 1. Built-in defaults
+  /// 2. Palette colors — cascade to all tokens referencing the slot (fg only, modifiers preserved)
+  /// 3. Token overrides — most specific, full [`ColorValue`] wins
   pub fn from_config(settings: &crate::config::Settings) -> Self {
     let mut theme = Self::default();
+    theme.apply_palette(settings.colors());
     theme.apply_overrides(settings.colors());
     theme
   }
@@ -259,155 +265,161 @@ impl Theme {
   /// Merge user color overrides into this theme, matching dot-separated keys to fields.
   pub fn apply_overrides(&mut self, colors: &crate::config::colors::Settings) {
     for (key, value) in colors.iter() {
-      match key.as_str() {
-        "artifact.detail.label" => self.artifact_detail_label = value.apply_to(self.artifact_detail_label),
-        "artifact.detail.separator" => self.artifact_detail_separator = value.apply_to(self.artifact_detail_separator),
-        "artifact.detail.value" => self.artifact_detail_value = value.apply_to(self.artifact_detail_value),
-        "artifact.list.archived.badge" => {
-          self.artifact_list_archived_badge = value.apply_to(self.artifact_list_archived_badge)
-        }
-        "artifact.list.kind" => self.artifact_list_kind = value.apply_to(self.artifact_list_kind),
-        "artifact.list.tag.archived" => {
-          self.artifact_list_tag_archived = value.apply_to(self.artifact_list_tag_archived)
-        }
-        "artifact.list.title" => self.artifact_list_title = value.apply_to(self.artifact_list_title),
-        "artifact.list.title.archived" => {
-          self.artifact_list_title_archived = value.apply_to(self.artifact_list_title_archived)
-        }
-
-        "banner.author" => self.banner_author = value.apply_to(self.banner_author),
-        "banner.author.name" => self.banner_author_name = value.apply_to(self.banner_author_name),
-        "banner.gradient.end" => self.banner_gradient_end = value.apply_to(self.banner_gradient_end),
-        "banner.gradient.start" => self.banner_gradient_start = value.apply_to(self.banner_gradient_start),
-        "banner.shadow" => self.banner_shadow = value.apply_to(self.banner_shadow),
-        "banner.update.command" => self.banner_update_command = value.apply_to(self.banner_update_command),
-        "banner.update.hint" => self.banner_update_hint = value.apply_to(self.banner_update_hint),
-        "banner.update.message" => self.banner_update_message = value.apply_to(self.banner_update_message),
-        "banner.update.version" => self.banner_update_version = value.apply_to(self.banner_update_version),
-        "banner.version" => self.banner_version = value.apply_to(self.banner_version),
-        "banner.version.date" => self.banner_version_date = value.apply_to(self.banner_version_date),
-        "banner.version.revision" => self.banner_version_revision = value.apply_to(self.banner_version_revision),
-
-        "border" => self.border = value.apply_to(self.border),
-
-        "config.heading" => self.config_heading = value.apply_to(self.config_heading),
-        "config.label" => self.config_label = value.apply_to(self.config_label),
-        "config.no_overrides" => self.config_no_overrides = value.apply_to(self.config_no_overrides),
-        "config.value" => self.config_value = value.apply_to(self.config_value),
-
-        "emphasis" => self.emphasis = value.apply_to(self.emphasis),
-        "error" => self.error = value.apply_to(self.error),
-
-        "id.prefix" => self.id_prefix = value.apply_to(self.id_prefix),
-        "id.rest" => self.id_rest = value.apply_to(self.id_rest),
-
-        "indicator.blocked" => self.indicator_blocked = value.apply_to(self.indicator_blocked),
-        "indicator.blocked_by.id" => self.indicator_blocked_by_id = value.apply_to(self.indicator_blocked_by_id),
-        "indicator.blocked_by.label" => {
-          self.indicator_blocked_by_label = value.apply_to(self.indicator_blocked_by_label)
-        }
-        "indicator.blocking" => self.indicator_blocking = value.apply_to(self.indicator_blocking),
-
-        "init.command.prefix" => self.init_command_prefix = value.apply_to(self.init_command_prefix),
-        "init.label" => self.init_label = value.apply_to(self.init_label),
-        "init.section" => self.init_section = value.apply_to(self.init_section),
-        "init.value" => self.init_value = value.apply_to(self.init_value),
-
-        "iteration.detail.count.blocked" => {
-          self.iteration_detail_count_blocked = value.apply_to(self.iteration_detail_count_blocked)
-        }
-        "iteration.detail.count.done" => {
-          self.iteration_detail_count_done = value.apply_to(self.iteration_detail_count_done)
-        }
-        "iteration.detail.count.in_progress" => {
-          self.iteration_detail_count_in_progress = value.apply_to(self.iteration_detail_count_in_progress)
-        }
-        "iteration.detail.count.open" => {
-          self.iteration_detail_count_open = value.apply_to(self.iteration_detail_count_open)
-        }
-        "iteration.detail.label" => self.iteration_detail_label = value.apply_to(self.iteration_detail_label),
-        "iteration.detail.value" => self.iteration_detail_value = value.apply_to(self.iteration_detail_value),
-
-        "iteration.graph.branch" => self.iteration_graph_branch = value.apply_to(self.iteration_graph_branch),
-        "iteration.graph.phase.icon" => {
-          self.iteration_graph_phase_icon = value.apply_to(self.iteration_graph_phase_icon)
-        }
-        "iteration.graph.phase.label" => {
-          self.iteration_graph_phase_label = value.apply_to(self.iteration_graph_phase_label)
-        }
-        "iteration.graph.phase.name" => {
-          self.iteration_graph_phase_name = value.apply_to(self.iteration_graph_phase_name)
-        }
-        "iteration.graph.separator" => self.iteration_graph_separator = value.apply_to(self.iteration_graph_separator),
-        "iteration.graph.title" => self.iteration_graph_title = value.apply_to(self.iteration_graph_title),
-
-        "iteration.list.summary" => self.iteration_list_summary = value.apply_to(self.iteration_list_summary),
-        "iteration.list.title" => self.iteration_list_title = value.apply_to(self.iteration_list_title),
-
-        "list.heading" => self.list_heading = value.apply_to(self.list_heading),
-        "list.summary" => self.list_summary = value.apply_to(self.list_summary),
-
-        "log.debug" => self.log_debug = value.apply_to(self.log_debug),
-        "log.error" => self.log_error = value.apply_to(self.log_error),
-        "log.info" => self.log_info = value.apply_to(self.log_info),
-        "log.timestamp" => self.log_timestamp = value.apply_to(self.log_timestamp),
-        "log.trace" => self.log_trace = value.apply_to(self.log_trace),
-        "log.warn" => self.log_warn = value.apply_to(self.log_warn),
-
-        "markdown.blockquote" | "md.blockquote" => self.markdown_blockquote = value.apply_to(self.markdown_blockquote),
-        "markdown.blockquote.border" | "md.blockquote.border" => {
-          self.markdown_blockquote_border = value.apply_to(self.markdown_blockquote_border)
-        }
-        "markdown.code.block" | "md.code.block" => self.markdown_code_block = value.apply_to(self.markdown_code_block),
-        "markdown.code.border" | "md.code.border" => {
-          self.markdown_code_border = value.apply_to(self.markdown_code_border)
-        }
-        "markdown.code.inline" | "md.code" => self.markdown_code_inline = value.apply_to(self.markdown_code_inline),
-        "markdown.emphasis" | "md.emphasis" => self.markdown_emphasis = value.apply_to(self.markdown_emphasis),
-        "markdown.heading" | "md.heading" => self.markdown_heading = value.apply_to(self.markdown_heading),
-        "markdown.link" | "md.link" => self.markdown_link = value.apply_to(self.markdown_link),
-        "markdown.rule" | "md.rule" => self.markdown_rule = value.apply_to(self.markdown_rule),
-        "markdown.strong" | "md.strong" => self.markdown_strong = value.apply_to(self.markdown_strong),
-
-        "message.created.label" => self.message_created_label = value.apply_to(self.message_created_label),
-        "message.success.icon" => self.message_success_icon = value.apply_to(self.message_success_icon),
-        "message.updated.label" => self.message_updated_label = value.apply_to(self.message_updated_label),
-
-        "muted" => self.muted = value.apply_to(self.muted),
-
-        "search.expand.separator" => self.search_expand_separator = value.apply_to(self.search_expand_separator),
-        "search.no_results.hint" => self.search_no_results_hint = value.apply_to(self.search_no_results_hint),
-        "search.query" => self.search_query = value.apply_to(self.search_query),
-        "search.summary" => self.search_summary = value.apply_to(self.search_summary),
-        "search.type.label" => self.search_type_label = value.apply_to(self.search_type_label),
-
-        "status.cancelled" => self.status_cancelled = value.apply_to(self.status_cancelled),
-        "status.done" => self.status_done = value.apply_to(self.status_done),
-        "status.in_progress" => self.status_in_progress = value.apply_to(self.status_in_progress),
-        "status.open" => self.status_open = value.apply_to(self.status_open),
-
-        "success" => self.success = value.apply_to(self.success),
-        "tag" => self.tag = value.apply_to(self.tag),
-
-        "task.detail.label" => self.task_detail_label = value.apply_to(self.task_detail_label),
-        "task.detail.separator" => self.task_detail_separator = value.apply_to(self.task_detail_separator),
-        "task.detail.title" => self.task_detail_title = value.apply_to(self.task_detail_title),
-        "task.detail.value" => self.task_detail_value = value.apply_to(self.task_detail_value),
-
-        "task.list.icon.cancelled" => self.task_list_icon_cancelled = value.apply_to(self.task_list_icon_cancelled),
-        "task.list.icon.done" => self.task_list_icon_done = value.apply_to(self.task_list_icon_done),
-        "task.list.icon.in_progress" => {
-          self.task_list_icon_in_progress = value.apply_to(self.task_list_icon_in_progress)
-        }
-        "task.list.icon.open" => self.task_list_icon_open = value.apply_to(self.task_list_icon_open),
-        "task.list.priority" => self.task_list_priority = value.apply_to(self.task_list_priority),
-        "task.list.title" => self.task_list_title = value.apply_to(self.task_list_title),
-        "task.list.title.cancelled" => self.task_list_title_cancelled = value.apply_to(self.task_list_title_cancelled),
-
-        _ => {
-          log::warn!("unknown color token  key={key:?}");
-        }
+      if let Some(style) = self.style_mut(key) {
+        *style = value.apply_to(*style);
+      } else {
+        log::warn!("unknown color token  key={key:?}");
       }
+    }
+  }
+
+  /// Cascade palette color overrides to all tokens referencing each slot.
+  ///
+  /// Palette values are color-only: they replace the fg color but preserve
+  /// per-token modifiers (bold, italic, etc.) from defaults.
+  fn apply_palette(&mut self, colors: &crate::config::colors::Settings) {
+    if colors.palette.is_empty() {
+      return;
+    }
+    for key in super::palette::ALL_TOKEN_KEYS {
+      if let Some(slot) = super::palette::palette_for_token(key)
+        && let Some(&color) = colors.palette.get(slot.key())
+        && let Some(style) = self.style_mut(key)
+      {
+        *style = style.fg(color);
+      }
+    }
+  }
+
+  /// Build a theme from color settings alone (palette + overrides), without full app config.
+  #[cfg(test)]
+  fn from_config_colors(colors: &crate::config::colors::Settings) -> Self {
+    let mut theme = Self::default();
+    theme.apply_palette(colors);
+    theme.apply_overrides(colors);
+    theme
+  }
+
+  /// Return a mutable reference to the style field for the given token key.
+  fn style_mut(&mut self, key: &str) -> Option<&mut Style> {
+    match key {
+      "artifact.detail.label" => Some(&mut self.artifact_detail_label),
+      "artifact.detail.separator" => Some(&mut self.artifact_detail_separator),
+      "artifact.detail.value" => Some(&mut self.artifact_detail_value),
+      "artifact.list.archived.badge" => Some(&mut self.artifact_list_archived_badge),
+      "artifact.list.kind" => Some(&mut self.artifact_list_kind),
+      "artifact.list.tag.archived" => Some(&mut self.artifact_list_tag_archived),
+      "artifact.list.title" => Some(&mut self.artifact_list_title),
+      "artifact.list.title.archived" => Some(&mut self.artifact_list_title_archived),
+
+      "banner.author" => Some(&mut self.banner_author),
+      "banner.author.name" => Some(&mut self.banner_author_name),
+      "banner.gradient.end" => Some(&mut self.banner_gradient_end),
+      "banner.gradient.start" => Some(&mut self.banner_gradient_start),
+      "banner.shadow" => Some(&mut self.banner_shadow),
+      "banner.update.command" => Some(&mut self.banner_update_command),
+      "banner.update.hint" => Some(&mut self.banner_update_hint),
+      "banner.update.message" => Some(&mut self.banner_update_message),
+      "banner.update.version" => Some(&mut self.banner_update_version),
+      "banner.version" => Some(&mut self.banner_version),
+      "banner.version.date" => Some(&mut self.banner_version_date),
+      "banner.version.revision" => Some(&mut self.banner_version_revision),
+
+      "border" => Some(&mut self.border),
+
+      "config.heading" => Some(&mut self.config_heading),
+      "config.label" => Some(&mut self.config_label),
+      "config.no_overrides" => Some(&mut self.config_no_overrides),
+      "config.value" => Some(&mut self.config_value),
+
+      "emphasis" => Some(&mut self.emphasis),
+      "error" => Some(&mut self.error),
+
+      "id.prefix" => Some(&mut self.id_prefix),
+      "id.rest" => Some(&mut self.id_rest),
+
+      "indicator.blocked" => Some(&mut self.indicator_blocked),
+      "indicator.blocked_by.id" => Some(&mut self.indicator_blocked_by_id),
+      "indicator.blocked_by.label" => Some(&mut self.indicator_blocked_by_label),
+      "indicator.blocking" => Some(&mut self.indicator_blocking),
+
+      "init.command.prefix" => Some(&mut self.init_command_prefix),
+      "init.label" => Some(&mut self.init_label),
+      "init.section" => Some(&mut self.init_section),
+      "init.value" => Some(&mut self.init_value),
+
+      "iteration.detail.count.blocked" => Some(&mut self.iteration_detail_count_blocked),
+      "iteration.detail.count.done" => Some(&mut self.iteration_detail_count_done),
+      "iteration.detail.count.in_progress" => Some(&mut self.iteration_detail_count_in_progress),
+      "iteration.detail.count.open" => Some(&mut self.iteration_detail_count_open),
+      "iteration.detail.label" => Some(&mut self.iteration_detail_label),
+      "iteration.detail.value" => Some(&mut self.iteration_detail_value),
+
+      "iteration.graph.branch" => Some(&mut self.iteration_graph_branch),
+      "iteration.graph.phase.icon" => Some(&mut self.iteration_graph_phase_icon),
+      "iteration.graph.phase.label" => Some(&mut self.iteration_graph_phase_label),
+      "iteration.graph.phase.name" => Some(&mut self.iteration_graph_phase_name),
+      "iteration.graph.separator" => Some(&mut self.iteration_graph_separator),
+      "iteration.graph.title" => Some(&mut self.iteration_graph_title),
+
+      "iteration.list.summary" => Some(&mut self.iteration_list_summary),
+      "iteration.list.title" => Some(&mut self.iteration_list_title),
+
+      "list.heading" => Some(&mut self.list_heading),
+      "list.summary" => Some(&mut self.list_summary),
+
+      "log.debug" => Some(&mut self.log_debug),
+      "log.error" => Some(&mut self.log_error),
+      "log.info" => Some(&mut self.log_info),
+      "log.timestamp" => Some(&mut self.log_timestamp),
+      "log.trace" => Some(&mut self.log_trace),
+      "log.warn" => Some(&mut self.log_warn),
+
+      "markdown.blockquote" | "md.blockquote" => Some(&mut self.markdown_blockquote),
+      "markdown.blockquote.border" | "md.blockquote.border" => Some(&mut self.markdown_blockquote_border),
+      "markdown.code.block" | "md.code.block" => Some(&mut self.markdown_code_block),
+      "markdown.code.border" | "md.code.border" => Some(&mut self.markdown_code_border),
+      "markdown.code.inline" | "md.code" => Some(&mut self.markdown_code_inline),
+      "markdown.emphasis" | "md.emphasis" => Some(&mut self.markdown_emphasis),
+      "markdown.heading" | "md.heading" => Some(&mut self.markdown_heading),
+      "markdown.link" | "md.link" => Some(&mut self.markdown_link),
+      "markdown.rule" | "md.rule" => Some(&mut self.markdown_rule),
+      "markdown.strong" | "md.strong" => Some(&mut self.markdown_strong),
+
+      "message.created.label" => Some(&mut self.message_created_label),
+      "message.success.icon" => Some(&mut self.message_success_icon),
+      "message.updated.label" => Some(&mut self.message_updated_label),
+
+      "muted" => Some(&mut self.muted),
+
+      "search.expand.separator" => Some(&mut self.search_expand_separator),
+      "search.no_results.hint" => Some(&mut self.search_no_results_hint),
+      "search.query" => Some(&mut self.search_query),
+      "search.summary" => Some(&mut self.search_summary),
+      "search.type.label" => Some(&mut self.search_type_label),
+
+      "status.cancelled" => Some(&mut self.status_cancelled),
+      "status.done" => Some(&mut self.status_done),
+      "status.in_progress" => Some(&mut self.status_in_progress),
+      "status.open" => Some(&mut self.status_open),
+
+      "success" => Some(&mut self.success),
+      "tag" => Some(&mut self.tag),
+
+      "task.detail.label" => Some(&mut self.task_detail_label),
+      "task.detail.separator" => Some(&mut self.task_detail_separator),
+      "task.detail.title" => Some(&mut self.task_detail_title),
+      "task.detail.value" => Some(&mut self.task_detail_value),
+
+      "task.list.icon.cancelled" => Some(&mut self.task_list_icon_cancelled),
+      "task.list.icon.done" => Some(&mut self.task_list_icon_done),
+      "task.list.icon.in_progress" => Some(&mut self.task_list_icon_in_progress),
+      "task.list.icon.open" => Some(&mut self.task_list_icon_open),
+      "task.list.priority" => Some(&mut self.task_list_priority),
+      "task.list.title" => Some(&mut self.task_list_title),
+      "task.list.title.cancelled" => Some(&mut self.task_list_title_cancelled),
+
+      _ => None,
     }
   }
 }
@@ -419,9 +431,123 @@ mod tests {
   use super::*;
 
   #[test]
+  fn it_cascades_palette_to_all_tokens_referencing_slot() {
+    let purple = Color::Rgb(148, 72, 199);
+    let mut colors = crate::config::colors::Settings::default();
+    colors.palette.insert("primary".to_string(), purple);
+
+    let mut theme = Theme::default();
+    theme.apply_palette(&colors);
+
+    // All Primary tokens should now have purple fg but keep their original modifiers
+    assert_eq!(
+      format!("{:?}", theme.emphasis),
+      format!("{:?}", Style::new().fg(purple).bold())
+    );
+    assert_eq!(
+      format!("{:?}", theme.config_heading),
+      format!("{:?}", Style::new().fg(purple).bold().underline())
+    );
+    assert_eq!(
+      format!("{:?}", theme.tag),
+      format!("{:?}", Style::new().fg(purple).italic())
+    );
+    assert_eq!(
+      format!("{:?}", theme.log_info),
+      format!("{:?}", Style::new().fg(purple))
+    );
+  }
+
+  #[test]
   fn it_creates_successfully_with_defaults() {
     let theme = Theme::default();
     let _ = theme.emphasis;
+  }
+
+  #[test]
+  fn it_does_not_affect_inline_rgb_tokens_on_palette_change() {
+    let mut colors = crate::config::colors::Settings::default();
+    colors.palette.insert("primary".to_string(), Color::Rgb(255, 0, 0));
+
+    let mut theme = Theme::default();
+    let original_gradient = theme.banner_gradient_start;
+    theme.apply_palette(&colors);
+
+    assert_eq!(
+      format!("{:?}", theme.banner_gradient_start),
+      format!("{:?}", original_gradient)
+    );
+  }
+
+  #[test]
+  fn it_does_not_affect_modifier_only_tokens_on_palette_change() {
+    let mut colors = crate::config::colors::Settings::default();
+    colors.palette.insert("primary".to_string(), Color::Rgb(255, 0, 0));
+
+    let mut theme = Theme::default();
+    theme.apply_palette(&colors);
+
+    assert_eq!(
+      format!("{:?}", theme.markdown_emphasis),
+      format!("{:?}", Style::default().italic())
+    );
+    assert_eq!(
+      format!("{:?}", theme.markdown_strong),
+      format!("{:?}", Style::default().bold())
+    );
+  }
+
+  #[test]
+  fn it_lets_token_override_win_over_palette() {
+    let purple = Color::Rgb(148, 72, 199);
+    let green = Color::Rgb(0, 255, 0);
+    let mut colors = crate::config::colors::Settings::default();
+    colors.palette.insert("primary".to_string(), purple);
+    colors.overrides.insert(
+      "emphasis".to_string(),
+      crate::config::colors::ColorValue {
+        bg: None,
+        bold: false,
+        dim: false,
+        fg: Some(green),
+        italic: true,
+        underline: false,
+      },
+    );
+
+    let theme = Theme::from_config_colors(&colors);
+
+    // emphasis should have green fg + italic from override, bold preserved from default
+    assert_eq!(
+      format!("{:?}", theme.emphasis),
+      format!("{:?}", Style::new().fg(green).bold().italic())
+    );
+    // but other primary tokens should have purple from palette
+    assert_eq!(
+      format!("{:?}", theme.tag),
+      format!("{:?}", Style::new().fg(purple).italic())
+    );
+  }
+
+  #[test]
+  fn it_preserves_modifiers_when_palette_cascades() {
+    let red = Color::Rgb(255, 0, 0);
+    let mut colors = crate::config::colors::Settings::default();
+    colors.palette.insert("success".to_string(), red);
+
+    let mut theme = Theme::default();
+    theme.apply_palette(&colors);
+
+    // success token has .bold() modifier — should be preserved
+    assert_eq!(
+      format!("{:?}", theme.success),
+      format!("{:?}", Style::new().fg(red).bold())
+    );
+    // status_done has no modifiers — just fg
+    assert_eq!(
+      format!("{:?}", theme.status_done),
+      format!("{:?}", Style::new().fg(red))
+    );
   }
 
   #[test]

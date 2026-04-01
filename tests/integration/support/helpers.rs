@@ -13,6 +13,11 @@ impl GestCmd {
   pub fn new() -> Self {
     let temp_dir = TempDir::new().expect("failed to create temp dir");
 
+    // Pre-create the data and state directories so config resolution succeeds
+    // before `init` populates the full directory tree.
+    std::fs::create_dir_all(temp_dir.path().join(".gest")).expect("failed to create .gest dir");
+    std::fs::create_dir_all(temp_dir.path().join(".gest-state")).expect("failed to create .gest-state dir");
+
     // Initialize a gest project in the temp dir
     let mut init = Self::build_cmd(&temp_dir);
     init.args(["init"]);
@@ -23,10 +28,26 @@ impl GestCmd {
     }
   }
 
-  /// Return a `Command` pre-configured with isolation env vars.
+  /// Create a new `GestCmd` with a fresh temp directory without running `gest init`.
+  ///
+  /// The data and state directories are created so that config loading succeeds,
+  /// but the store structure is not initialized. Useful for commands that do not
+  /// need an initialized project (e.g. `version`).
+  pub fn new_uninit() -> Self {
+    let temp_dir = TempDir::new().expect("failed to create temp dir");
+
+    std::fs::create_dir_all(temp_dir.path().join(".gest")).expect("failed to create .gest dir");
+    std::fs::create_dir_all(temp_dir.path().join(".gest-state")).expect("failed to create .gest-state dir");
+
+    Self {
+      temp_dir,
+    }
+  }
+
+  /// Return a `Command` pre-configured with isolation env vars and color disabled.
   pub fn cmd(&self) -> Command {
     let mut cmd = Self::build_cmd(&self.temp_dir);
-    cmd.arg("--no-color");
+    cmd.env("NO_COLOR", "1");
     cmd
   }
 
@@ -38,6 +59,25 @@ impl GestCmd {
   /// Shorthand for `cmd().args(args).assert()`.
   pub fn run(&self, args: &[&str]) -> assert_cmd::assert::Assert {
     self.cmd().args(args).assert()
+  }
+
+  /// Create an artifact with the given title and body, returning the new artifact ID.
+  pub fn create_artifact(&self, title: &str, body: &str) -> String {
+    let output = self
+      .cmd()
+      .args(["artifact", "create", "--title", title, "--body", body])
+      .output()
+      .expect("failed to run artifact create");
+
+    assert!(
+      output.status.success(),
+      "artifact create failed: {}",
+      String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    extract_id_from_create_output(&stdout)
+      .unwrap_or_else(|| panic!("could not extract artifact ID from output:\n{stdout}"))
   }
 
   /// Read a file relative to the data directory.
@@ -64,4 +104,12 @@ impl GestCmd {
     cmd.env("GEST_STATE_DIR", path.join(".gest-state"));
     cmd
   }
+}
+
+/// Extract the entity ID from a "created <entity>  <id>" output line.
+pub fn extract_id_from_create_output(output: &str) -> Option<String> {
+  output
+    .lines()
+    .find(|line| line.contains("created"))
+    .and_then(|line| line.split_whitespace().last().map(str::to_string))
 }

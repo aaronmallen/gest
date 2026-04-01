@@ -1,1 +1,3 @@
-// Behavior test modules will be added in Phase 2.
+mod when_global_flags;
+mod when_smoke;
+mod when_workflows;

@@ -1,1 +1,12 @@
-// Command test modules will be added in Phase 2.
+mod artifact;
+mod config;
+mod generate;
+mod init;
+mod iteration;
+mod search;
+mod self_update;
+mod tags;
+mod task;
+mod task_note;
+mod undo;
+mod version;

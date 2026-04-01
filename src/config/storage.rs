@@ -56,17 +56,14 @@ impl Settings {
   /// with a path-derived hash. The state directory is always global (never in-repo).
   pub fn resolve_state_dir(&self, cwd: &Path) -> Result<PathBuf, Error> {
     if let Ok(path) = super::env::GEST_STATE_DIR.value() {
-      if path.is_absolute() && path.is_dir() {
+      if path.is_absolute() {
         log::debug!("$GEST_STATE_DIR is set");
         log::trace!("state directory resolved to {}", path.display());
         return Ok(path);
-      } else if path.is_dir() {
-        log::debug!("$GEST_STATE_DIR is set, but is not an absolute path");
-        log::warn!("$GEST_STATE_DIR must be an absolute path");
-        log::trace!("ignoring $GEST_STATE_DIR: {}", path.display());
-      } else if path.is_absolute() {
-        return Err(Error::NotADirectory(path));
       }
+      log::debug!("$GEST_STATE_DIR is set, but is not an absolute path");
+      log::warn!("$GEST_STATE_DIR must be an absolute path");
+      log::trace!("ignoring $GEST_STATE_DIR: {}", path.display());
     }
 
     if let Some(path) = &self.state_dir {

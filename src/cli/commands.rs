@@ -9,4 +9,5 @@ pub mod serve;
 /// Shared tag-listing logic used by multiple subcommands.
 pub mod tags;
 pub mod task;
+pub mod undo;
 pub mod version;

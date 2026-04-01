@@ -108,17 +108,21 @@ impl Cli {
       theme,
     };
 
-    // Capture filesystem state before the command for the event store.
-    let snapshot = capture::Snapshot::capture(ctx.settings.data_dir());
-    let result = command.call(&ctx);
+    if command.is_capturable() {
+      // Capture filesystem state before the command for the event store.
+      let snapshot = capture::Snapshot::capture(ctx.settings.data_dir());
+      let result = command.call(&ctx);
 
-    // Record any file changes to the event store. Failures are logged but
-    // do not affect the command's exit status.
-    if let Err(e) = record_snapshot(&ctx.settings, &snapshot) {
-      log::warn!("event store: {e}");
+      // Record any file changes to the event store. Failures are logged but
+      // do not affect the command's exit status.
+      if let Err(e) = record_snapshot(&ctx.settings, &snapshot) {
+        log::warn!("event store: {e}");
+      }
+
+      result
+    } else {
+      command.call(&ctx)
     }
-
-    result
   }
 }
 
@@ -133,6 +137,7 @@ enum Command {
   SelfUpdate(commands::self_update::Command),
   Serve(commands::serve::Command),
   Task(commands::task::Command),
+  Undo(commands::undo::Command),
   Version(commands::version::Command),
 }
 
@@ -148,8 +153,17 @@ impl Command {
       Self::SelfUpdate(cmd) => cmd.call(ctx),
       Self::Serve(cmd) => cmd.call(ctx),
       Self::Task(cmd) => cmd.call(ctx),
+      Self::Undo(cmd) => cmd.call(ctx),
       Self::Version(cmd) => cmd.call(ctx),
     }
+  }
+
+  /// Whether this command's file changes should be captured in the event store.
+  ///
+  /// `Undo` is excluded to prevent infinite undo loops (each undo would
+  /// otherwise be recorded as a new undoable transaction).
+  fn is_capturable(&self) -> bool {
+    !matches!(self, Self::Undo(_))
   }
 }
 

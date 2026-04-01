@@ -8,13 +8,14 @@ use crate::{config::Settings, model::Id};
 
 /// Create all required store subdirectories under the layout's entity dirs.
 pub fn ensure_dirs(config: &Settings) -> super::Result<()> {
-  fs::create_dir_all(config.artifact_dir())?;
-  fs::create_dir_all(config.artifact_dir().join("archive"))?;
-  fs::create_dir_all(config.iteration_dir())?;
-  fs::create_dir_all(config.iteration_dir().join("resolved"))?;
-  fs::create_dir_all(config.state_dir())?;
-  fs::create_dir_all(config.task_dir())?;
-  fs::create_dir_all(config.task_dir().join("resolved"))?;
+  let storage = config.storage();
+  fs::create_dir_all(storage.artifact_dir())?;
+  fs::create_dir_all(storage.artifact_dir().join("archive"))?;
+  fs::create_dir_all(storage.iteration_dir())?;
+  fs::create_dir_all(storage.iteration_dir().join("resolved"))?;
+  fs::create_dir_all(storage.state_dir())?;
+  fs::create_dir_all(storage.task_dir())?;
+  fs::create_dir_all(storage.task_dir().join("resolved"))?;
   Ok(())
 }
 

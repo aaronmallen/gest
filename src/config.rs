@@ -10,8 +10,6 @@ mod log;
 pub mod serve;
 pub(crate) mod storage;
 
-use std::path::{Path, PathBuf};
-
 use serde::{Deserialize, Serialize};
 
 pub use self::loader::load;
@@ -26,7 +24,7 @@ pub enum Error {
   #[error(transparent)]
   Io(#[from] std::io::Error),
   #[error("{0} is not a directory.")]
-  NotADirectory(PathBuf),
+  NotADirectory(std::path::PathBuf),
 }
 
 /// Top-level configuration, composed of color, log, serve, and storage sections.
@@ -37,37 +35,12 @@ pub struct Settings {
   log: log::Settings,
   serve: serve::Settings,
   storage: storage::Settings,
-  #[serde(skip)]
-  resolved_artifact_dir: PathBuf,
-  #[serde(skip)]
-  resolved_data_dir: PathBuf,
-  #[serde(skip)]
-  resolved_iteration_dir: PathBuf,
-  #[serde(skip)]
-  resolved_state_dir: PathBuf,
-  #[serde(skip)]
-  resolved_task_dir: PathBuf,
 }
 
 impl Settings {
-  /// The resolved artifact storage directory.
-  pub fn artifact_dir(&self) -> &Path {
-    &self.resolved_artifact_dir
-  }
-
   /// Returns the color customization settings.
   pub fn colors(&self) -> &colors::Settings {
     &self.colors
-  }
-
-  /// The resolved base data directory.
-  pub fn data_dir(&self) -> &Path {
-    &self.resolved_data_dir
-  }
-
-  /// The resolved iteration storage directory.
-  pub fn iteration_dir(&self) -> &Path {
-    &self.resolved_iteration_dir
   }
 
   /// Returns the logging settings.
@@ -80,44 +53,14 @@ impl Settings {
     &self.serve
   }
 
-  /// The resolved state directory (event store, undo log).
-  pub fn state_dir(&self) -> &Path {
-    &self.resolved_state_dir
-  }
-
-  /// Resolve storage paths from the working directory.
-  ///
-  /// Must be called before accessing `data_dir`, `artifact_dir`, `task_dir`,
-  /// or `iteration_dir`. Resolves the base data directory and all per-entity
-  /// directories according to env var / config / fallback precedence.
-  pub fn resolve_storage(&mut self, cwd: PathBuf) -> Result<(), Error> {
-    self.resolved_state_dir = self.storage.resolve_state_dir(&cwd)?;
-    let data_dir = self.storage.resolve_data_dir(cwd)?;
-    self.resolve_storage_at(data_dir);
-    Ok(())
-  }
-
-  /// Set the state directory path directly, skipping env-var/fallback discovery.
-  #[cfg(test)]
-  pub fn resolve_state_at(&mut self, state_dir: PathBuf) {
-    self.resolved_state_dir = state_dir;
-  }
-
-  /// Set storage paths for an already-known data directory, skipping discovery.
-  pub fn resolve_storage_at(&mut self, data_dir: PathBuf) {
-    self.resolved_data_dir = data_dir;
-    self.resolved_artifact_dir = self.storage.resolve_artifact_dir(&self.resolved_data_dir);
-    self.resolved_iteration_dir = self.storage.resolve_iteration_dir(&self.resolved_data_dir);
-    self.resolved_task_dir = self.storage.resolve_task_dir(&self.resolved_data_dir);
-  }
-
   /// Returns the data storage settings.
   pub fn storage(&self) -> &storage::Settings {
     &self.storage
   }
 
-  /// The resolved task storage directory.
-  pub fn task_dir(&self) -> &Path {
-    &self.resolved_task_dir
+  /// Returns a mutable reference to the storage settings (test only).
+  #[cfg(test)]
+  pub fn storage_mut(&mut self) -> &mut storage::Settings {
+    &mut self.storage
   }
 }

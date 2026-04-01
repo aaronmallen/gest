@@ -16,6 +16,9 @@ const CONFIG_NAMES: &[&str] = &[".config/gest.toml", ".gest/config.toml", ".gest
 const GLOBAL_CONFIG_NAME: &str = "config.toml";
 
 /// Loads and merges configuration from global and per-directory TOML files.
+///
+/// Storage paths are resolved automatically so the returned [`Settings`] is
+/// ready to use immediately.
 pub fn load(cwd: &Path) -> Result<Settings, Error> {
   let mut merged = empty_table();
 
@@ -24,9 +27,13 @@ pub fn load(cwd: &Path) -> Result<Settings, Error> {
     deep_merge(&mut merged, load_first_match(&dir, CONFIG_NAMES)?);
   }
 
-  merged
+  let mut settings: Settings = merged
     .try_into()
-    .map_err(|e: toml::de::Error| Error::Config(e.to_string()))
+    .map_err(|e: toml::de::Error| Error::Config(e.to_string()))?;
+
+  settings.storage.resolve(cwd.to_path_buf())?;
+
+  Ok(settings)
 }
 
 /// Returns all ancestor directories of `path`, ordered from root to `path` itself.
@@ -236,7 +243,10 @@ mod tests {
 
       with_vars_unset(UNSET_VARS, || {
         let settings = load(tmp.path()).unwrap();
-        assert_eq!(settings, Settings::default());
+        // Config values should match defaults; resolved storage paths will differ.
+        assert_eq!(settings.colors(), &crate::config::colors::Settings::default());
+        assert_eq!(settings.log(), &crate::config::log::Settings::default());
+        assert_eq!(settings.serve(), &crate::config::serve::Settings::default());
       })
     }
 

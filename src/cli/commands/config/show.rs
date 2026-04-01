@@ -12,7 +12,7 @@ pub struct Command;
 impl Command {
   /// Render active settings, data directory, log level, and config file locations.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let data_dir = ctx.settings.data_dir().display().to_string();
+    let data_dir = ctx.settings.storage().data_dir().display().to_string();
     let log_level = ctx.settings.log().level().unwrap_or("warn");
 
     let mut view =

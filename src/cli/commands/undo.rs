@@ -20,11 +20,11 @@ pub struct Command {
 impl Command {
   /// Reverse the N most recent non-undone transactions by restoring file snapshots.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let store = EventStore::open(ctx.settings.state_dir())
+    let store = EventStore::open(ctx.settings.storage().state_dir())
       .map_err(|e| cli::Error::generic(format!("failed to open event store: {e}")))?;
 
     let project_id = capture::project_id(&ctx.settings);
-    let data_dir = ctx.settings.data_dir();
+    let data_dir = ctx.settings.storage().data_dir();
 
     let mut undone = 0;
     for _ in 0..self.steps {

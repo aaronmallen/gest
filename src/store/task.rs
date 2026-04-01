@@ -136,8 +136,8 @@ pub fn create_task(config: &Settings, new: NewTask) -> super::Result<Task> {
 
 /// Check whether a task has been moved to the resolved directory.
 pub fn is_task_resolved(config: &Settings, id: &Id) -> bool {
-  let resolved_path = config.task_dir().join(format!("resolved/{id}.toml"));
-  let active_path = config.task_dir().join(format!("{id}.toml"));
+  let resolved_path = config.storage().task_dir().join(format!("resolved/{id}.toml"));
+  let active_path = config.storage().task_dir().join(format!("{id}.toml"));
   resolved_path.exists() && !active_path.exists()
 }
 
@@ -145,8 +145,8 @@ pub fn is_task_resolved(config: &Settings, id: &Id) -> bool {
 pub fn list_tasks(config: &Settings, filter: &TaskFilter) -> super::Result<Vec<Task>> {
   let parse = |content: &str| Ok(toml::from_str::<Task>(content)?);
   let mut tasks = load_entities_from_dirs(
-    config.task_dir(),
-    &config.task_dir().join("resolved"),
+    config.storage().task_dir(),
+    &config.storage().task_dir().join("resolved"),
     "toml",
     false,
     filter.all,
@@ -177,8 +177,8 @@ pub fn list_tasks(config: &Settings, filter: &TaskFilter) -> super::Result<Vec<T
 
 /// Load a single task by exact ID, checking both active and resolved directories.
 pub fn read_task(config: &Settings, id: &Id) -> super::Result<Task> {
-  let active = config.task_dir().join(format!("{id}.toml"));
-  let resolved = config.task_dir().join(format!("resolved/{id}.toml"));
+  let active = config.storage().task_dir().join(format!("{id}.toml"));
+  let resolved = config.storage().task_dir().join(format!("resolved/{id}.toml"));
 
   read_entity_file(&active, &resolved, "resolved", "Task", id, |content| {
     Ok(toml::from_str::<Task>(content)?)
@@ -196,8 +196,8 @@ pub fn resolve_task(config: &Settings, id: &Id) -> super::Result<()> {
   move_entity_file(
     config,
     &content,
-    &config.task_dir().join(format!("resolved/{id}.toml")),
-    &config.task_dir().join(format!("{id}.toml")),
+    &config.storage().task_dir().join(format!("resolved/{id}.toml")),
+    &config.storage().task_dir().join(format!("{id}.toml")),
   )?;
 
   Ok(())
@@ -207,8 +207,8 @@ pub fn resolve_task(config: &Settings, id: &Id) -> super::Result<()> {
 pub fn resolve_task_id(config: &Settings, prefix: &str, include_resolved: bool) -> super::Result<Id> {
   log::debug!("resolving task ID prefix '{prefix}'");
   resolve_id(
-    config.task_dir(),
-    Some(&config.task_dir().join("resolved")),
+    config.storage().task_dir(),
+    Some(&config.storage().task_dir().join("resolved")),
     "toml",
     prefix,
     include_resolved,
@@ -254,8 +254,8 @@ pub fn update_task(config: &Settings, id: &Id, patch: TaskPatch) -> super::Resul
     move_entity_file(
       config,
       &content,
-      &config.task_dir().join(format!("resolved/{id}.toml")),
-      &config.task_dir().join(format!("{id}.toml")),
+      &config.storage().task_dir().join(format!("resolved/{id}.toml")),
+      &config.storage().task_dir().join(format!("{id}.toml")),
     )?;
   } else if !task.status.is_terminal() && was_resolved {
     task.resolved_at = None;
@@ -263,8 +263,8 @@ pub fn update_task(config: &Settings, id: &Id, patch: TaskPatch) -> super::Resul
     move_entity_file(
       config,
       &content,
-      &config.task_dir().join(format!("{id}.toml")),
-      &config.task_dir().join(format!("resolved/{id}.toml")),
+      &config.storage().task_dir().join(format!("{id}.toml")),
+      &config.storage().task_dir().join(format!("resolved/{id}.toml")),
     )?;
   } else {
     write_task(config, &task)?;
@@ -278,11 +278,11 @@ pub fn update_task(config: &Settings, id: &Id, patch: TaskPatch) -> super::Resul
 /// If the task already exists in the resolved directory, it is written there
 /// to avoid creating a duplicate in the active directory.
 pub fn write_task(config: &Settings, task: &Task) -> super::Result<()> {
-  let resolved_path = config.task_dir().join(format!("resolved/{}.toml", task.id));
+  let resolved_path = config.storage().task_dir().join(format!("resolved/{}.toml", task.id));
   let path = if resolved_path.exists() {
     resolved_path
   } else {
-    config.task_dir().join(format!("{}.toml", task.id))
+    config.storage().task_dir().join(format!("{}.toml", task.id))
   };
   write_task_to_path(config, task, &path)
 }

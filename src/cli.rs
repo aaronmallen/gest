@@ -8,11 +8,11 @@ mod commands;
 use clap::{ArgAction, Parser, Subcommand};
 use yansi::hyperlink::HyperlinkExt;
 
-use crate::{config::Settings, ui::theme::Theme};
+use crate::{config, ui::theme::Theme};
 
 /// Bundles all runtime context that commands need: resolved settings and theme.
 pub(crate) struct AppContext {
-  pub(crate) settings: Settings,
+  pub(crate) settings: config::Settings,
   pub(crate) theme: Theme,
 }
 
@@ -76,7 +76,7 @@ pub(crate) struct Cli {
 }
 
 impl Cli {
-  fn call(&self, mut settings: Settings) -> Result<()> {
+  fn call(&self, settings: config::Settings) -> Result<()> {
     if self.print_version {
       let theme = Theme::from_config(&settings);
       let ctx = AppContext {
@@ -97,11 +97,8 @@ impl Cli {
     let theme = Theme::from_config(&settings);
     crate::logger::init(level, &theme);
 
-    let cwd = std::env::current_dir()?;
-    settings.resolve_storage(cwd)?;
-
     log::debug!("log level set to {level}");
-    log::debug!("data directory: {}", settings.data_dir().display());
+    log::debug!("data directory: {}", settings.storage().data_dir().display());
 
     let ctx = AppContext {
       settings,
@@ -110,7 +107,7 @@ impl Cli {
 
     if command.is_capturable() {
       // Capture filesystem state before the command for the event store.
-      let snapshot = capture::Snapshot::capture(ctx.settings.data_dir());
+      let snapshot = capture::Snapshot::capture(ctx.settings.storage().data_dir());
       let result = command.call(&ctx);
 
       // Record any file changes to the event store. Failures are logged but
@@ -172,15 +169,15 @@ impl Command {
 /// Opens the event store, begins a transaction, records any changed files,
 /// and rolls back the transaction if nothing actually changed.
 fn record_snapshot(
-  settings: &Settings,
+  settings: &config::Settings,
   snapshot: &capture::Snapshot,
 ) -> std::result::Result<(), crate::event_store::Error> {
-  let store = crate::event_store::EventStore::open(settings.state_dir())?;
+  let store = crate::event_store::EventStore::open(settings.storage().state_dir())?;
   let project_id = capture::project_id(settings);
   let command = capture::command_string();
   let tx_id = store.begin_transaction(&project_id, &command)?;
 
-  let had_changes = snapshot.record_changes(settings.data_dir(), &store, &tx_id)?;
+  let had_changes = snapshot.record_changes(settings.storage().data_dir(), &store, &tx_id)?;
   if !had_changes {
     // No file changes — remove the empty transaction.
     store.rollback_transaction(&tx_id)?;

@@ -9,7 +9,7 @@ use std::{collections::HashMap, fs, path::Path};
 use sha2::{Digest, Sha256};
 
 use crate::{
-  config::Settings,
+  config,
   event_store::{EventStore, EventType},
 };
 
@@ -124,8 +124,9 @@ pub(crate) fn command_string() -> String {
 ///
 /// The state dir is always `<state_home>/gest/<project_hash>/`, so the last
 /// component is the project hash.
-pub(crate) fn project_id(settings: &Settings) -> String {
+pub(crate) fn project_id(settings: &config::Settings) -> String {
   settings
+    .storage()
     .state_dir()
     .file_name()
     .map(|n| n.to_string_lossy().into_owned())

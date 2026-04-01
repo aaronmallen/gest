@@ -24,7 +24,7 @@ impl Command {
       let base = cwd.join(".gest");
       init_at(&base, storage, Some(".gest/config.toml"), &ctx.theme)
     } else {
-      init_at(ctx.settings.data_dir(), storage, None, &ctx.theme)
+      init_at(ctx.settings.storage().data_dir(), storage, None, &ctx.theme)
     }
   }
 }
@@ -43,9 +43,9 @@ fn init_at(
     std::fs::create_dir_all(base)?;
   }
   for (entity_dir, secondary) in [
-    (storage.resolve_artifact_dir(base), "archive"),
-    (storage.resolve_iteration_dir(base), "resolved"),
-    (storage.resolve_task_dir(base), "resolved"),
+    (storage.resolve_artifact_dir_from(base), "archive"),
+    (storage.resolve_iteration_dir_from(base), "resolved"),
+    (storage.resolve_task_dir_from(base), "resolved"),
   ] {
     std::fs::create_dir_all(entity_dir.join(secondary))?;
   }

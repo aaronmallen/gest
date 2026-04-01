@@ -22,11 +22,75 @@ pub struct Settings {
   iteration_dir: Option<PathBuf>,
   state_dir: Option<PathBuf>,
   task_dir: Option<PathBuf>,
+  #[serde(skip)]
+  resolved_artifact_dir: PathBuf,
+  #[serde(skip)]
+  resolved_data_dir: PathBuf,
+  #[serde(skip)]
+  resolved_iteration_dir: PathBuf,
+  #[serde(skip)]
+  resolved_state_dir: PathBuf,
+  #[serde(skip)]
+  resolved_task_dir: PathBuf,
 }
 
 impl Settings {
+  /// The resolved artifact storage directory.
+  pub fn artifact_dir(&self) -> &Path {
+    &self.resolved_artifact_dir
+  }
+
+  /// The resolved base data directory.
+  pub fn data_dir(&self) -> &Path {
+    &self.resolved_data_dir
+  }
+
+  /// The resolved iteration storage directory.
+  pub fn iteration_dir(&self) -> &Path {
+    &self.resolved_iteration_dir
+  }
+
+  /// The resolved state directory (event store, undo log).
+  pub fn state_dir(&self) -> &Path {
+    &self.resolved_state_dir
+  }
+
+  /// The resolved task storage directory.
+  pub fn task_dir(&self) -> &Path {
+    &self.resolved_task_dir
+  }
+
+  /// Resolve all storage paths from the working directory.
+  ///
+  /// Called during config loading so the settings are ready to use immediately.
+  pub(crate) fn resolve(&mut self, cwd: PathBuf) -> Result<(), Error> {
+    self.resolved_state_dir = self.resolve_state_dir(&cwd)?;
+    self.resolved_data_dir = self.resolve_data_dir(cwd)?;
+    let data_dir = self.resolved_data_dir.clone();
+    self.resolved_artifact_dir = self.resolve_artifact_dir_from(&data_dir);
+    self.resolved_iteration_dir = self.resolve_iteration_dir_from(&data_dir);
+    self.resolved_task_dir = self.resolve_task_dir_from(&data_dir);
+    Ok(())
+  }
+
+  /// Set storage paths for an already-known data directory, skipping discovery.
+  #[cfg(test)]
+  pub fn resolve_at(&mut self, data_dir: PathBuf) {
+    self.resolved_data_dir = data_dir;
+    let base = self.resolved_data_dir.clone();
+    self.resolved_artifact_dir = self.resolve_artifact_dir_from(&base);
+    self.resolved_iteration_dir = self.resolve_iteration_dir_from(&base);
+    self.resolved_task_dir = self.resolve_task_dir_from(&base);
+  }
+
+  /// Set the state directory path directly, skipping env-var/fallback discovery.
+  #[cfg(test)]
+  pub fn resolve_state_at(&mut self, state_dir: PathBuf) {
+    self.resolved_state_dir = state_dir;
+  }
+
   /// Resolve the artifact directory for a given base data directory.
-  pub(crate) fn resolve_artifact_dir(&self, data_dir: &Path) -> PathBuf {
+  pub(crate) fn resolve_artifact_dir_from(&self, data_dir: &Path) -> PathBuf {
     resolve_entity_dir(
       &super::env::GEST_ARTIFACT_DIR,
       self.artifact_dir.as_deref(),
@@ -36,7 +100,7 @@ impl Settings {
   }
 
   /// Resolve the iteration directory for a given base data directory.
-  pub(crate) fn resolve_iteration_dir(&self, data_dir: &Path) -> PathBuf {
+  pub(crate) fn resolve_iteration_dir_from(&self, data_dir: &Path) -> PathBuf {
     resolve_entity_dir(
       &super::env::GEST_ITERATION_DIR,
       self.iteration_dir.as_deref(),
@@ -46,7 +110,7 @@ impl Settings {
   }
 
   /// Resolve the task directory for a given base data directory.
-  pub(crate) fn resolve_task_dir(&self, data_dir: &Path) -> PathBuf {
+  pub(crate) fn resolve_task_dir_from(&self, data_dir: &Path) -> PathBuf {
     resolve_entity_dir(&super::env::GEST_TASK_DIR, self.task_dir.as_deref(), data_dir, "tasks")
   }
 
@@ -328,12 +392,15 @@ mod tests {
         let settings = Settings::default();
 
         assert_eq!(
-          settings.resolve_artifact_dir(&data_dir),
+          settings.resolve_artifact_dir_from(&data_dir),
           Path::new("/tmp/gest-data/artifacts")
         );
-        assert_eq!(settings.resolve_task_dir(&data_dir), Path::new("/tmp/gest-data/tasks"));
         assert_eq!(
-          settings.resolve_iteration_dir(&data_dir),
+          settings.resolve_task_dir_from(&data_dir),
+          Path::new("/tmp/gest-data/tasks")
+        );
+        assert_eq!(
+          settings.resolve_iteration_dir_from(&data_dir),
           Path::new("/tmp/gest-data/iterations")
         );
       });
@@ -357,10 +424,10 @@ mod tests {
             ..Default::default()
           };
 
-          assert_eq!(settings.resolve_artifact_dir(&data_dir), env_artifact);
-          assert_eq!(settings.resolve_task_dir(&data_dir), Path::new("/config/tasks"));
+          assert_eq!(settings.resolve_artifact_dir_from(&data_dir), env_artifact);
+          assert_eq!(settings.resolve_task_dir_from(&data_dir), Path::new("/config/tasks"));
           assert_eq!(
-            settings.resolve_iteration_dir(&data_dir),
+            settings.resolve_iteration_dir_from(&data_dir),
             Path::new("/tmp/gest-data/iterations")
           );
         },
@@ -383,10 +450,10 @@ mod tests {
           ..Default::default()
         };
 
-        assert_eq!(settings.resolve_artifact_dir(&data_dir), Path::new("/custom/docs"));
-        assert_eq!(settings.resolve_task_dir(&data_dir), Path::new("/custom/tasks"));
+        assert_eq!(settings.resolve_artifact_dir_from(&data_dir), Path::new("/custom/docs"));
+        assert_eq!(settings.resolve_task_dir_from(&data_dir), Path::new("/custom/tasks"));
         assert_eq!(
-          settings.resolve_iteration_dir(&data_dir),
+          settings.resolve_iteration_dir_from(&data_dir),
           Path::new("/custom/iterations")
         );
       });
@@ -414,9 +481,9 @@ mod tests {
             ..Default::default()
           };
 
-          assert_eq!(settings.resolve_artifact_dir(&data_dir), env_artifact);
-          assert_eq!(settings.resolve_task_dir(&data_dir), env_task);
-          assert_eq!(settings.resolve_iteration_dir(&data_dir), env_iter);
+          assert_eq!(settings.resolve_artifact_dir_from(&data_dir), env_artifact);
+          assert_eq!(settings.resolve_task_dir_from(&data_dir), env_task);
+          assert_eq!(settings.resolve_iteration_dir_from(&data_dir), env_iter);
         },
       );
     }

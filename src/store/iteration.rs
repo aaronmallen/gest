@@ -67,8 +67,8 @@ pub fn create_iteration(config: &Settings, new: NewIteration) -> super::Result<I
 
 /// Check whether an iteration has been moved to the resolved directory.
 pub fn is_iteration_resolved(config: &Settings, id: &Id) -> bool {
-  let resolved_path = config.iteration_dir().join(format!("resolved/{id}.toml"));
-  let active_path = config.iteration_dir().join(format!("{id}.toml"));
+  let resolved_path = config.storage().iteration_dir().join(format!("resolved/{id}.toml"));
+  let active_path = config.storage().iteration_dir().join(format!("{id}.toml"));
   resolved_path.exists() && !active_path.exists()
 }
 
@@ -76,8 +76,8 @@ pub fn is_iteration_resolved(config: &Settings, id: &Id) -> bool {
 pub fn list_iterations(config: &Settings, filter: &IterationFilter) -> super::Result<Vec<Iteration>> {
   let parse = |content: &str| Ok(toml::from_str::<Iteration>(content)?);
   let mut iterations = load_entities_from_dirs(
-    config.iteration_dir(),
-    &config.iteration_dir().join("resolved"),
+    config.storage().iteration_dir(),
+    &config.storage().iteration_dir().join("resolved"),
     "toml",
     false,
     filter.all,
@@ -103,8 +103,8 @@ pub fn list_iterations(config: &Settings, filter: &IterationFilter) -> super::Re
 
 /// Load a single iteration by exact ID, checking both active and resolved directories.
 pub fn read_iteration(config: &Settings, id: &Id) -> super::Result<Iteration> {
-  let active = config.iteration_dir().join(format!("{id}.toml"));
-  let resolved = config.iteration_dir().join(format!("resolved/{id}.toml"));
+  let active = config.storage().iteration_dir().join(format!("{id}.toml"));
+  let resolved = config.storage().iteration_dir().join(format!("resolved/{id}.toml"));
 
   read_entity_file(&active, &resolved, "resolved", "Iteration", id, |content| {
     Ok(toml::from_str::<Iteration>(content)?)
@@ -148,8 +148,8 @@ pub fn resolve_iteration(config: &Settings, id: &Id) -> super::Result<()> {
   move_entity_file(
     config,
     &content,
-    &config.iteration_dir().join(format!("resolved/{id}.toml")),
-    &config.iteration_dir().join(format!("{id}.toml")),
+    &config.storage().iteration_dir().join(format!("resolved/{id}.toml")),
+    &config.storage().iteration_dir().join(format!("{id}.toml")),
   )?;
 
   Ok(())
@@ -159,8 +159,8 @@ pub fn resolve_iteration(config: &Settings, id: &Id) -> super::Result<()> {
 pub fn resolve_iteration_id(config: &Settings, prefix: &str, include_resolved: bool) -> super::Result<Id> {
   log::debug!("resolving iteration ID prefix '{prefix}'");
   resolve_id(
-    config.iteration_dir(),
-    Some(&config.iteration_dir().join("resolved")),
+    config.storage().iteration_dir(),
+    Some(&config.storage().iteration_dir().join("resolved")),
     "toml",
     prefix,
     include_resolved,
@@ -197,8 +197,8 @@ pub fn update_iteration(config: &Settings, id: &Id, patch: IterationPatch) -> su
     move_entity_file(
       config,
       &content,
-      &config.iteration_dir().join(format!("resolved/{id}.toml")),
-      &config.iteration_dir().join(format!("{id}.toml")),
+      &config.storage().iteration_dir().join(format!("resolved/{id}.toml")),
+      &config.storage().iteration_dir().join(format!("{id}.toml")),
     )?;
   } else if !iteration.status.is_terminal() && was_resolved {
     iteration.completed_at = None;
@@ -206,8 +206,8 @@ pub fn update_iteration(config: &Settings, id: &Id, patch: IterationPatch) -> su
     move_entity_file(
       config,
       &content,
-      &config.iteration_dir().join(format!("{id}.toml")),
-      &config.iteration_dir().join(format!("resolved/{id}.toml")),
+      &config.storage().iteration_dir().join(format!("{id}.toml")),
+      &config.storage().iteration_dir().join(format!("resolved/{id}.toml")),
     )?;
   } else {
     write_iteration(config, &iteration)?;
@@ -222,11 +222,14 @@ pub fn update_iteration(config: &Settings, id: &Id, patch: IterationPatch) -> su
 /// to avoid creating a duplicate in the active directory.
 pub fn write_iteration(config: &Settings, iteration: &Iteration) -> super::Result<()> {
   ensure_dirs(config)?;
-  let resolved_path = config.iteration_dir().join(format!("resolved/{}.toml", iteration.id));
+  let resolved_path = config
+    .storage()
+    .iteration_dir()
+    .join(format!("resolved/{}.toml", iteration.id));
   let path = if resolved_path.exists() {
     resolved_path
   } else {
-    config.iteration_dir().join(format!("{}.toml", iteration.id))
+    config.storage().iteration_dir().join(format!("{}.toml", iteration.id))
   };
   let content = toml::to_string(iteration)?;
   log::trace!("writing iteration {} to {}", iteration.id, path.display());

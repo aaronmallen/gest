@@ -23,8 +23,8 @@ pub fn archive_artifact(config: &Settings, id: &Id) -> super::Result<()> {
   move_entity_file(
     config,
     &content,
-    &config.artifact_dir().join(format!("archive/{id}.md")),
-    &config.artifact_dir().join(format!("{id}.md")),
+    &config.storage().artifact_dir().join(format!("archive/{id}.md")),
+    &config.storage().artifact_dir().join(format!("{id}.md")),
   )?;
 
   Ok(())
@@ -52,8 +52,8 @@ pub fn create_artifact(config: &Settings, new: NewArtifact) -> super::Result<Art
 /// List artifacts matching the given filter criteria.
 pub fn list_artifacts(config: &Settings, filter: &ArtifactFilter) -> super::Result<Vec<Artifact>> {
   let mut artifacts = load_entities_from_dirs(
-    config.artifact_dir(),
-    &config.artifact_dir().join("archive"),
+    config.storage().artifact_dir(),
+    &config.storage().artifact_dir().join("archive"),
     "md",
     filter.only_archived,
     filter.show_all || filter.only_archived,
@@ -79,8 +79,8 @@ pub fn list_artifacts(config: &Settings, filter: &ArtifactFilter) -> super::Resu
 
 /// Load a single artifact by exact ID, checking both active and archived directories.
 pub fn read_artifact(config: &Settings, id: &Id) -> super::Result<Artifact> {
-  let active = config.artifact_dir().join(format!("{id}.md"));
-  let archived = config.artifact_dir().join(format!("archive/{id}.md"));
+  let active = config.storage().artifact_dir().join(format!("{id}.md"));
+  let archived = config.storage().artifact_dir().join(format!("archive/{id}.md"));
 
   read_entity_file(&active, &archived, "archived", "Artifact", id, parse_artifact_file)
 }
@@ -89,8 +89,8 @@ pub fn read_artifact(config: &Settings, id: &Id) -> super::Result<Artifact> {
 pub fn resolve_artifact_id(config: &Settings, prefix: &str, show_all: bool) -> super::Result<Id> {
   log::debug!("resolving artifact ID prefix '{prefix}'");
   resolve_id(
-    config.artifact_dir(),
-    Some(&config.artifact_dir().join("archive")),
+    config.storage().artifact_dir(),
+    Some(&config.storage().artifact_dir().join("archive")),
     "md",
     prefix,
     show_all,
@@ -130,11 +130,14 @@ pub fn update_artifact(config: &Settings, id: &Id, patch: ArtifactPatch) -> supe
 pub fn write_artifact(config: &Settings, artifact: &Artifact) -> super::Result<()> {
   ensure_dirs(config)?;
   let content = serialize_artifact(artifact)?;
-  let archived_path = config.artifact_dir().join(format!("archive/{}.md", artifact.id));
+  let archived_path = config
+    .storage()
+    .artifact_dir()
+    .join(format!("archive/{}.md", artifact.id));
   let path = if archived_path.exists() {
     archived_path
   } else {
-    config.artifact_dir().join(format!("{}.md", artifact.id))
+    config.storage().artifact_dir().join(format!("{}.md", artifact.id))
   };
   log::trace!("writing artifact {} to {}", artifact.id, path.display());
   fs::write(path, content)?;

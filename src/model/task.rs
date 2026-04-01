@@ -91,7 +91,7 @@ pub struct Task {
   pub phase: Option<u16>,
   #[serde(default)]
   pub priority: Option<u8>,
-  #[serde(alias = "archived_at", with = "super::optional_datetime")]
+  #[serde(with = "super::optional_datetime")]
   pub resolved_at: Option<DateTime<Utc>>,
   pub status: Status,
   #[serde(default)]

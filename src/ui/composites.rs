@@ -10,6 +10,7 @@ pub mod indicators;
 pub mod iteration_detail;
 pub mod iteration_graph;
 pub mod iteration_list_row;
+pub mod iteration_status;
 pub mod search_result;
 pub mod status_badge;
 pub mod success_message;

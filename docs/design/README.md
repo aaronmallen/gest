@@ -17,6 +17,7 @@ This directory contains Architecture Decision Records (ADRs) for the project.
 | [0009] | Zero-Config Discovery (TOML Only)            | Active               | 2026-03-29 |
 | [0010] | Atomic UI Architecture                       | Active               | 2026-03-30 |
 | [0011] | Askama for Web UI Templating                 | Active               | 2026-03-31 |
+| [0012] | SQLite for the Event Store                   | Active               | 2026-04-01 |
 
 ADRs document significant architectural decisions, the context in which they were made, and their consequences. See
 [Writing ADRs] for the process and template.
@@ -32,4 +33,5 @@ ADRs document significant architectural decisions, the context in which they wer
 [0009]: https://github.com/aaronmallen/gest/blob/main/docs/design/0009-zero-config-discovery-toml-only.md
 [0010]: https://github.com/aaronmallen/gest/blob/main/docs/design/0010-atomic-ui-architecture.md
 [0011]: https://github.com/aaronmallen/gest/blob/main/docs/design/0011-askama-for-web-ui-templating.md
+[0012]: https://github.com/aaronmallen/gest/blob/main/docs/design/0012-sqlite-for-the-event-store.md
 [Writing ADRs]: https://github.com/aaronmallen/gest/blob/main/docs/process/writing-adrs.md

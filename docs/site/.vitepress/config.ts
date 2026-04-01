@@ -31,6 +31,7 @@ export default defineConfig({
           { text: 'task', link: '/cli/task' },
           { text: 'artifact', link: '/cli/artifact' },
           { text: 'iteration', link: '/cli/iteration' },
+          { text: 'tag', link: '/cli/tag' },
           { text: 'search', link: '/cli/search' },
           { text: 'undo', link: '/cli/undo' },
           { text: 'serve', link: '/cli/serve' },

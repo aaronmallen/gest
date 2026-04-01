@@ -76,7 +76,7 @@ pub fn search(config: &Settings, query: &str, show_all: bool) -> super::Result<S
   let all_tasks = super::list_tasks(config, &task_filter)?;
 
   let artifact_filter = ArtifactFilter {
-    show_all,
+    all: show_all,
     ..Default::default()
   };
   let all_artifacts = super::list_artifacts(config, &artifact_filter)?;

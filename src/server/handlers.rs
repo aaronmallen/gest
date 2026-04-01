@@ -553,7 +553,7 @@ pub async fn task_update(State(state): State<ServerState>, Path(id_str): Path<St
 /// GET /artifacts — artifact list with status filtering.
 pub async fn artifact_list(State(state): State<ServerState>, Query(params): Query<ArtifactListParams>) -> Response {
   let filter = ArtifactFilter {
-    show_all: true,
+    all: true,
     ..Default::default()
   };
 

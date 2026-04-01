@@ -56,7 +56,7 @@ pub fn list_artifacts(config: &Settings, filter: &ArtifactFilter) -> super::Resu
     &config.storage().artifact_dir().join("archive"),
     "md",
     filter.only_archived,
-    filter.show_all || filter.only_archived,
+    filter.all || filter.only_archived,
     parse_artifact_file,
   )?;
 
@@ -260,7 +260,7 @@ mod tests {
       crate::store::archive_artifact(&make_config(dir.path()), &to_archive.id).unwrap();
 
       let filter = ArtifactFilter {
-        show_all: true,
+        all: true,
         ..Default::default()
       };
       let artifacts = crate::store::list_artifacts(&make_config(dir.path()), &filter).unwrap();

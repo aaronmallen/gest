@@ -59,7 +59,7 @@ mod tests {
       assert_eq!(artifacts.len(), 0);
 
       let filter = ArtifactFilter {
-        show_all: true,
+        all: true,
         ..Default::default()
       };
       let artifacts = store::list_artifacts(&ctx.settings, &filter).unwrap();

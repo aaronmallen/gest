@@ -75,7 +75,7 @@ pub fn list_tags(config: &crate::config::Settings) -> Result<Vec<String>> {
   }
 
   let artifact_filter = crate::model::ArtifactFilter {
-    show_all: true,
+    all: true,
     ..Default::default()
   };
   for artifact in list_artifacts(config, &artifact_filter)? {

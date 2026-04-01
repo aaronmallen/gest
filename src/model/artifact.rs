@@ -24,7 +24,7 @@ pub struct Artifact {
 pub struct ArtifactFilter {
   pub kind: Option<String>,
   pub only_archived: bool,
-  pub show_all: bool,
+  pub all: bool,
   pub tag: Option<String>,
 }
 

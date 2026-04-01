@@ -38,7 +38,7 @@ impl Command {
     let filter = ArtifactFilter {
       kind: self.kind.clone(),
       only_archived: self.archived,
-      show_all: self.show_all,
+      all: self.show_all,
       tag: self.tag.clone(),
     };
 

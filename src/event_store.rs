@@ -164,6 +164,14 @@ impl EventStore {
     }))
   }
 
+  /// Delete a transaction that produced no events (cleanup for no-op commands).
+  pub fn rollback_transaction(&self, transaction_id: &str) -> Result<()> {
+    self
+      .conn
+      .execute("DELETE FROM transactions WHERE id = ?1", params![transaction_id])?;
+    Ok(())
+  }
+
   /// Mark a transaction as undone by setting its `undone_at` timestamp.
   pub fn mark_undone(&self, transaction_id: &str) -> Result<()> {
     let now = Utc::now().to_rfc3339();

@@ -1,3 +1,4 @@
+pub(crate) mod capture;
 pub mod editor;
 pub mod git;
 pub mod helpers;
@@ -106,7 +107,18 @@ impl Cli {
       settings,
       theme,
     };
-    command.call(&ctx)
+
+    // Capture filesystem state before the command for the event store.
+    let snapshot = capture::Snapshot::capture(ctx.settings.data_dir());
+    let result = command.call(&ctx);
+
+    // Record any file changes to the event store. Failures are logged but
+    // do not affect the command's exit status.
+    if let Err(e) = record_snapshot(&ctx.settings, &snapshot) {
+      log::warn!("event store: {e}");
+    }
+
+    result
   }
 }
 
@@ -139,6 +151,28 @@ impl Command {
       Self::Version(cmd) => cmd.call(ctx),
     }
   }
+}
+
+/// Record filesystem changes to the event store after a command runs.
+///
+/// Opens the event store, begins a transaction, records any changed files,
+/// and rolls back the transaction if nothing actually changed.
+fn record_snapshot(
+  settings: &Settings,
+  snapshot: &capture::Snapshot,
+) -> std::result::Result<(), crate::event_store::Error> {
+  let store = crate::event_store::EventStore::open(settings.state_dir())?;
+  let project_id = capture::project_id(settings);
+  let command = capture::command_string();
+  let tx_id = store.begin_transaction(&project_id, &command)?;
+
+  let had_changes = snapshot.record_changes(settings.data_dir(), &store, &tx_id)?;
+  if !had_changes {
+    // No file changes — remove the empty transaction.
+    store.rollback_transaction(&tx_id)?;
+  }
+
+  Ok(())
 }
 
 /// Entry point for the CLI: loads configuration then parses and dispatches the command.

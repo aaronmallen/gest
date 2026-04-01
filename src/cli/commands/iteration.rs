@@ -6,6 +6,7 @@ mod list;
 mod meta;
 mod remove;
 mod show;
+mod status;
 mod tag;
 mod untag;
 mod update;
@@ -31,6 +32,7 @@ enum IterationCommand {
   Meta(meta::Command),
   Remove(remove::Command),
   Show(show::Command),
+  Status(status::Command),
   Tag(tag::Command),
   Untag(untag::Command),
   Update(update::Command),
@@ -48,6 +50,7 @@ impl Command {
       IterationCommand::Meta(cmd) => cmd.call(ctx),
       IterationCommand::Remove(cmd) => cmd.call(ctx),
       IterationCommand::Show(cmd) => cmd.call(ctx),
+      IterationCommand::Status(cmd) => cmd.call(ctx),
       IterationCommand::Tag(cmd) => cmd.call(ctx),
       IterationCommand::Untag(cmd) => cmd.call(ctx),
       IterationCommand::Update(cmd) => cmd.call(ctx),

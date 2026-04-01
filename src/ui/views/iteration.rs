@@ -1,13 +1,17 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::ui::{
-  composites::{
-    grouped_list::GroupedList,
-    iteration_detail::{IterationDetail, TaskCounts},
-    iteration_graph::{IterationGraph, PhaseData},
-    iteration_list_row::IterationListRow,
+use crate::{
+  store::IterationProgress,
+  ui::{
+    composites::{
+      grouped_list::GroupedList,
+      iteration_detail::{IterationDetail, TaskCounts},
+      iteration_graph::{IterationGraph, PhaseData},
+      iteration_list_row::IterationListRow,
+      iteration_status::IterationStatus,
+    },
+    theme::Theme,
   },
-  theme::Theme,
 };
 
 /// Renders the full detail page for a single iteration, including task status breakdown.
@@ -103,6 +107,22 @@ impl Display for IterationListView<'_> {
     let list = GroupedList::new("iterations", self.summary(), self.theme).rows(rows);
 
     write!(f, "{list}")
+  }
+}
+
+/// Renders an iteration status card showing aggregated progress.
+pub struct IterationStatusView<'a> {
+  pub id: &'a str,
+  pub progress: &'a IterationProgress,
+  pub status: &'a str,
+  pub theme: &'a Theme,
+  pub title: &'a str,
+}
+
+impl Display for IterationStatusView<'_> {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    let status = IterationStatus::new(self.id, self.title, self.status, self.progress, self.theme);
+    write!(f, "{status}")
   }
 }
 

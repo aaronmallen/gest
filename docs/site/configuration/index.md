@@ -64,6 +64,19 @@ it with collaborators.
 gest init --local
 ```
 
+## State storage (event store)
+
+Separately from entity data, gest maintains a **state directory** for local operational state
+such as the undo event store. The state directory is always global (never inside the repo) and
+is resolved with this precedence:
+
+1. `$GEST_STATE_DIR` environment variable (must be an absolute path)
+2. `storage.state_dir` in config (must be an absolute path)
+3. The platform's global state home: `~/.local/state/gest/<hash>/`
+
+The state directory is created automatically on first use. It is not version-controlled and does
+not sync between machines — undo history is local to each workstation.
+
 ## Per-entity directory overrides
 
 By default, all entity types (artifacts, tasks, iterations) are stored under
@@ -106,6 +119,7 @@ paths.
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `data_dir` | string (absolute path) | _(auto-resolved)_ | Override the data directory. Must be an absolute path to an existing directory. |
+| `state_dir` | string (absolute path) | _(auto-resolved)_ | Override the state directory (event store). Must be an absolute path. |
 | `artifact_dir` | string (path) | `<data_dir>/artifacts` | Override the artifact storage directory. |
 | `iteration_dir` | string (path) | `<data_dir>/iterations` | Override the iteration storage directory. |
 | `task_dir` | string (path) | `<data_dir>/tasks` | Override the task storage directory. |
@@ -190,6 +204,7 @@ bold = true
 | --- | --- |
 | `GEST_CONFIG` | Override the path to the global config file. |
 | `GEST_DATA_DIR` | Override the data storage directory (must be an absolute path). |
+| `GEST_STATE_DIR` | Override the state directory for the event store (must be an absolute path). |
 | `GEST_ARTIFACT_DIR` | Override the artifact storage directory. |
 | `GEST_ITERATION_DIR` | Override the iteration storage directory. |
 | `GEST_TASK_DIR` | Override the task storage directory. |

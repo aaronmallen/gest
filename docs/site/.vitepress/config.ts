@@ -32,6 +32,7 @@ export default defineConfig({
           { text: 'artifact', link: '/cli/artifact' },
           { text: 'iteration', link: '/cli/iteration' },
           { text: 'search', link: '/cli/search' },
+          { text: 'undo', link: '/cli/undo' },
           { text: 'serve', link: '/cli/serve' },
           { text: 'config', link: '/cli/config' },
           { text: 'generate', link: '/cli/generate' },

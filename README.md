@@ -92,6 +92,7 @@ The dashboard provides:
 | `gest artifact`     | Create, list, show, update, tag, archive, and manage artifacts |
 | `gest iteration`    | Manage iterations (group tasks into phased execution plans)    |
 | `gest search`       | Search across tasks and artifacts                              |
+| `gest undo`         | Undo the most recent mutating command(s)                       |
 | `gest serve`        | Start the web dashboard for browsing and managing entities     |
 | `gest config`       | View and modify configuration                                  |
 | `gest generate`     | Generate shell completions and man pages                       |

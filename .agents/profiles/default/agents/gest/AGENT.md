@@ -266,6 +266,58 @@ GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration meta s
 GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration meta get <id> <key>
 ```
 
+### Orchestration
+
+These commands support multi-agent execution of iteration phases.
+
+#### Status
+
+Check iteration progress (active phase, task counts, assignees):
+
+```sh
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration status <id>          # human-readable
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration status <id> --json   # structured JSON
+```
+
+JSON output includes: `active_phase`, `total_phases`, `phase_progress` (`done`/`total`), `blocked`, `in_progress`,
+`assignees`, `overall_progress` (`done`/`total`).
+
+#### Next
+
+Find and optionally claim the next available task in the iteration:
+
+```sh
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration next <id>                          # show next task
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration next <id> --claim --agent <name>   # atomically claim it
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration next <id> --json                   # structured JSON
+```
+
+Exits with code 2 when no tasks remain (distinguishes "idle" from "error").
+
+Options: `--claim` (set task to in-progress), `--agent <name>` (set assigned_to).
+
+#### Advance
+
+Move to the next phase once the current phase is complete:
+
+```sh
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration advance <id>           # advance if phase is done
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration advance <id> --force   # advance past stuck tasks
+```
+
+## Undo
+
+Reverse the most recent mutating command(s) by restoring file snapshots. Every mutating CLI command is automatically
+recorded in a local event store. Non-mutating commands (show, list, search) are not recorded.
+
+```sh
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- undo       # undo last command
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- undo 3     # undo last 3 commands
+```
+
+Undo supports create (deletes file), modify (restores prior content), and delete (recreates file) operations. The undo
+command itself is not recorded, so repeated calls walk backwards through history.
+
 ## Search
 
 ```sh

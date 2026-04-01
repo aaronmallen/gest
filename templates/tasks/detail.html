@@ -4,6 +4,7 @@
 {% block nav_tasks %}class="active"{% endblock %}
 
 {% block content %}
+<h1 class="section-heading">{{ task.title }}</h1>
 <div class="summary">
   <a href="/tasks">&larr; tasks</a>
   &middot;
@@ -94,7 +95,7 @@
 
     {% if !task.description.is_empty() %}
     <hr class="rule">
-    <div class="section-heading">Description</div>
+    <h2 class="section-heading">Description</h2>
     <div class="md-content">
       {{ description_html|safe }}
     </div>
@@ -102,7 +103,7 @@
 
     {% if !display_links.is_empty() %}
     <hr class="rule">
-    <div class="section-heading">Links</div>
+    <h2 class="section-heading">Links</h2>
     <table>
       <tbody>
         {% for link in display_links.iter() %}
@@ -124,7 +125,7 @@
 
     {% if is_blocked %}
     <hr class="rule">
-    <div class="section-heading" style="color: var(--error);">Blocked by</div>
+    <h2 class="section-heading" style="color: var(--error);">Blocked by</h2>
     {% for bid in blocking.blocked_by_ids.iter() %}
       <a href="/tasks/{{ bid }}"><span class="c-azure">{{ bid[..8] }}</span></a>{{ " " }}
     {% endfor %}
@@ -132,7 +133,7 @@
 
     {% if !task.metadata.is_empty() %}
     <hr class="rule">
-    <div class="section-heading">Metadata</div>
+    <h2 class="section-heading">Metadata</h2>
     <table>
       <tbody>
         {% for (key, val) in task.metadata.iter() %}
@@ -147,7 +148,7 @@
   </div>
 </div>
 
-<div class="section-heading" style="margin-top: 24px;">Activity</div>
+<h2 class="section-heading" style="margin-top: 24px;">Activity</h2>
 
 {% for entry in timeline.iter() %}
   {% match entry %}

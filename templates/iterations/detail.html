@@ -4,6 +4,7 @@
 {% block nav_iterations %}class="active"{% endblock %}
 
 {% block content %}
+<h1 class="section-heading">{{ iteration.title }}</h1>
 <div class="summary">
   <a href="/iterations">← iterations</a>
   &nbsp;·&nbsp;
@@ -71,13 +72,13 @@
 
     {% if !iteration.description.is_empty() %}
     <hr class="rule">
-    <div class="section-heading">Description</div>
+    <h2 class="section-heading">Description</h2>
     <div style="white-space: pre-wrap;">{{ iteration.description }}</div>
     {% endif %}
 
     {% if !tasks.is_empty() %}
     <hr class="rule">
-    <div class="section-heading">Tasks by Phase</div>
+    <h2 class="section-heading">Tasks by Phase</h2>
     {% for phase in phases %}
     <div style="margin-bottom: 16px;">
       <div class="c-pewter bold" style="margin-bottom: 6px;">Phase {{ phase.number }}</div>

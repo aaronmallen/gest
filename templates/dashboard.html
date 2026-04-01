@@ -2,6 +2,7 @@
 {% block title %}gest — dashboard{% endblock %}
 {% block nav_dashboard %}class="active"{% endblock %}
 {% block content %}
+<h1 class="section-heading">Dashboard</h1>
 <div class="dash-grid">
   <a href="/tasks" class="dash-card" aria-label="{{ task_count }} tasks">
     <div class="dash-card-count">{{ task_count }}</div>
@@ -17,7 +18,7 @@
   </a>
 </div>
 
-<div class="section-heading">tasks by status</div>
+<h2 class="section-heading">tasks by status</h2>
 <div class="dash-grid">
   <a href="/tasks" class="dash-card" aria-label="{{ open_count }} open tasks">
     <div class="dash-card-count status-open">{{ open_count }}</div>

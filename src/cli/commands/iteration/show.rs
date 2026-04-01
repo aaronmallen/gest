@@ -68,6 +68,7 @@ impl Command {
       title: &iteration.title,
       phase_count: phase_set.len(),
       counts,
+      events: &iteration.events,
       theme,
     };
     println!("{view}");

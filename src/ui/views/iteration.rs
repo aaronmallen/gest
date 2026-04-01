@@ -1,8 +1,12 @@
 use std::fmt::{self, Display, Formatter};
 
+use yansi::Paint;
+
 use crate::{
+  model::event::{Event, EventKind},
   store::IterationProgress,
   ui::{
+    atoms::separator::Separator,
     composites::{
       grouped_list::GroupedList,
       iteration_detail::{IterationDetail, TaskCounts},
@@ -18,6 +22,8 @@ use crate::{
 pub struct IterationDetailView<'a> {
   /// Aggregated task status counts for the iteration.
   pub counts: TaskCounts,
+  /// Events attached to this iteration.
+  pub events: &'a [Event],
   pub id: &'a str,
   pub phase_count: usize,
   pub theme: &'a Theme,
@@ -40,7 +46,77 @@ impl Display for IterationDetailView<'_> {
       self.theme,
     );
 
-    write!(f, "{detail}")
+    write!(f, "{detail}")?;
+
+    if !self.events.is_empty() {
+      writeln!(f)?;
+      writeln!(f)?;
+      let sep = Separator::labeled("activity", self.theme.task_detail_separator);
+      writeln!(f, "  {sep}")?;
+
+      let mut sorted_events: Vec<&Event> = self.events.iter().collect();
+      sorted_events.sort_by_key(|e| e.created_at);
+
+      for (i, event) in sorted_events.iter().enumerate() {
+        writeln!(f)?;
+        let description = format_event_description(event);
+        let dimmed = format!("{}", description.dim());
+        writeln!(f, "    {dimmed}")?;
+
+        let author_display = format_event_author(event);
+        let created = event.created_at.format("%Y-%m-%d %H:%M").to_string();
+        let meta = format!("{}", format!("{author_display}  {created}").dim());
+        writeln!(f, "    {meta}")?;
+
+        if i < sorted_events.len() - 1 {
+          writeln!(f)?;
+        }
+      }
+
+      writeln!(f)?;
+      let rule = Separator::rule(self.theme.task_detail_separator);
+      write!(f, "  {rule}")?;
+    }
+
+    Ok(())
+  }
+}
+
+fn format_event_author(event: &Event) -> String {
+  use crate::model::note::AuthorType;
+  match event.author_type {
+    AuthorType::Agent => format!("{} (agent)", event.author),
+    AuthorType::Human => match &event.author_email {
+      Some(email) => format!("{} <{}>", event.author, email),
+      None => event.author.clone(),
+    },
+  }
+}
+
+fn format_event_description(event: &Event) -> String {
+  match &event.kind {
+    EventKind::PhaseChange {
+      from,
+      to,
+    } => {
+      let from_str = from.map_or("none".to_string(), |v| v.to_string());
+      let to_str = to.map_or("none".to_string(), |v| v.to_string());
+      format!("phase changed from {from_str} to {to_str}")
+    }
+    EventKind::PriorityChange {
+      from,
+      to,
+    } => {
+      let from_str = from.map_or("none".to_string(), |v| format!("P{v}"));
+      let to_str = to.map_or("none".to_string(), |v| format!("P{v}"));
+      format!("priority changed from {from_str} to {to_str}")
+    }
+    EventKind::StatusChange {
+      from,
+      to,
+    } => {
+      format!("status changed from {from} to {to}")
+    }
   }
 }
 
@@ -150,6 +226,7 @@ mod tests {
         open: 3,
         blocked: 1,
       },
+      events: &[],
       theme: &t,
     };
     let out = view.to_string();
@@ -179,6 +256,7 @@ mod tests {
         open: 0,
         blocked: 0,
       },
+      events: &[],
       theme: &t,
     };
     let out = view.to_string();

@@ -1,7 +1,13 @@
 use std::fmt::{self, Display, Formatter};
 
+use chrono::{DateTime, Utc};
+use yansi::Paint;
+
 use crate::{
-  model::Note,
+  model::{
+    Note,
+    event::{Event, EventKind},
+  },
   ui::{
     atoms::{id::Id, label::Label, separator::Separator, value::Value},
     composites::{
@@ -40,6 +46,8 @@ pub struct TaskDetailView<'a> {
   pub assigned: Option<&'a str>,
   /// Optional markdown body rendered as the description section.
   pub body: Option<&'a str>,
+  /// Events attached to this task.
+  pub events: &'a [Event],
   pub id: &'a str,
   /// Relation-target pairs (e.g., `("blocked-by", "<id>")`).
   pub links: Vec<(&'a str, &'a str)>,
@@ -66,36 +74,52 @@ impl Display for TaskDetailView<'_> {
 
     write!(f, "{detail}")?;
 
-    if !self.notes.is_empty() {
+    let timeline = build_timeline(self.notes, self.events);
+
+    if !timeline.is_empty() {
       writeln!(f)?;
       writeln!(f)?;
-      let sep = Separator::labeled("notes", self.theme.task_detail_separator);
+      let sep = Separator::labeled("activity", self.theme.task_detail_separator);
       writeln!(f, "  {sep}")?;
 
       let max_label = 7;
       let width = utils::terminal_width() as usize;
-      for (i, note) in self.notes.iter().enumerate() {
+      for (i, entry) in timeline.iter().enumerate() {
         writeln!(f)?;
-        let short_id = note.id.short();
-        let id_atom = Id::new(&short_id, self.theme);
-        writeln!(f, "  {id_atom}")?;
+        match entry {
+          TimelineEntry::Note(note) => {
+            let short_id = note.id.short();
+            let id_atom = Id::new(&short_id, self.theme);
+            writeln!(f, "  {id_atom}")?;
 
-        let author_display = format_note_author(note);
-        let label = Label::new("author", self.theme.task_detail_label).pad_to(max_label);
-        let val = Value::new(&author_display, self.theme.task_detail_value);
-        writeln!(f, "    {label}  {val}")?;
+            let author_display = format_note_author(note);
+            let label = Label::new("author", self.theme.task_detail_label).pad_to(max_label);
+            let val = Value::new(&author_display, self.theme.task_detail_value);
+            writeln!(f, "    {label}  {val}")?;
 
-        let created = note.created_at.format("%Y-%m-%d %H:%M").to_string();
-        let label = Label::new("created", self.theme.task_detail_label).pad_to(max_label);
-        let val = Value::new(&created, self.theme.task_detail_value);
-        writeln!(f, "    {label}  {val}")?;
+            let created = note.created_at.format("%Y-%m-%d %H:%M").to_string();
+            let label = Label::new("created", self.theme.task_detail_label).pad_to(max_label);
+            let val = Value::new(&created, self.theme.task_detail_value);
+            writeln!(f, "    {label}  {val}")?;
 
-        let rendered = markdown::render(&note.body, self.theme, width.saturating_sub(6));
-        for line in rendered.lines() {
-          writeln!(f, "    {line}")?;
+            let rendered = markdown::render(&note.body, self.theme, width.saturating_sub(6));
+            for line in rendered.lines() {
+              writeln!(f, "    {line}")?;
+            }
+          }
+          TimelineEntry::Event(event) => {
+            let description = format_event_description(event);
+            let dimmed = format!("{}", description.dim());
+            writeln!(f, "    {dimmed}")?;
+
+            let author_display = format_event_author(event);
+            let created = event.created_at.format("%Y-%m-%d %H:%M").to_string();
+            let meta = format!("{}", format!("{author_display}  {created}").dim());
+            writeln!(f, "    {meta}")?;
+          }
         }
 
-        if i < self.notes.len() - 1 {
+        if i < timeline.len() - 1 {
           writeln!(f)?;
         }
       }
@@ -106,6 +130,66 @@ impl Display for TaskDetailView<'_> {
     }
 
     Ok(())
+  }
+}
+
+enum TimelineEntry<'a> {
+  Event(&'a Event),
+  Note(&'a Note),
+}
+
+impl TimelineEntry<'_> {
+  fn created_at(&self) -> DateTime<Utc> {
+    match self {
+      Self::Event(e) => e.created_at,
+      Self::Note(n) => n.created_at,
+    }
+  }
+}
+
+fn build_timeline<'a>(notes: &'a [Note], events: &'a [Event]) -> Vec<TimelineEntry<'a>> {
+  let mut timeline: Vec<TimelineEntry<'a>> = Vec::with_capacity(notes.len() + events.len());
+  timeline.extend(notes.iter().map(TimelineEntry::Note));
+  timeline.extend(events.iter().map(TimelineEntry::Event));
+  timeline.sort_by_key(|e| e.created_at());
+  timeline
+}
+
+fn format_event_author(event: &Event) -> String {
+  use crate::model::note::AuthorType;
+  match event.author_type {
+    AuthorType::Agent => format!("{} (agent)", event.author),
+    AuthorType::Human => match &event.author_email {
+      Some(email) => format!("{} <{}>", event.author, email),
+      None => event.author.clone(),
+    },
+  }
+}
+
+fn format_event_description(event: &Event) -> String {
+  match &event.kind {
+    EventKind::PhaseChange {
+      from,
+      to,
+    } => {
+      let from_str = from.map_or("none".to_string(), |v| v.to_string());
+      let to_str = to.map_or("none".to_string(), |v| v.to_string());
+      format!("phase changed from {from_str} to {to_str}")
+    }
+    EventKind::PriorityChange {
+      from,
+      to,
+    } => {
+      let from_str = from.map_or("none".to_string(), |v| format!("P{v}"));
+      let to_str = to.map_or("none".to_string(), |v| format!("P{v}"));
+      format!("priority changed from {from_str} to {to_str}")
+    }
+    EventKind::StatusChange {
+      from,
+      to,
+    } => {
+      format!("status changed from {from} to {to}")
+    }
   }
 }
 
@@ -298,6 +382,7 @@ mod tests {
           assigned: Some("claude-code"),
           tags: &tags,
           links: vec![("blocked-by", "hpvrlbme")],
+          events: &[],
           notes: &[],
           body: Some("## heading\n\nBody text."),
           theme: &t,
@@ -328,6 +413,7 @@ mod tests {
           assigned: None,
           tags: &[],
           links: vec![],
+          events: &[],
           notes: &[],
           body: None,
           theme: &t,
@@ -336,6 +422,123 @@ mod tests {
 
         assert!(out.contains("minimal task"));
         assert!(!out.contains("description"), "should not contain body section");
+      }
+
+      #[test]
+      fn it_renders_event_in_activity_section() {
+        use crate::model::{event::EventKind, note::AuthorType};
+
+        let t = theme();
+        let now = chrono::Utc::now();
+        let events = vec![Event {
+          author: "alice".to_string(),
+          author_email: None,
+          author_type: AuthorType::Human,
+          created_at: now,
+          description: None,
+          id: "zyxwvutsrqponmlkzyxwvutsrqponmlk".parse().unwrap(),
+          kind: EventKind::StatusChange {
+            from: "open".to_string(),
+            to: "in-progress".to_string(),
+          },
+        }];
+        let view = TaskDetailView {
+          id: "abcd1234",
+          title: "test task",
+          status: "in-progress",
+          priority: None,
+          phase: None,
+          assigned: None,
+          tags: &[],
+          links: vec![],
+          events: &events,
+          notes: &[],
+          body: None,
+          theme: &t,
+        };
+        let out = view.to_string();
+
+        assert!(out.contains("activity"), "should contain activity section header");
+        assert!(
+          out.contains("status changed from open to in-progress"),
+          "should contain event description"
+        );
+        assert!(out.contains("alice"), "should contain event author");
+      }
+
+      #[test]
+      fn it_renders_merged_timeline_sorted_by_created_at() {
+        use crate::model::{event::EventKind, note::AuthorType};
+
+        let t = theme();
+        let now = chrono::Utc::now();
+        let earlier = now - chrono::Duration::hours(1);
+
+        let events = vec![Event {
+          author: "bot".to_string(),
+          author_email: None,
+          author_type: AuthorType::Agent,
+          created_at: earlier,
+          description: None,
+          id: "zyxwvutsrqponmlkzyxwvutsrqponmlk".parse().unwrap(),
+          kind: EventKind::StatusChange {
+            from: "open".to_string(),
+            to: "in-progress".to_string(),
+          },
+        }];
+        let notes = vec![Note {
+          author: "bob".to_string(),
+          author_email: None,
+          author_type: AuthorType::Human,
+          body: "Starting work on this.".to_string(),
+          created_at: now,
+          id: "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".parse().unwrap(),
+          updated_at: now,
+        }];
+        let view = TaskDetailView {
+          id: "abcd1234",
+          title: "test task",
+          status: "in-progress",
+          priority: None,
+          phase: None,
+          assigned: None,
+          tags: &[],
+          links: vec![],
+          events: &events,
+          notes: &notes,
+          body: None,
+          theme: &t,
+        };
+        let out = view.to_string();
+
+        let event_pos = out.find("status changed").unwrap();
+        let note_pos = out.find("Starting work").unwrap();
+        assert!(event_pos < note_pos, "event (earlier) should appear before note (now)");
+      }
+
+      #[test]
+      fn it_omits_activity_section_when_empty() {
+        let t = theme();
+        let view = TaskDetailView {
+          id: "abcd1234",
+          title: "test task",
+          status: "open",
+          priority: None,
+          phase: None,
+          assigned: None,
+          tags: &[],
+          links: vec![],
+          events: &[],
+          notes: &[],
+          body: None,
+          theme: &t,
+        };
+        let out = view.to_string();
+
+        assert!(
+          !out.contains("activity"),
+          "should not contain activity section when empty"
+        );
       }
     }
   }

@@ -27,6 +27,7 @@ log = "0.4"
 pulldown-cmark = "0.13"
 rand = "0.10"
 rayon = "1"
+rusqlite = { features = ["bundled"], version = "0.39" }
 rust-embed = { features = ["include-exclude"], version = "8" }
 semver = "1"
 serde = { features = ["derive"], version = "1" }

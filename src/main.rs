@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod event_store;
 mod logger;
 mod model;
 mod server;

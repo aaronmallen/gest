@@ -15,13 +15,15 @@ use super::{
   state::ServerState,
   templates::{
     ArtifactCreateTemplate, ArtifactDetailTemplate, ArtifactEditTemplate, ArtifactListTemplate, DashboardTemplate,
-    DisplayLink, DisplayNote, IterationBoardTemplate, IterationDetailTemplate, IterationListTemplate, PhaseGroup,
-    SearchTemplate, TaskCreateTemplate, TaskDetailTemplate, TaskEditTemplate, TaskListTemplate, TaskRow,
+    DisplayEvent, DisplayLink, DisplayNote, IterationBoardTemplate, IterationDetailTemplate, IterationListTemplate,
+    PhaseGroup, SearchTemplate, TaskCreateTemplate, TaskDetailTemplate, TaskEditTemplate, TaskListTemplate, TaskRow,
+    TimelineEntry,
   },
 };
 use crate::{
   model::{
     ArtifactFilter, ArtifactPatch, IterationFilter, NewArtifact, NewTask, TaskFilter, TaskPatch,
+    event::EventKind,
     iteration::Status as IterationStatus,
     link::{Link, RelationshipType},
     note::AuthorType,
@@ -321,25 +323,65 @@ pub async fn task_detail(State(state): State<ServerState>, Path(id_str): Path<St
     })
     .collect();
 
-  let display_notes: Vec<DisplayNote> = task
-    .notes
-    .iter()
-    .map(|note| {
-      let author = match note.author_type {
-        AuthorType::Agent => note.author.clone(),
-        AuthorType::Human => note.author.clone(),
-      };
-      let avatar_url = gravatar_url(note.author_email.as_deref());
-      DisplayNote {
+  let mut timeline: Vec<(chrono::DateTime<chrono::Utc>, TimelineEntry)> = Vec::new();
+
+  for note in &task.notes {
+    let author = note.author.clone();
+    let avatar_url = gravatar_url(note.author_email.as_deref());
+    timeline.push((
+      note.created_at,
+      TimelineEntry::Note(DisplayNote {
         author,
         avatar_url,
         body_html: render_markdown(&note.body),
         created_at: note.created_at.format("%Y-%m-%d %H:%M UTC").to_string(),
         id_short: note.id.short(),
         is_agent: matches!(note.author_type, AuthorType::Agent),
+      }),
+    ));
+  }
+
+  for event in &task.events {
+    let author = event.author.clone();
+    let avatar_url = gravatar_url(event.author_email.as_deref());
+    let description = match &event.kind {
+      EventKind::PhaseChange {
+        from,
+        to,
+      } => {
+        let f = from.map_or("none".to_string(), |v| v.to_string());
+        let t = to.map_or("none".to_string(), |v| v.to_string());
+        format!("phase changed from {f} to {t}")
       }
-    })
-    .collect();
+      EventKind::PriorityChange {
+        from,
+        to,
+      } => {
+        let f = from.map_or("none".to_string(), |v| format!("P{v}"));
+        let t = to.map_or("none".to_string(), |v| format!("P{v}"));
+        format!("priority changed from {f} to {t}")
+      }
+      EventKind::StatusChange {
+        from,
+        to,
+      } => {
+        format!("status changed from {from} to {to}")
+      }
+    };
+    timeline.push((
+      event.created_at,
+      TimelineEntry::Event(DisplayEvent {
+        author,
+        avatar_url,
+        created_at: event.created_at.format("%Y-%m-%d %H:%M UTC").to_string(),
+        description,
+        is_agent: matches!(event.author_type, AuthorType::Agent),
+      }),
+    ));
+  }
+
+  timeline.sort_by_key(|(ts, _)| *ts);
+  let timeline: Vec<TimelineEntry> = timeline.into_iter().map(|(_, entry)| entry).collect();
 
   TaskDetailTemplate {
     task,
@@ -347,7 +389,7 @@ pub async fn task_detail(State(state): State<ServerState>, Path(id_str): Path<St
     is_blocked,
     description_html,
     display_links,
-    display_notes,
+    timeline,
   }
   .into_response()
 }

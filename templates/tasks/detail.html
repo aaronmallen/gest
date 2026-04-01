@@ -147,23 +147,42 @@
   </div>
 </div>
 
-<div class="section-heading" style="margin-top: 24px;">Notes</div>
+<div class="section-heading" style="margin-top: 24px;">Activity</div>
 
-{% for note in display_notes.iter() %}
-<div class="note-card">
-  <div class="note-header">
-    <img class="note-avatar" src="{{ note.avatar_url }}" alt="{{ note.author }}">
-    <div class="note-meta">
-      <span class="c-silver bold">{{ note.author }}</span>
-      {% if note.is_agent %}<span class="note-agent-badge">agent</span>{% endif %}
-      <span class="c-dim">&middot; {{ note.created_at }}</span>
+{% for entry in timeline.iter() %}
+  {% match entry %}
+    {% when TimelineEntry::Event with (event) %}
+    <div class="note-card event-card">
+      <div class="note-header">
+        <img class="note-avatar" src="{{ event.avatar_url }}" alt="{{ event.author }}">
+        <div class="note-meta">
+          <span class="c-dim">{{ event.description }}</span>
+        </div>
+      </div>
+      <div class="note-header" style="padding-top: 0;">
+        <div class="note-meta" style="margin-left: 44px;">
+          <span class="c-pewter">{{ event.author }}</span>
+          {% if event.is_agent %}<span class="note-agent-badge">agent</span>{% endif %}
+          <span class="c-dim">&middot; {{ event.created_at }}</span>
+        </div>
+      </div>
     </div>
-    <span class="c-dim" style="margin-left: auto;">{{ note.id_short }}</span>
-  </div>
-  <div class="note-body md-content">
-    {{ note.body_html|safe }}
-  </div>
-</div>
+    {% when TimelineEntry::Note with (note) %}
+    <div class="note-card">
+      <div class="note-header">
+        <img class="note-avatar" src="{{ note.avatar_url }}" alt="{{ note.author }}">
+        <div class="note-meta">
+          <span class="c-silver bold">{{ note.author }}</span>
+          {% if note.is_agent %}<span class="note-agent-badge">agent</span>{% endif %}
+          <span class="c-dim">&middot; {{ note.created_at }}</span>
+        </div>
+        <span class="c-dim" style="margin-left: auto;">{{ note.id_short }}</span>
+      </div>
+      <div class="note-body md-content">
+        {{ note.body_html|safe }}
+      </div>
+    </div>
+  {% endmatch %}
 {% endfor %}
 
 <div class="note-card">

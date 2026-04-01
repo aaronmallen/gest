@@ -101,6 +101,15 @@ impl IntoResponse for DashboardTemplate {
 
 // ── Display helpers ───────────────────────────────────────────────────────────
 
+/// Pre-rendered event for display in the task detail template.
+pub struct DisplayEvent {
+  pub author: String,
+  pub avatar_url: String,
+  pub created_at: String,
+  pub description: String,
+  pub is_agent: bool,
+}
+
 pub struct DisplayLink {
   pub display_text: String,
   pub href: Option<String>,
@@ -214,9 +223,9 @@ pub struct TaskDetailTemplate {
   pub blocking: ResolvedBlocking,
   pub description_html: String,
   pub display_links: Vec<DisplayLink>,
-  pub display_notes: Vec<DisplayNote>,
   pub is_blocked: bool,
   pub task: Task,
+  pub timeline: Vec<TimelineEntry>,
 }
 
 impl IntoResponse for TaskDetailTemplate {
@@ -264,6 +273,12 @@ pub struct TaskRow {
   pub blocking: ResolvedBlocking,
   pub is_blocked: bool,
   pub task: Task,
+}
+
+/// A timeline entry merging events and notes, sorted by time.
+pub enum TimelineEntry {
+  Event(DisplayEvent),
+  Note(DisplayNote),
 }
 
 // ── Render helper ─────────────────────────────────────────────────────────────

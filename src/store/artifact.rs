@@ -4,7 +4,7 @@ use chrono::Utc;
 
 use super::{
   Error,
-  fs::{ensure_dirs, move_entity_file, resolve_id},
+  fs::{ensure_dirs, move_entity_file, next_id, resolve_id},
   helpers::{load_entities_from_dirs, read_entity_file},
 };
 use crate::{
@@ -37,7 +37,7 @@ pub fn create_artifact(config: &Settings, new: NewArtifact) -> super::Result<Art
     archived_at: None,
     body: new.body,
     created_at: now,
-    id: Id::new(),
+    id: next_id(config)?,
     kind: new.kind,
     metadata: new.metadata,
     tags: new.tags,

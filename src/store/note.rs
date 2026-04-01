@@ -15,7 +15,7 @@ pub fn add_note(config: &Settings, task_id: &Id, new: NewNote) -> super::Result<
     author_type: new.author_type,
     body: new.body,
     created_at: now,
-    id: Id::new(),
+    id: super::fs::next_id(config)?,
     updated_at: now,
   };
   task.notes.push(note.clone());

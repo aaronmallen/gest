@@ -3,7 +3,7 @@ use std::{collections::HashSet, fs};
 use chrono::Utc;
 
 use super::{
-  fs::{ensure_dirs, move_entity_file, resolve_id},
+  fs::{ensure_dirs, move_entity_file, next_id, resolve_id},
   helpers::{load_entities_from_dirs, read_entity_file},
 };
 use crate::{
@@ -49,7 +49,7 @@ pub fn create_iteration(config: &Settings, new: NewIteration) -> super::Result<I
     created_at: now,
     description: new.description,
     events: Vec::new(),
-    id: Id::new(),
+    id: next_id(config)?,
     links: new.links,
     metadata: new.metadata,
     phase_count: Some(0),

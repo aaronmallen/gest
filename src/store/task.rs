@@ -3,7 +3,7 @@ use std::{collections::HashMap, fs, path::Path};
 use chrono::Utc;
 
 use super::{
-  fs::{ensure_dirs, move_entity_file, resolve_id},
+  fs::{ensure_dirs, move_entity_file, next_id, resolve_id},
   helpers::{load_entities_from_dirs, read_entity_file},
 };
 use crate::{
@@ -32,7 +32,7 @@ pub fn create_task(config: &Settings, new: NewTask) -> super::Result<Task> {
     created_at: now,
     description: new.description,
     events: Vec::new(),
-    id: Id::new(),
+    id: next_id(config)?,
     links: new.links,
     metadata: new.metadata,
     notes: Vec::new(),

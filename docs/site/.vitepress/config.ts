@@ -54,6 +54,10 @@ export default defineConfig({
         text: 'FAQ',
         link: '/faq',
       },
+      {
+        text: 'Changelog',
+        link: '/changelog',
+      },
     ],
 
     search: {

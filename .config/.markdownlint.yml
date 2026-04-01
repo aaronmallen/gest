@@ -4,5 +4,8 @@ line-length:
   strict: true
   tables: false
 no-duplicate-heading: false
+no-inline-html:
+  allowed_elements:
+    - span
 single-title:
   front_matter_title: ""

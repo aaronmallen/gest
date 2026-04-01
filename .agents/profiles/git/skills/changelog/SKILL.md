@@ -92,8 +92,30 @@ Added, Changed, Deprecated, Removed, Fixed, Security.
 Ensure all `[#N]` issue references have corresponding reference-style links at the bottom of the file. Reference links
 are numerically sorted. The `[Unreleased]` comparison link should compare the latest tag to `main`.
 
-### 6. Present for Review
+### 6. Update Docs Site Changelog
 
-Show the user the updated Unreleased section and ask for approval before writing the file.
+Read `docs/site/changelog.md`. This is a human-centric changelog that lives on the VitePress docs site. It uses a
+different format from `CHANGELOG.md`:
+
+- **Version heading:** `## vX.Y.Z` followed by `<span style="opacity: 0.5">YYYY-MM-DD</span>` on the next line
+- **Thematic sub-headings** within each version (e.g. "Task Notes", "Web UI", "Performance") — not KACL categories
+  (Added/Changed/Fixed)
+- **Narrative paragraphs** per theme explaining what changed and why it matters from the user's perspective, followed by
+  bullet specifics where needed
+- **Inline issue links** (e.g. `[#42](https://github.com/aaronmallen/gest/issues/42)`) — not reference-style
+- **Breaking changes** called out clearly within their thematic group
+- **No `[Unreleased]` section** — only published versions appear
+
+Transform the KACL entries you wrote in step 5 into this narrative format. Group related changes thematically rather
+than by category. Write in a conversational yet technical tone — explain the "why" and user impact, not implementation
+details.
+
+Insert the new version section **after** the introductory text and **before** the first existing `## vX.Y.Z` heading.
+Do not rewrite existing version sections.
+
+### 7. Present for Review
+
+Show the user both the updated `CHANGELOG.md` Unreleased section and the new `docs/site/changelog.md` version section.
+Ask for approval before writing either file.
 
 [Keep a Changelog]: https://keepachangelog.com/en/1.1.0/

@@ -78,6 +78,16 @@ impl IntoResponse for TaskListTemplate {
   }
 }
 
+/// Pre-rendered note for display in the task detail template.
+pub struct DisplayNote {
+  pub author: String,
+  pub avatar_url: String,
+  pub body_html: String,
+  pub created_at: String,
+  pub id_short: String,
+  pub is_agent: bool,
+}
+
 #[derive(Template)]
 #[template(path = "tasks/detail.html")]
 pub struct TaskDetailTemplate {
@@ -86,6 +96,7 @@ pub struct TaskDetailTemplate {
   pub is_blocked: bool,
   pub description_html: String,
   pub display_links: Vec<DisplayLink>,
+  pub display_notes: Vec<DisplayNote>,
 }
 
 impl IntoResponse for TaskDetailTemplate {

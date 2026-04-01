@@ -1,11 +1,17 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::ui::{
-  composites::{
-    grouped_list::GroupedList, status_badge::StatusBadge, success_message::SuccessMessage, task_detail::TaskDetail,
-    task_list_row::TaskListRow,
+use crate::{
+  model::Note,
+  ui::{
+    atoms::{id::Id, label::Label, separator::Separator, value::Value},
+    composites::{
+      grouped_list::GroupedList, status_badge::StatusBadge, success_message::SuccessMessage, task_detail::TaskDetail,
+      task_list_row::TaskListRow,
+    },
+    markdown,
+    theme::Theme,
+    utils,
   },
-  theme::Theme,
 };
 
 /// Renders a success message after creating a task.
@@ -37,6 +43,8 @@ pub struct TaskDetailView<'a> {
   pub id: &'a str,
   /// Relation-target pairs (e.g., `("blocked-by", "<id>")`).
   pub links: Vec<(&'a str, &'a str)>,
+  /// Notes attached to this task.
+  pub notes: &'a [Note],
   /// Phase number and optional phase name.
   pub phase: Option<(u32, Option<&'a str>)>,
   pub priority: Option<u8>,
@@ -56,7 +64,59 @@ impl Display for TaskDetailView<'_> {
       .links(self.links.clone())
       .body(self.body);
 
-    write!(f, "{detail}")
+    write!(f, "{detail}")?;
+
+    if !self.notes.is_empty() {
+      writeln!(f)?;
+      writeln!(f)?;
+      let sep = Separator::labeled("notes", self.theme.task_detail_separator);
+      writeln!(f, "  {sep}")?;
+
+      let max_label = 7;
+      let width = utils::terminal_width() as usize;
+      for (i, note) in self.notes.iter().enumerate() {
+        writeln!(f)?;
+        let short_id = note.id.short();
+        let id_atom = Id::new(&short_id, self.theme);
+        writeln!(f, "  {id_atom}")?;
+
+        let author_display = format_note_author(note);
+        let label = Label::new("author", self.theme.task_detail_label).pad_to(max_label);
+        let val = Value::new(&author_display, self.theme.task_detail_value);
+        writeln!(f, "    {label}  {val}")?;
+
+        let created = note.created_at.format("%Y-%m-%d %H:%M").to_string();
+        let label = Label::new("created", self.theme.task_detail_label).pad_to(max_label);
+        let val = Value::new(&created, self.theme.task_detail_value);
+        writeln!(f, "    {label}  {val}")?;
+
+        let rendered = markdown::render(&note.body, self.theme, width.saturating_sub(6));
+        for line in rendered.lines() {
+          writeln!(f, "    {line}")?;
+        }
+
+        if i < self.notes.len() - 1 {
+          writeln!(f)?;
+        }
+      }
+
+      writeln!(f)?;
+      let rule = Separator::rule(self.theme.task_detail_separator);
+      write!(f, "  {rule}")?;
+    }
+
+    Ok(())
+  }
+}
+
+fn format_note_author(note: &Note) -> String {
+  use crate::model::note::AuthorType;
+  match note.author_type {
+    AuthorType::Agent => format!("{} (agent)", note.author),
+    AuthorType::Human => match &note.author_email {
+      Some(email) => format!("{} <{}>", note.author, email),
+      None => note.author.clone(),
+    },
   }
 }
 
@@ -238,6 +298,7 @@ mod tests {
           assigned: Some("claude-code"),
           tags: &tags,
           links: vec![("blocked-by", "hpvrlbme")],
+          notes: &[],
           body: Some("## heading\n\nBody text."),
           theme: &t,
         };
@@ -267,6 +328,7 @@ mod tests {
           assigned: None,
           tags: &[],
           links: vec![],
+          notes: &[],
           body: None,
           theme: &t,
         };

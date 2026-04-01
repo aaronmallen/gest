@@ -146,4 +146,44 @@
     {% endif %}
   </div>
 </div>
+
+<div class="section-heading" style="margin-top: 24px;">Notes</div>
+
+{% for note in display_notes.iter() %}
+<div class="note-card">
+  <div class="note-header">
+    <img class="note-avatar" src="{{ note.avatar_url }}" alt="{{ note.author }}">
+    <div class="note-meta">
+      <span class="c-silver bold">{{ note.author }}</span>
+      {% if note.is_agent %}<span class="note-agent-badge">agent</span>{% endif %}
+      <span class="c-dim">&middot; {{ note.created_at }}</span>
+    </div>
+    <span class="c-dim" style="margin-left: auto;">{{ note.id_short }}</span>
+  </div>
+  <div class="note-body md-content">
+    {{ note.body_html|safe }}
+  </div>
+</div>
+{% endfor %}
+
+<div class="note-card">
+  <form method="post" action="/tasks/{{ task.id }}/notes">
+    <div class="form-group md-preview-container">
+      <label for="note-body">Add a note</label>
+      <button type="button" class="btn md-preview-btn md-preview-toggle" data-target="note-body">Preview</button>
+      <textarea
+        id="note-body"
+        name="body"
+        class="form-textarea"
+        placeholder="Write a note… (Markdown supported)"
+        rows="3"
+        style="min-height: 80px;"
+      ></textarea>
+      <div id="note-body-preview" class="md-preview md-content"></div>
+    </div>
+    <div class="form-actions" style="margin-top: 12px;">
+      <button type="submit" class="btn btn-primary">Add Note</button>
+    </div>
+  </form>
+</div>
 {% endblock %}

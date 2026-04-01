@@ -15,6 +15,7 @@ pub fn router(state: ServerState) -> Router {
     .route("/tasks/new", get(handlers::task_create_form))
     .route("/tasks/{id}/edit", get(handlers::task_edit_form))
     .route("/tasks/{id}", get(handlers::task_detail).post(handlers::task_update))
+    .route("/tasks/{id}/notes", post(handlers::note_add))
     .route(
       "/artifacts",
       get(handlers::artifact_list).post(handlers::artifact_create),

@@ -580,6 +580,50 @@
     }
 
     .md-preview.active { display: block; }
+
+    /* ── note cards ──────────────────────────────────────────────────── */
+    .note-card {
+      background: var(--obsidian);
+      border: 1px solid #1C1E26;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 12px;
+    }
+
+    .note-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .note-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .note-meta {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 12px;
+    }
+
+    .note-agent-badge {
+      font-size: 10px;
+      color: var(--amber);
+      border: 1px solid var(--amber);
+      border-radius: 4px;
+      padding: 1px 6px;
+      letter-spacing: .04em;
+    }
+
+    .note-body {
+      padding-left: 42px;
+    }
   </style>
   {% block head %}{% endblock %}
 </head>

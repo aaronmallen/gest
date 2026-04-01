@@ -92,6 +92,7 @@ fn print_task_detail(task: &Task, theme: &crate::ui::theme::Theme) {
     assigned: task.assigned_to.as_deref(),
     tags: &task.tags,
     links,
+    notes: &task.notes,
     body,
     theme,
   };

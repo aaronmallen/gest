@@ -65,6 +65,7 @@ impl Command {
       assigned: task.assigned_to.as_deref(),
       tags: &task.tags,
       links,
+      notes: &task.notes,
       body,
       theme,
     };

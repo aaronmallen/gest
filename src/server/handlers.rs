@@ -13,8 +13,8 @@ use super::{
   state::ServerState,
   templates::{
     ArtifactCreateTemplate, ArtifactDetailTemplate, ArtifactEditTemplate, ArtifactListTemplate, DashboardTemplate,
-    DisplayLink, IterationBoardTemplate, IterationDetailTemplate, IterationListTemplate, PhaseGroup, SearchTemplate,
-    TaskCreateTemplate, TaskDetailTemplate, TaskEditTemplate, TaskListTemplate, TaskRow,
+    DisplayLink, DisplayNote, IterationBoardTemplate, IterationDetailTemplate, IterationListTemplate, PhaseGroup,
+    SearchTemplate, TaskCreateTemplate, TaskDetailTemplate, TaskEditTemplate, TaskListTemplate, TaskRow,
   },
 };
 use crate::{
@@ -203,12 +203,34 @@ pub async fn task_detail(State(state): State<ServerState>, Path(id_str): Path<St
     })
     .collect();
 
+  let display_notes: Vec<DisplayNote> = task
+    .notes
+    .iter()
+    .map(|note| {
+      use crate::model::note::AuthorType;
+      let author = match note.author_type {
+        AuthorType::Agent => note.author.clone(),
+        AuthorType::Human => note.author.clone(),
+      };
+      let avatar_url = gravatar_url(note.author_email.as_deref());
+      DisplayNote {
+        author,
+        avatar_url,
+        body_html: render_markdown(&note.body),
+        created_at: note.created_at.format("%Y-%m-%d %H:%M UTC").to_string(),
+        id_short: note.id.short(),
+        is_agent: matches!(note.author_type, AuthorType::Agent),
+      }
+    })
+    .collect();
+
   TaskDetailTemplate {
     task,
     blocking,
     is_blocked,
     description_html,
     display_links,
+    display_notes,
   }
   .into_response()
 }
@@ -905,6 +927,63 @@ pub async fn api_render_markdown(Json(payload): Json<RenderMarkdownBody>) -> Res
     html_output,
   )
     .into_response()
+}
+
+/// Form data for adding a note to a task.
+#[derive(serde::Deserialize)]
+pub struct NoteFormData {
+  #[serde(default)]
+  pub body: String,
+}
+
+/// POST /tasks/:id/notes — add a note to a task.
+pub async fn note_add(
+  State(state): State<ServerState>,
+  Path(id_str): Path<String>,
+  Form(form): Form<NoteFormData>,
+) -> Response {
+  let id = match store::resolve_task_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response(),
+  };
+
+  let body = form.body.trim().to_string();
+  if body.is_empty() {
+    return Redirect::to(&format!("/tasks/{id}")).into_response();
+  }
+
+  let (author, author_email, author_type) = {
+    use crate::model::note::AuthorType;
+    match crate::cli::git::resolve_author() {
+      Some(git_author) => (git_author.name, git_author.email, AuthorType::Human),
+      None => ("web".to_string(), None, AuthorType::Human),
+    }
+  };
+
+  let new = crate::model::NewNote {
+    author,
+    author_email,
+    author_type,
+    body,
+  };
+
+  match store::note::add_note(&state.settings, &id, new) {
+    Ok(_) => Redirect::to(&format!("/tasks/{id}")).into_response(),
+    Err(e) => {
+      log::error!("failed to add note: {e}");
+      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
+    }
+  }
+}
+
+/// Generate a Gravatar URL from an email address using SHA-256.
+fn gravatar_url(email: Option<&str>) -> String {
+  use sha2::{Digest, Sha256};
+  let email = email.unwrap_or("");
+  let trimmed = email.trim().to_lowercase();
+  let digest = Sha256::digest(trimmed.as_bytes());
+  let hash: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+  format!("https://gravatar.com/avatar/{hash}?s=32&d=identicon")
 }
 
 /// Fallback handler for unmatched routes.

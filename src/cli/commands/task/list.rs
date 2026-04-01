@@ -26,6 +26,9 @@ pub struct Command {
   /// Filter by tag.
   #[arg(long)]
   pub tag: Option<String>,
+  /// Filter by assigned-to name.
+  #[arg(long)]
+  pub assigned_to: Option<String>,
 }
 
 impl Command {
@@ -37,7 +40,7 @@ impl Command {
 
     let filter = TaskFilter {
       all: self.show_all,
-      assigned_to: None,
+      assigned_to: self.assigned_to.clone(),
       status,
       tag: self.tag.clone(),
     };
@@ -112,6 +115,7 @@ mod tests {
         json: false,
         status: Some("in-progress".to_string()),
         tag: None,
+        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();
@@ -127,6 +131,7 @@ mod tests {
         json: false,
         status: None,
         tag: None,
+        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();
@@ -144,6 +149,7 @@ mod tests {
         json: false,
         status: None,
         tag: None,
+        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();
@@ -161,6 +167,7 @@ mod tests {
         json: true,
         status: None,
         tag: None,
+        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();
@@ -183,6 +190,7 @@ mod tests {
         json: false,
         status: None,
         tag: None,
+        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();
@@ -205,6 +213,7 @@ mod tests {
         json: false,
         status: None,
         tag: None,
+        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();

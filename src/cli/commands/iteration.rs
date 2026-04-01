@@ -1,4 +1,5 @@
 mod add;
+mod advance;
 mod create;
 mod graph;
 mod link;
@@ -25,6 +26,7 @@ pub struct Command {
 
 #[derive(Debug, Subcommand)]
 enum IterationCommand {
+  Advance(advance::Command),
   Add(add::Command),
   Create(create::Command),
   Graph(graph::Command),
@@ -44,6 +46,7 @@ impl Command {
   /// Dispatch to the appropriate iteration subcommand.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
     match &self.command {
+      IterationCommand::Advance(cmd) => cmd.call(ctx),
       IterationCommand::Add(cmd) => cmd.call(ctx),
       IterationCommand::Create(cmd) => cmd.call(ctx),
       IterationCommand::Graph(cmd) => cmd.call(ctx),

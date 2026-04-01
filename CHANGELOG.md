@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [v0.3.5] - 2026-03-31
+
+### Added
+
+- Task notes with author attribution (human via git config, agent via `--agent` flag), timestamps, and rendered markdown
+  body — managed via `gest task note add|list|show|update|delete` subcommands
+- Notes appear in `task show` output and the web UI task detail page with Gravatar avatars and agent badges
+- Iteration orchestration commands: `iteration status` for progress tracking, `iteration next` for peeking at or
+  claiming the next available task, and `iteration advance` for signaling phase completion
+- `--assigned-to` filter on `task list` for narrowing tasks by assignee
+- `--has-available` filter on `iteration list` for finding iterations with claimable work
+- `gest search` now includes iterations in search results
+
 ## [v0.3.4] - 2026-03-31
 
 ### Fixed
@@ -154,7 +167,7 @@ Initial release
 [#23]: https://github.com/aaronmallen/gest/issues/23
 [#24]: https://github.com/aaronmallen/gest/issues/24
 
-[Unreleased]: https://github.com/aaronmallen/gest/compare/0.3.4...main
+[Unreleased]: https://github.com/aaronmallen/gest/compare/0.3.5...main
 [v0.2.0]: https://github.com/aaronmallen/gest/compare/0.1.0...0.2.0
 [v0.2.1]: https://github.com/aaronmallen/gest/compare/0.2.0...0.2.1
 [v0.2.2]: https://github.com/aaronmallen/gest/compare/0.2.1...0.2.2
@@ -164,3 +177,4 @@ Initial release
 [v0.3.2]: https://github.com/aaronmallen/gest/compare/0.3.1...0.3.2
 [v0.3.3]: https://github.com/aaronmallen/gest/compare/0.3.2...0.3.3
 [v0.3.4]: https://github.com/aaronmallen/gest/compare/0.3.3...0.3.4
+[v0.3.5]: https://github.com/aaronmallen/gest/compare/0.3.4...0.3.5

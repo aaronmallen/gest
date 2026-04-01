@@ -7,7 +7,7 @@ keywords = ["cli", "agent", "artifact", "task"]
 license = "MIT"
 name = "gest"
 repository = "https://github.com/aaronmallen/gest"
-version = "0.3.4"
+version = "0.3.5"
 
 [package.metadata.binstall]
 bin-dir = "{bin}{binary-ext}"

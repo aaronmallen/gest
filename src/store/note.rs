@@ -24,6 +24,21 @@ pub fn add_note(config: &Settings, task_id: &Id, new: NewNote) -> super::Result<
   Ok(note)
 }
 
+/// Delete a note from a task.
+pub fn delete_note(config: &Settings, task_id: &Id, note_id: &Id) -> super::Result<()> {
+  let mut task = super::read_task(config, task_id)?;
+  let len_before = task.notes.len();
+  task.notes.retain(|n| n.id != *note_id);
+  if task.notes.len() == len_before {
+    return Err(super::Error::generic(format!(
+      "Note {note_id} not found on task {task_id}"
+    )));
+  }
+  task.updated_at = Utc::now();
+  super::write_task(config, &task)?;
+  Ok(())
+}
+
 /// List all notes for a task, ordered by creation time (oldest first).
 pub fn list_notes(config: &Settings, task_id: &Id) -> super::Result<Vec<Note>> {
   let task = super::read_task(config, task_id)?;
@@ -61,19 +76,4 @@ pub fn update_note(config: &Settings, task_id: &Id, note_id: &Id, patch: NotePat
   let updated = note.clone();
   super::write_task(config, &task)?;
   Ok(updated)
-}
-
-/// Delete a note from a task.
-pub fn delete_note(config: &Settings, task_id: &Id, note_id: &Id) -> super::Result<()> {
-  let mut task = super::read_task(config, task_id)?;
-  let len_before = task.notes.len();
-  task.notes.retain(|n| n.id != *note_id);
-  if task.notes.len() == len_before {
-    return Err(super::Error::generic(format!(
-      "Note {note_id} not found on task {task_id}"
-    )));
-  }
-  task.updated_at = Utc::now();
-  super::write_task(config, &task)?;
-  Ok(())
 }

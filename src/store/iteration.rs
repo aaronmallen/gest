@@ -15,20 +15,6 @@ use crate::{
   },
 };
 
-/// Compute how many distinct phases the iteration's tasks span by reading each task file.
-fn compute_phase_count(config: &Settings, tasks: &[String]) -> usize {
-  let mut phases = HashSet::new();
-  for task_ref in tasks {
-    let task_id_str = task_ref.strip_prefix("tasks/").unwrap_or(task_ref);
-    if let Ok(id) = task_id_str.parse()
-      && let Ok(task) = super::read_task(config, &id)
-    {
-      phases.insert(task.phase.unwrap_or(0));
-    }
-  }
-  phases.len()
-}
-
 /// Append a task reference to an iteration (idempotent).
 pub fn add_task(config: &Settings, iteration_id: &Id, task_id: &str) -> super::Result<Iteration> {
   let mut iteration = read_iteration(config, iteration_id)?;
@@ -265,6 +251,20 @@ pub fn write_iteration(config: &Settings, iteration: &Iteration) -> super::Resul
   log::trace!("writing iteration {} to {}", iteration.id, path.display());
   fs::write(path, content)?;
   Ok(())
+}
+
+/// Compute how many distinct phases the iteration's tasks span by reading each task file.
+fn compute_phase_count(config: &Settings, tasks: &[String]) -> usize {
+  let mut phases = HashSet::new();
+  for task_ref in tasks {
+    let task_id_str = task_ref.strip_prefix("tasks/").unwrap_or(task_ref);
+    if let Ok(id) = task_id_str.parse()
+      && let Ok(task) = super::read_task(config, &id)
+    {
+      phases.insert(task.phase.unwrap_or(0));
+    }
+  }
+  phases.len()
 }
 
 #[cfg(test)]
@@ -550,70 +550,6 @@ mod tests {
     }
   }
 
-  mod update_resolved_iteration {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-    use crate::model::IterationPatch;
-
-    #[test]
-    fn it_writes_to_resolved_not_active() {
-      let dir = tempfile::tempdir().unwrap();
-      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Original");
-      crate::store::write_iteration(&make_config(dir.path()), &iteration).unwrap();
-      crate::store::resolve_iteration(&make_config(dir.path()), &iteration.id).unwrap();
-
-      let patch = IterationPatch {
-        title: Some("Updated".to_string()),
-        ..Default::default()
-      };
-      crate::store::update_iteration(&make_config(dir.path()), &iteration.id, patch, None).unwrap();
-
-      // File should only exist in resolved, not active
-      assert!(
-        !dir
-          .path()
-          .join("iterations/zyxwvutsrqponmlkzyxwvutsrqponmlk.toml")
-          .exists()
-      );
-      assert!(
-        dir
-          .path()
-          .join("iterations/resolved/zyxwvutsrqponmlkzyxwvutsrqponmlk.toml")
-          .exists()
-      );
-
-      let loaded = crate::store::read_iteration(&make_config(dir.path()), &iteration.id).unwrap();
-      assert_eq!(loaded.title, "Updated");
-    }
-
-    #[test]
-    fn it_keeps_active_iteration_in_active_dir() {
-      let dir = tempfile::tempdir().unwrap();
-      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Original");
-      crate::store::write_iteration(&make_config(dir.path()), &iteration).unwrap();
-
-      let patch = IterationPatch {
-        title: Some("Updated".to_string()),
-        ..Default::default()
-      };
-      crate::store::update_iteration(&make_config(dir.path()), &iteration.id, patch, None).unwrap();
-
-      assert!(
-        dir
-          .path()
-          .join("iterations/zyxwvutsrqponmlkzyxwvutsrqponmlk.toml")
-          .exists()
-      );
-      assert!(
-        !dir
-          .path()
-          .join("iterations/resolved/zyxwvutsrqponmlkzyxwvutsrqponmlk.toml")
-          .exists()
-      );
-    }
-  }
-
   mod update_iteration_events {
     use super::*;
     use crate::model::{
@@ -681,6 +617,70 @@ mod tests {
       let updated = crate::store::update_iteration(&make_config(dir.path()), &iteration.id, patch, None).unwrap();
 
       assert!(updated.events.is_empty());
+    }
+  }
+
+  mod update_resolved_iteration {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::model::IterationPatch;
+
+    #[test]
+    fn it_writes_to_resolved_not_active() {
+      let dir = tempfile::tempdir().unwrap();
+      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Original");
+      crate::store::write_iteration(&make_config(dir.path()), &iteration).unwrap();
+      crate::store::resolve_iteration(&make_config(dir.path()), &iteration.id).unwrap();
+
+      let patch = IterationPatch {
+        title: Some("Updated".to_string()),
+        ..Default::default()
+      };
+      crate::store::update_iteration(&make_config(dir.path()), &iteration.id, patch, None).unwrap();
+
+      // File should only exist in resolved, not active
+      assert!(
+        !dir
+          .path()
+          .join("iterations/zyxwvutsrqponmlkzyxwvutsrqponmlk.toml")
+          .exists()
+      );
+      assert!(
+        dir
+          .path()
+          .join("iterations/resolved/zyxwvutsrqponmlkzyxwvutsrqponmlk.toml")
+          .exists()
+      );
+
+      let loaded = crate::store::read_iteration(&make_config(dir.path()), &iteration.id).unwrap();
+      assert_eq!(loaded.title, "Updated");
+    }
+
+    #[test]
+    fn it_keeps_active_iteration_in_active_dir() {
+      let dir = tempfile::tempdir().unwrap();
+      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Original");
+      crate::store::write_iteration(&make_config(dir.path()), &iteration).unwrap();
+
+      let patch = IterationPatch {
+        title: Some("Updated".to_string()),
+        ..Default::default()
+      };
+      crate::store::update_iteration(&make_config(dir.path()), &iteration.id, patch, None).unwrap();
+
+      assert!(
+        dir
+          .path()
+          .join("iterations/zyxwvutsrqponmlkzyxwvutsrqponmlk.toml")
+          .exists()
+      );
+      assert!(
+        !dir
+          .path()
+          .join("iterations/resolved/zyxwvutsrqponmlkzyxwvutsrqponmlk.toml")
+          .exists()
+      );
     }
   }
 }

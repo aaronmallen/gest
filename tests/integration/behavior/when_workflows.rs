@@ -20,6 +20,31 @@ fn extract_short_id(output: &str) -> Option<String> {
 }
 
 #[test]
+fn it_creates_artifact_then_lists() {
+  let env = GestCmd::new();
+
+  env
+    .cmd()
+    .args([
+      "artifact",
+      "create",
+      "--title",
+      "My Design Spec",
+      "--body",
+      "# My Design Spec\n\nSpec content here.",
+    ])
+    .assert()
+    .success();
+
+  env
+    .cmd()
+    .args(["artifact", "list"])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("My Design Spec"));
+}
+
+#[test]
 fn it_creates_then_lists_tasks() {
   let env = GestCmd::new();
 
@@ -59,29 +84,4 @@ fn it_creates_then_shows_task() {
     .assert()
     .success()
     .stdout(predicate::str::contains("Showable Task"));
-}
-
-#[test]
-fn it_creates_artifact_then_lists() {
-  let env = GestCmd::new();
-
-  env
-    .cmd()
-    .args([
-      "artifact",
-      "create",
-      "--title",
-      "My Design Spec",
-      "--body",
-      "# My Design Spec\n\nSpec content here.",
-    ])
-    .assert()
-    .success();
-
-  env
-    .cmd()
-    .args(["artifact", "list"])
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("My Design Spec"));
 }

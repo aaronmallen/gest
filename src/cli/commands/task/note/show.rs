@@ -3,6 +3,7 @@ use clap::Args;
 use crate::{
   cli::{self, AppContext},
   store,
+  ui::views::note::NoteDetailView,
 };
 
 /// Show a single note on a task.
@@ -41,7 +42,6 @@ impl Command {
       return Ok(());
     }
 
-    use crate::ui::views::note::NoteDetailView;
     let view = NoteDetailView {
       note,
       theme,
@@ -61,6 +61,21 @@ mod tests {
       model::{NewNote, note::AuthorType},
       test_helpers::{make_test_context, make_test_task},
     };
+
+    #[test]
+    fn it_errors_on_missing_note() {
+      let dir = tempfile::tempdir().unwrap();
+      let ctx = make_test_context(dir.path());
+      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      store::write_task(&ctx.settings, &task).unwrap();
+
+      let cmd = Command {
+        task_id: "zyxw".to_string(),
+        note_id: "nonexistent".to_string(),
+        json: false,
+      };
+      assert!(cmd.call(&ctx).is_err());
+    }
 
     #[test]
     fn it_shows_a_note() {
@@ -106,21 +121,6 @@ mod tests {
         json: true,
       };
       cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_errors_on_missing_note() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        task_id: "zyxw".to_string(),
-        note_id: "nonexistent".to_string(),
-        json: false,
-      };
-      assert!(cmd.call(&ctx).is_err());
     }
   }
 }

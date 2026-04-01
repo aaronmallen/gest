@@ -19,6 +19,17 @@ fn create_iteration(env: &GestCmd, title: &str) -> String {
 }
 
 #[test]
+fn it_errors_on_nonexistent() {
+  let env = GestCmd::new();
+
+  env
+    .cmd()
+    .args(["iteration", "show", "doesnotexist00000000000000000000"])
+    .assert()
+    .failure();
+}
+
+#[test]
 fn it_shows_an_iteration() {
   let env = GestCmd::new();
   let id = create_iteration(&env, "Sprint 1");
@@ -29,15 +40,4 @@ fn it_shows_an_iteration() {
     .assert()
     .success()
     .stdout(predicate::str::contains("Sprint 1"));
-}
-
-#[test]
-fn it_errors_on_nonexistent() {
-  let env = GestCmd::new();
-
-  env
-    .cmd()
-    .args(["iteration", "show", "doesnotexist00000000000000000000"])
-    .assert()
-    .failure();
 }

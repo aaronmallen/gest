@@ -3,6 +3,18 @@ use predicates::prelude::*;
 use crate::support::helpers::GestCmd;
 
 #[test]
+fn it_errors_on_unknown_key() {
+  let env = GestCmd::new();
+
+  env
+    .cmd()
+    .args(["config", "get", "nonexistent.key"])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("Unknown config key"));
+}
+
+#[test]
 fn it_gets_a_config_value() {
   let env = GestCmd::new();
 
@@ -19,16 +31,4 @@ fn it_gets_a_config_value() {
     .assert()
     .success()
     .stdout(predicate::str::contains("info"));
-}
-
-#[test]
-fn it_errors_on_unknown_key() {
-  let env = GestCmd::new();
-
-  env
-    .cmd()
-    .args(["config", "get", "nonexistent.key"])
-    .assert()
-    .failure()
-    .stderr(predicate::str::contains("Unknown config key"));
 }

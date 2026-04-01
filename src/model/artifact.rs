@@ -22,9 +22,9 @@ pub struct Artifact {
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct ArtifactFilter {
+  pub all: bool,
   pub kind: Option<String>,
   pub only_archived: bool,
-  pub all: bool,
   pub tag: Option<String>,
 }
 

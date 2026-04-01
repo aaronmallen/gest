@@ -1,6 +1,7 @@
 //! Embedded static assets served via rust-embed.
 
 use axum::{
+  extract::Path,
   http::{StatusCode, header},
   response::{IntoResponse, Response},
 };
@@ -13,7 +14,7 @@ use rust_embed::Embed;
 struct StaticAssets;
 
 /// Serve an embedded static asset by path.
-pub async fn serve(axum::extract::Path(path): axum::extract::Path<String>) -> Response {
+pub async fn serve(Path(path): Path<String>) -> Response {
   match StaticAssets::get(&path) {
     Some(file) => {
       let mime = mime_for(&path);

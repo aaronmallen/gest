@@ -6,6 +6,14 @@ fn gest() -> Command {
 }
 
 #[test]
+fn it_errors_on_unknown_shell() {
+  gest()
+    .args(["generate", "completions", "--shell", "notashell"])
+    .assert()
+    .failure();
+}
+
+#[test]
 fn it_generates_bash_completions() {
   gest()
     .args(["generate", "completions", "--shell", "bash"])
@@ -21,12 +29,4 @@ fn it_generates_zsh_completions() {
     .assert()
     .success()
     .stdout(predicate::str::is_empty().not());
-}
-
-#[test]
-fn it_errors_on_unknown_shell() {
-  gest()
-    .args(["generate", "completions", "--shell", "notashell"])
-    .assert()
-    .failure();
 }

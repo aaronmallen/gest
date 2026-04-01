@@ -21,6 +21,19 @@ fn create_task_id(env: &GestCmd) -> String {
 }
 
 #[test]
+fn it_lists_empty_when_no_notes() {
+  let env = GestCmd::new();
+  let task_id = create_task_id(&env);
+
+  env
+    .cmd()
+    .args(["task", "note", "list", &task_id])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("No notes on task"));
+}
+
+#[test]
 fn it_lists_notes() {
   let env = GestCmd::new();
   let task_id = create_task_id(&env);
@@ -46,17 +59,4 @@ fn it_lists_notes() {
     .assert()
     .success()
     .stdout(predicate::str::contains("First note"));
-}
-
-#[test]
-fn it_lists_empty_when_no_notes() {
-  let env = GestCmd::new();
-  let task_id = create_task_id(&env);
-
-  env
-    .cmd()
-    .args(["task", "note", "list", &task_id])
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("No notes on task"));
 }

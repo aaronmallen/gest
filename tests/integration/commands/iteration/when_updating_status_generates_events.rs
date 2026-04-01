@@ -41,6 +41,34 @@ fn read_iteration_toml(env: &GestCmd, short_id: &str) -> String {
 }
 
 #[test]
+fn it_generates_no_event_when_status_is_unchanged() {
+  let env = GestCmd::new();
+  let id = create_iteration_and_get_id(&env, "No-op iteration");
+
+  // Update to the same status the iteration already has — no event should be generated.
+  env.run(&["iteration", "update", &id, "--status", "active"]).success();
+
+  let content = read_iteration_toml(&env, &id);
+  assert!(
+    !content.contains("status-change"),
+    "expected no status-change event in the TOML file, got:\n{content}"
+  );
+}
+
+#[test]
+fn it_persists_the_event_so_iteration_show_json_includes_it() {
+  let env = GestCmd::new();
+  let id = create_iteration_and_get_id(&env, "JSON event iteration");
+
+  env.run(&["iteration", "update", &id, "--status", "failed"]).success();
+
+  env
+    .run(&["iteration", "show", &id, "--json"])
+    .success()
+    .stdout(predicate::str::contains("status-change"));
+}
+
+#[test]
 fn it_records_a_status_change_event_in_the_iteration_file() {
   let env = GestCmd::new();
   let id = create_iteration_and_get_id(&env, "Event iteration");
@@ -71,32 +99,4 @@ fn it_records_the_correct_from_and_to_statuses_in_the_event() {
     content.contains("failed"),
     "expected 'failed' as the to-status in the event, got:\n{content}"
   );
-}
-
-#[test]
-fn it_generates_no_event_when_status_is_unchanged() {
-  let env = GestCmd::new();
-  let id = create_iteration_and_get_id(&env, "No-op iteration");
-
-  // Update to the same status the iteration already has — no event should be generated.
-  env.run(&["iteration", "update", &id, "--status", "active"]).success();
-
-  let content = read_iteration_toml(&env, &id);
-  assert!(
-    !content.contains("status-change"),
-    "expected no status-change event in the TOML file, got:\n{content}"
-  );
-}
-
-#[test]
-fn it_persists_the_event_so_iteration_show_json_includes_it() {
-  let env = GestCmd::new();
-  let id = create_iteration_and_get_id(&env, "JSON event iteration");
-
-  env.run(&["iteration", "update", &id, "--status", "failed"]).success();
-
-  env
-    .run(&["iteration", "show", &id, "--json"])
-    .success()
-    .stdout(predicate::str::contains("status-change"));
 }

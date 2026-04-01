@@ -18,29 +18,6 @@ fn gest_local_init_cmd(temp_dir: &TempDir) -> Command {
 }
 
 #[test]
-fn it_initializes_a_new_project() {
-  let temp_dir = TempDir::new().expect("failed to create temp dir");
-
-  gest_local_init_cmd(&temp_dir)
-    .args(["init", "--local"])
-    .assert()
-    .success();
-
-  assert!(temp_dir.path().join(".gest").is_dir());
-}
-
-#[test]
-fn it_outputs_initialized_gest_on_success() {
-  let temp_dir = TempDir::new().expect("failed to create temp dir");
-
-  gest_local_init_cmd(&temp_dir)
-    .args(["init", "--local"])
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("initialized gest"));
-}
-
-#[test]
 fn it_creates_expected_directory_structure() {
   let temp_dir = TempDir::new().expect("failed to create temp dir");
 
@@ -68,6 +45,18 @@ fn it_creates_expected_directory_structure() {
 }
 
 #[test]
+fn it_initializes_a_new_project() {
+  let temp_dir = TempDir::new().expect("failed to create temp dir");
+
+  gest_local_init_cmd(&temp_dir)
+    .args(["init", "--local"])
+    .assert()
+    .success();
+
+  assert!(temp_dir.path().join(".gest").is_dir());
+}
+
+#[test]
 fn it_is_idempotent_when_already_initialized() {
   let temp_dir = TempDir::new().expect("failed to create temp dir");
 
@@ -84,4 +73,15 @@ fn it_is_idempotent_when_already_initialized() {
   assert!(base.join("tasks").is_dir());
   assert!(base.join("artifacts").is_dir());
   assert!(base.join("iterations").is_dir());
+}
+
+#[test]
+fn it_outputs_initialized_gest_on_success() {
+  let temp_dir = TempDir::new().expect("failed to create temp dir");
+
+  gest_local_init_cmd(&temp_dir)
+    .args(["init", "--local"])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("initialized gest"));
 }

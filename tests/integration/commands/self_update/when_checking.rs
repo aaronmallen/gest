@@ -16,14 +16,14 @@ fn gest_cmd(temp_dir: &TempDir) -> Command {
 }
 
 #[test]
-fn it_shows_help_without_error() {
+fn it_describes_the_target_flag_as_pinning_to_a_specific_version() {
   let temp_dir = TempDir::new().expect("failed to create temp dir");
 
   gest_cmd(&temp_dir)
     .args(&["self-update", "--help"])
     .assert()
     .success()
-    .stdout(predicate::str::contains("self-update"));
+    .stdout(predicate::str::contains("version"));
 }
 
 #[test]
@@ -38,17 +38,6 @@ fn it_includes_target_flag_in_help() {
 }
 
 #[test]
-fn it_describes_the_target_flag_as_pinning_to_a_specific_version() {
-  let temp_dir = TempDir::new().expect("failed to create temp dir");
-
-  gest_cmd(&temp_dir)
-    .args(&["self-update", "--help"])
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("version"));
-}
-
-#[test]
 fn it_rejects_unknown_flags() {
   let temp_dir = TempDir::new().expect("failed to create temp dir");
 
@@ -56,4 +45,15 @@ fn it_rejects_unknown_flags() {
     .args(&["self-update", "--nonexistent-flag"])
     .assert()
     .failure();
+}
+
+#[test]
+fn it_shows_help_without_error() {
+  let temp_dir = TempDir::new().expect("failed to create temp dir");
+
+  gest_cmd(&temp_dir)
+    .args(&["self-update", "--help"])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("self-update"));
 }

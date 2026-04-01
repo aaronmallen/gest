@@ -177,6 +177,79 @@ mod tests {
     use super::*;
 
     #[test]
+    fn it_errors_when_no_entity_matches() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_config(dir.path());
+      ensure_dirs(&config).unwrap();
+
+      let result = resolve_any_id(&config, "zyxw");
+
+      assert!(result.is_err());
+      let err = result.unwrap_err().to_string();
+      assert!(err.contains("No entity found"), "Expected not-found error, got: {err}");
+    }
+
+    #[test]
+    fn it_errors_with_disambiguation_when_multiple_types_match() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_config(dir.path());
+      let task = crate::test_helpers::make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let artifact = crate::test_helpers::make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      write_task(&config, &task).unwrap();
+      write_artifact(&config, &artifact).unwrap();
+
+      let result = resolve_any_id(&config, "zyxw");
+
+      assert!(result.is_err());
+      let err = result.unwrap_err().to_string();
+      assert!(err.contains("Ambiguous"), "Expected ambiguity error, got: {err}");
+      assert!(err.contains("task"), "Expected task in disambiguation, got: {err}");
+      assert!(
+        err.contains("artifact"),
+        "Expected artifact in disambiguation, got: {err}"
+      );
+    }
+
+    #[test]
+    fn it_includes_archived_artifacts() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_config(dir.path());
+      let artifact = crate::test_helpers::make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      write_artifact(&config, &artifact).unwrap();
+      archive_artifact(&config, &artifact.id).unwrap();
+
+      let resolved = resolve_any_id(&config, "zyxw").unwrap();
+
+      assert_eq!(resolved.entity_type, EntityType::Artifact);
+    }
+
+    #[test]
+    fn it_includes_resolved_iterations() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_config(dir.path());
+      let iteration = crate::test_helpers::make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      write_iteration(&config, &iteration).unwrap();
+      resolve_iteration(&config, &iteration.id).unwrap();
+
+      let resolved = resolve_any_id(&config, "zyxw").unwrap();
+
+      assert_eq!(resolved.entity_type, EntityType::Iteration);
+    }
+
+    #[test]
+    fn it_includes_resolved_tasks() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_config(dir.path());
+      let task = crate::test_helpers::make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      write_task(&config, &task).unwrap();
+      resolve_task(&config, &task.id).unwrap();
+
+      let resolved = resolve_any_id(&config, "zyxw").unwrap();
+
+      assert_eq!(resolved.entity_type, EntityType::Task);
+    }
+
+    #[test]
     fn it_resolves_a_task_prefix() {
       let dir = tempfile::tempdir().unwrap();
       let config = make_config(dir.path());
@@ -213,79 +286,6 @@ mod tests {
 
       assert_eq!(resolved.entity_type, EntityType::Iteration);
       assert_eq!(resolved.id.to_string(), "zyxwvutsrqponmlkzyxwvutsrqponmlk");
-    }
-
-    #[test]
-    fn it_errors_when_no_entity_matches() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      ensure_dirs(&config).unwrap();
-
-      let result = resolve_any_id(&config, "zyxw");
-
-      assert!(result.is_err());
-      let err = result.unwrap_err().to_string();
-      assert!(err.contains("No entity found"), "Expected not-found error, got: {err}");
-    }
-
-    #[test]
-    fn it_errors_with_disambiguation_when_multiple_types_match() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = crate::test_helpers::make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      let artifact = crate::test_helpers::make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      write_task(&config, &task).unwrap();
-      write_artifact(&config, &artifact).unwrap();
-
-      let result = resolve_any_id(&config, "zyxw");
-
-      assert!(result.is_err());
-      let err = result.unwrap_err().to_string();
-      assert!(err.contains("Ambiguous"), "Expected ambiguity error, got: {err}");
-      assert!(err.contains("task"), "Expected task in disambiguation, got: {err}");
-      assert!(
-        err.contains("artifact"),
-        "Expected artifact in disambiguation, got: {err}"
-      );
-    }
-
-    #[test]
-    fn it_includes_resolved_tasks() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = crate::test_helpers::make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      write_task(&config, &task).unwrap();
-      resolve_task(&config, &task.id).unwrap();
-
-      let resolved = resolve_any_id(&config, "zyxw").unwrap();
-
-      assert_eq!(resolved.entity_type, EntityType::Task);
-    }
-
-    #[test]
-    fn it_includes_archived_artifacts() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let artifact = crate::test_helpers::make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      write_artifact(&config, &artifact).unwrap();
-      archive_artifact(&config, &artifact.id).unwrap();
-
-      let resolved = resolve_any_id(&config, "zyxw").unwrap();
-
-      assert_eq!(resolved.entity_type, EntityType::Artifact);
-    }
-
-    #[test]
-    fn it_includes_resolved_iterations() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let iteration = crate::test_helpers::make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      write_iteration(&config, &iteration).unwrap();
-      resolve_iteration(&config, &iteration.id).unwrap();
-
-      let resolved = resolve_any_id(&config, "zyxw").unwrap();
-
-      assert_eq!(resolved.entity_type, EntityType::Iteration);
     }
   }
 }

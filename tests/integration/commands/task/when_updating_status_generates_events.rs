@@ -43,6 +43,34 @@ fn read_task_toml(env: &GestCmd, short_id: &str) -> String {
 }
 
 #[test]
+fn it_generates_no_event_when_status_is_unchanged() {
+  let env = GestCmd::new();
+  let id = create_task_and_get_id(&env, "No-op task");
+
+  // Update to the same status the task already has — no event should be generated.
+  env.run(&["task", "update", &id, "--status", "open"]).success();
+
+  let content = read_task_toml(&env, &id);
+  assert!(
+    !content.contains("status-change"),
+    "expected no status-change event in the TOML file, got:\n{content}"
+  );
+}
+
+#[test]
+fn it_persists_the_event_so_task_show_json_includes_it() {
+  let env = GestCmd::new();
+  let id = create_task_and_get_id(&env, "JSON event task");
+
+  env.run(&["task", "update", &id, "--status", "in-progress"]).success();
+
+  env
+    .run(&["task", "show", &id, "--json"])
+    .success()
+    .stdout(predicate::str::contains("status-change"));
+}
+
+#[test]
 fn it_records_a_status_change_event_in_the_task_file() {
   let env = GestCmd::new();
   let id = create_task_and_get_id(&env, "Event task");
@@ -73,32 +101,4 @@ fn it_records_the_correct_from_and_to_statuses_in_the_event() {
     content.contains("in-progress"),
     "expected 'in-progress' as the to-status in the event, got:\n{content}"
   );
-}
-
-#[test]
-fn it_generates_no_event_when_status_is_unchanged() {
-  let env = GestCmd::new();
-  let id = create_task_and_get_id(&env, "No-op task");
-
-  // Update to the same status the task already has — no event should be generated.
-  env.run(&["task", "update", &id, "--status", "open"]).success();
-
-  let content = read_task_toml(&env, &id);
-  assert!(
-    !content.contains("status-change"),
-    "expected no status-change event in the TOML file, got:\n{content}"
-  );
-}
-
-#[test]
-fn it_persists_the_event_so_task_show_json_includes_it() {
-  let env = GestCmd::new();
-  let id = create_task_and_get_id(&env, "JSON event task");
-
-  env.run(&["task", "update", &id, "--status", "in-progress"]).success();
-
-  env
-    .run(&["task", "show", &id, "--json"])
-    .success()
-    .stdout(predicate::str::contains("status-change"));
 }

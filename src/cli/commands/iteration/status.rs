@@ -58,18 +58,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_renders_status_card() {
+    fn it_renders_empty_iteration_status() {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
 
-      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      task.phase = Some(1);
-      task.status = TaskStatus::InProgress;
-      task.assigned_to = Some("agent-1".to_string());
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks = vec!["tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string()];
+      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       store::write_iteration(&ctx.settings, &iteration).unwrap();
 
       let cmd = Command {
@@ -102,11 +95,18 @@ mod tests {
     }
 
     #[test]
-    fn it_renders_empty_iteration_status() {
+    fn it_renders_status_card() {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
 
-      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      task.phase = Some(1);
+      task.status = TaskStatus::InProgress;
+      task.assigned_to = Some("agent-1".to_string());
+      store::write_task(&ctx.settings, &task).unwrap();
+
+      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      iteration.tasks = vec!["tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string()];
       store::write_iteration(&ctx.settings, &iteration).unwrap();
 
       let cmd = Command {

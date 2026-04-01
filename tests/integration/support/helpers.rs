@@ -9,6 +9,16 @@ pub struct GestCmd {
 }
 
 impl GestCmd {
+  fn build_cmd(temp_dir: &TempDir) -> Command {
+    let mut cmd = Command::cargo_bin("gest").expect("gest binary not found");
+    let path = temp_dir.path();
+    cmd.current_dir(path);
+    cmd.env("GEST_CONFIG", path.join("gest.toml"));
+    cmd.env("GEST_PROJECT_DIR", path.join(".gest"));
+    cmd.env("GEST_STATE_DIR", path.join(".gest-state"));
+    cmd
+  }
+
   /// Create a new `GestCmd` with a fresh temp directory and run `gest init` in it.
   pub fn new() -> Self {
     let temp_dir = TempDir::new().expect("failed to create temp dir");
@@ -51,16 +61,6 @@ impl GestCmd {
     cmd
   }
 
-  /// Return a `Command` with isolation env vars but no extra args.
-  pub fn raw_cmd(&self) -> Command {
-    Self::build_cmd(&self.temp_dir)
-  }
-
-  /// Shorthand for `cmd().args(args).assert()`.
-  pub fn run(&self, args: &[&str]) -> assert_cmd::assert::Assert {
-    self.cmd().args(args).assert()
-  }
-
   /// Create an artifact with the given title and body, returning the new artifact ID.
   pub fn create_artifact(&self, title: &str, body: &str) -> String {
     let output = self
@@ -80,29 +80,29 @@ impl GestCmd {
       .unwrap_or_else(|| panic!("could not extract artifact ID from output:\n{stdout}"))
   }
 
+  fn data_dir(&self) -> PathBuf {
+    self.temp_dir.path().join(".gest")
+  }
+
+  /// Return a `Command` with isolation env vars but no extra args.
+  pub fn raw_cmd(&self) -> Command {
+    Self::build_cmd(&self.temp_dir)
+  }
+
   /// Read a file relative to the data directory.
   pub fn read_data_file(&self, relative: &str) -> String {
     let path = self.data_dir().join(relative);
     std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()))
   }
 
+  /// Shorthand for `cmd().args(args).assert()`.
+  pub fn run(&self, args: &[&str]) -> assert_cmd::assert::Assert {
+    self.cmd().args(args).assert()
+  }
+
   /// Return the temp directory path.
   pub fn temp_dir_path(&self) -> &Path {
     self.temp_dir.path()
-  }
-
-  fn data_dir(&self) -> PathBuf {
-    self.temp_dir.path().join(".gest")
-  }
-
-  fn build_cmd(temp_dir: &TempDir) -> Command {
-    let mut cmd = Command::cargo_bin("gest").expect("gest binary not found");
-    let path = temp_dir.path();
-    cmd.current_dir(path);
-    cmd.env("GEST_CONFIG", path.join("gest.toml"));
-    cmd.env("GEST_PROJECT_DIR", path.join(".gest"));
-    cmd.env("GEST_STATE_DIR", path.join(".gest-state"));
-    cmd
   }
 }
 

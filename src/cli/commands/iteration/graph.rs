@@ -18,16 +18,6 @@ pub struct Command {
   pub id: String,
 }
 
-/// Intermediate representation of a task used to build graph view data.
-struct TaskRow {
-  blocked_by: Option<String>,
-  id: String,
-  is_blocking: bool,
-  priority: Option<u8>,
-  status: String,
-  title: String,
-}
-
 impl Command {
   /// Load iteration tasks, group by phase, and render the execution graph.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
@@ -83,6 +73,16 @@ impl Command {
 
     Ok(())
   }
+}
+
+/// Intermediate representation of a task used to build graph view data.
+struct TaskRow {
+  blocked_by: Option<String>,
+  id: String,
+  is_blocking: bool,
+  priority: Option<u8>,
+  status: String,
+  title: String,
 }
 
 #[cfg(test)]

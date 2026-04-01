@@ -6,6 +6,9 @@ use std::{
 use super::Error;
 use crate::{config::Settings, model::Id};
 
+/// Maximum number of ID generation attempts before giving up.
+const MAX_ID_ATTEMPTS: usize = 100;
+
 /// Result of scanning a directory for file stems matching a given prefix.
 ///
 /// Only the first two matches are retained—enough to distinguish between
@@ -103,9 +106,6 @@ pub(crate) fn resolve_id(
   }
   Err(Error::generic(msg))
 }
-
-/// Maximum number of ID generation attempts before giving up.
-const MAX_ID_ATTEMPTS: usize = 100;
 
 /// Generate a new [`Id`] that does not collide (by short prefix) with any
 /// existing entity across artifacts, tasks, and iterations.
@@ -221,16 +221,6 @@ mod tests {
     }
 
     #[test]
-    fn it_generates_a_unique_id() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      crate::store::ensure_dirs(&config).unwrap();
-
-      let id = super::super::next_id(&config).unwrap();
-      assert_eq!(id.to_string().len(), 32);
-    }
-
-    #[test]
     fn it_avoids_short_prefix_collisions_across_entity_types() {
       let dir = tempfile::tempdir().unwrap();
       let config = make_config(dir.path());
@@ -268,6 +258,16 @@ mod tests {
         let id = super::super::next_id(&config).unwrap();
         assert_ne!(id.short(), artifact_short);
       }
+    }
+
+    #[test]
+    fn it_generates_a_unique_id() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_config(dir.path());
+      crate::store::ensure_dirs(&config).unwrap();
+
+      let id = super::super::next_id(&config).unwrap();
+      assert_eq!(id.to_string().len(), 32);
     }
   }
 }

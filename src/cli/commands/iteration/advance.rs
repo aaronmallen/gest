@@ -79,6 +79,30 @@ mod tests {
     }
 
     #[test]
+    fn it_errors_when_phase_has_non_terminal_tasks() {
+      let dir = tempfile::tempdir().unwrap();
+      let ctx = make_test_context(dir.path());
+
+      let mut t1 = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      t1.phase = Some(1);
+      t1.status = TaskStatus::InProgress;
+      store::write_task(&ctx.settings, &t1).unwrap();
+
+      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      iteration.tasks = vec![t1.id.to_string()];
+      store::write_iteration(&ctx.settings, &iteration).unwrap();
+
+      let cmd = Command {
+        id: "zyxw".to_string(),
+        force: false,
+      };
+
+      let err = cmd.call(&ctx).unwrap_err();
+      let msg = err.to_string();
+      assert!(msg.contains("non-terminal"), "expected non-terminal error, got: {msg}");
+    }
+
+    #[test]
     fn it_force_advances_with_non_terminal_tasks() {
       let dir = tempfile::tempdir().unwrap();
       let ctx = make_test_context(dir.path());
@@ -103,30 +127,6 @@ mod tests {
       };
 
       cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_errors_when_phase_has_non_terminal_tasks() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let mut t1 = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      t1.phase = Some(1);
-      t1.status = TaskStatus::InProgress;
-      store::write_task(&ctx.settings, &t1).unwrap();
-
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks = vec![t1.id.to_string()];
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        force: false,
-      };
-
-      let err = cmd.call(&ctx).unwrap_err();
-      let msg = err.to_string();
-      assert!(msg.contains("non-terminal"), "expected non-terminal error, got: {msg}");
     }
   }
 }

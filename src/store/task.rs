@@ -524,28 +524,10 @@ mod tests {
     use crate::model::link::RelationshipType;
 
     #[test]
-    fn it_returns_active_blocker() {
+    fn it_excludes_cancelled_blocker() {
       let dir = tempfile::tempdir().unwrap();
-      let blocker = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "Blocker");
-      crate::store::write_task(&make_config(dir.path()), &blocker).unwrap();
-
-      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocked");
-      task.links = vec![Link {
-        ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string(),
-        rel: RelationshipType::BlockedBy,
-      }];
-      crate::store::write_task(&make_config(dir.path()), &task).unwrap();
-
-      let result = crate::store::resolve_blocking(&make_config(dir.path()), &task);
-      assert_eq!(result.blocked_by_ids, vec!["kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"]);
-      assert!(!result.is_blocking);
-    }
-
-    #[test]
-    fn it_excludes_done_blocker() {
-      let dir = tempfile::tempdir().unwrap();
-      let mut blocker = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "Done Blocker");
-      blocker.status = Status::Done;
+      let mut blocker = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "Cancelled Blocker");
+      blocker.status = Status::Cancelled;
       crate::store::write_task(&make_config(dir.path()), &blocker).unwrap();
 
       let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocked");
@@ -561,10 +543,10 @@ mod tests {
     }
 
     #[test]
-    fn it_excludes_cancelled_blocker() {
+    fn it_excludes_done_blocker() {
       let dir = tempfile::tempdir().unwrap();
-      let mut blocker = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "Cancelled Blocker");
-      blocker.status = Status::Cancelled;
+      let mut blocker = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "Done Blocker");
+      blocker.status = Status::Done;
       crate::store::write_task(&make_config(dir.path()), &blocker).unwrap();
 
       let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocked");
@@ -597,25 +579,10 @@ mod tests {
     }
 
     #[test]
-    fn it_shows_is_blocking_for_non_terminal_task_with_blocks_link() {
+    fn it_hides_is_blocking_for_cancelled_task() {
       let dir = tempfile::tempdir().unwrap();
-      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocking");
-      task.links = vec![Link {
-        ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string(),
-        rel: RelationshipType::Blocks,
-      }];
-      crate::store::write_task(&make_config(dir.path()), &task).unwrap();
-
-      let result = crate::store::resolve_blocking(&make_config(dir.path()), &task);
-
-      assert!(result.is_blocking);
-    }
-
-    #[test]
-    fn it_hides_is_blocking_for_done_task() {
-      let dir = tempfile::tempdir().unwrap();
-      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Done Blocker");
-      task.status = Status::Done;
+      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Cancelled Blocker");
+      task.status = Status::Cancelled;
       task.links = vec![Link {
         ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string(),
         rel: RelationshipType::Blocks,
@@ -628,10 +595,10 @@ mod tests {
     }
 
     #[test]
-    fn it_hides_is_blocking_for_cancelled_task() {
+    fn it_hides_is_blocking_for_done_task() {
       let dir = tempfile::tempdir().unwrap();
-      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Cancelled Blocker");
-      task.status = Status::Cancelled;
+      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Done Blocker");
+      task.status = Status::Done;
       task.links = vec![Link {
         ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string(),
         rel: RelationshipType::Blocks,
@@ -661,6 +628,39 @@ mod tests {
       let result = crate::store::resolve_blocking(&make_config(dir.path()), &task);
 
       assert!(result.blocked_by_ids.is_empty());
+    }
+
+    #[test]
+    fn it_returns_active_blocker() {
+      let dir = tempfile::tempdir().unwrap();
+      let blocker = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "Blocker");
+      crate::store::write_task(&make_config(dir.path()), &blocker).unwrap();
+
+      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocked");
+      task.links = vec![Link {
+        ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string(),
+        rel: RelationshipType::BlockedBy,
+      }];
+      crate::store::write_task(&make_config(dir.path()), &task).unwrap();
+
+      let result = crate::store::resolve_blocking(&make_config(dir.path()), &task);
+      assert_eq!(result.blocked_by_ids, vec!["kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"]);
+      assert!(!result.is_blocking);
+    }
+
+    #[test]
+    fn it_shows_is_blocking_for_non_terminal_task_with_blocks_link() {
+      let dir = tempfile::tempdir().unwrap();
+      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocking");
+      task.links = vec![Link {
+        ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string(),
+        rel: RelationshipType::Blocks,
+      }];
+      crate::store::write_task(&make_config(dir.path()), &task).unwrap();
+
+      let result = crate::store::resolve_blocking(&make_config(dir.path()), &task);
+
+      assert!(result.is_blocking);
     }
   }
 

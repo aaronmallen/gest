@@ -3,6 +3,18 @@ use predicates::prelude::*;
 use crate::support::helpers::GestCmd;
 
 #[test]
+fn it_errors_on_nonexistent() {
+  let env = GestCmd::new();
+
+  env
+    .cmd()
+    .args(["artifact", "show", "kkkkkkkkk"])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("not found"));
+}
+
+#[test]
 fn it_shows_an_artifact() {
   let env = GestCmd::new();
 
@@ -14,16 +26,4 @@ fn it_shows_an_artifact() {
     .assert()
     .success()
     .stdout(predicate::str::contains("Show Me"));
-}
-
-#[test]
-fn it_errors_on_nonexistent() {
-  let env = GestCmd::new();
-
-  env
-    .cmd()
-    .args(["artifact", "show", "kkkkkkkkk"])
-    .assert()
-    .failure()
-    .stderr(predicate::str::contains("not found"));
 }

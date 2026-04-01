@@ -18,6 +18,19 @@ fn create_iteration(env: &GestCmd, title: &str) -> String {
 }
 
 #[test]
+fn it_updates_iteration_status() {
+  let env = GestCmd::new();
+  let id = create_iteration(&env, "Sprint 1");
+
+  env
+    .cmd()
+    .args(["iteration", "update", &id, "--status", "completed"])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("Updated iteration"));
+}
+
+#[test]
 fn it_updates_iteration_title() {
   let env = GestCmd::new();
   let id = create_iteration(&env, "Old Title");
@@ -35,17 +48,4 @@ fn it_updates_iteration_title() {
     .assert()
     .success()
     .stdout(predicate::str::contains("New Title"));
-}
-
-#[test]
-fn it_updates_iteration_status() {
-  let env = GestCmd::new();
-  let id = create_iteration(&env, "Sprint 1");
-
-  env
-    .cmd()
-    .args(["iteration", "update", &id, "--status", "completed"])
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("Updated iteration"));
 }

@@ -21,14 +21,6 @@ fn create_task_and_get_id(env: &GestCmd, title: &str) -> String {
 }
 
 #[test]
-fn it_sets_metadata() {
-  let env = GestCmd::new();
-  let id = create_task_and_get_id(&env, "Meta task");
-
-  env.run(&["task", "meta", "set", &id, "priority", "high"]).success();
-}
-
-#[test]
 fn it_gets_metadata() {
   let env = GestCmd::new();
   let id = create_task_and_get_id(&env, "Meta get task");
@@ -39,4 +31,12 @@ fn it_gets_metadata() {
     .run(&["task", "meta", "get", &id, "priority"])
     .success()
     .stdout(predicate::str::contains("high"));
+}
+
+#[test]
+fn it_sets_metadata() {
+  let env = GestCmd::new();
+  let id = create_task_and_get_id(&env, "Meta task");
+
+  env.run(&["task", "meta", "set", &id, "priority", "high"]).success();
 }

@@ -12,12 +12,6 @@ pub struct Command {
   command: MetaCommand,
 }
 
-#[derive(Debug, Subcommand)]
-enum MetaCommand {
-  Get(get::Command),
-  Set(set::Command),
-}
-
 impl Command {
   /// Dispatch to the `get` or `set` metadata subcommand.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
@@ -26,4 +20,10 @@ impl Command {
       MetaCommand::Set(cmd) => cmd.call(ctx),
     }
   }
+}
+
+#[derive(Debug, Subcommand)]
+enum MetaCommand {
+  Get(get::Command),
+  Set(set::Command),
 }

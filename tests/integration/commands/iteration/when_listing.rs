@@ -3,6 +3,13 @@ use predicates::prelude::*;
 use crate::support::helpers::GestCmd;
 
 #[test]
+fn it_lists_empty() {
+  let env = GestCmd::new();
+
+  env.cmd().args(["iteration", "list"]).assert().success();
+}
+
+#[test]
 fn it_lists_iterations() {
   let env = GestCmd::new();
 
@@ -14,11 +21,4 @@ fn it_lists_iterations() {
     .assert()
     .success()
     .stdout(predicate::str::contains("Sprint 1"));
-}
-
-#[test]
-fn it_lists_empty() {
-  let env = GestCmd::new();
-
-  env.cmd().args(["iteration", "list"]).assert().success();
 }

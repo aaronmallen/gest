@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use clap::Args;
+use toml::{Table, Value};
 
 use crate::{
   cli::{self, AppContext},
@@ -37,10 +38,10 @@ impl Command {
     let mut toml_value = if config_path.exists() {
       let content = std::fs::read_to_string(&config_path)?;
       content
-        .parse::<toml::Value>()
+        .parse::<Value>()
         .map_err(|e| cli::Error::generic(format!("Failed to parse config: {e}")))?
     } else {
-      toml::Value::Table(toml::Table::new())
+      Value::Table(Table::new())
     };
 
     let table = toml_value

@@ -13,6 +13,9 @@ use crate::{
 /// List iterations, optionally filtered by status or tag.
 #[derive(Debug, Args)]
 pub struct Command {
+  /// Only show iterations that have at least one claimable task.
+  #[arg(long)]
+  pub has_available: bool,
   /// Output iteration list as JSON.
   #[arg(short, long)]
   pub json: bool,
@@ -25,9 +28,6 @@ pub struct Command {
   /// Filter by tag.
   #[arg(long)]
   pub tag: Option<String>,
-  /// Only show iterations that have at least one claimable task.
-  #[arg(long)]
-  pub has_available: bool,
 }
 
 impl Command {
@@ -102,7 +102,7 @@ mod tests {
       let i1 = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
       let mut i2 = make_test_iteration("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
       i2.title = "Failed one".to_string();
-      i2.status = crate::model::iteration::Status::Failed;
+      i2.status = Status::Failed;
       store::write_iteration(&ctx.settings, &i1).unwrap();
       store::write_iteration(&ctx.settings, &i2).unwrap();
 

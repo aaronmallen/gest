@@ -133,77 +133,6 @@ impl Display for TaskDetailView<'_> {
   }
 }
 
-enum TimelineEntry<'a> {
-  Event(&'a Event),
-  Note(&'a Note),
-}
-
-impl TimelineEntry<'_> {
-  fn created_at(&self) -> DateTime<Utc> {
-    match self {
-      Self::Event(e) => e.created_at,
-      Self::Note(n) => n.created_at,
-    }
-  }
-}
-
-fn build_timeline<'a>(notes: &'a [Note], events: &'a [Event]) -> Vec<TimelineEntry<'a>> {
-  let mut timeline: Vec<TimelineEntry<'a>> = Vec::with_capacity(notes.len() + events.len());
-  timeline.extend(notes.iter().map(TimelineEntry::Note));
-  timeline.extend(events.iter().map(TimelineEntry::Event));
-  timeline.sort_by_key(|e| e.created_at());
-  timeline
-}
-
-fn format_event_author(event: &Event) -> String {
-  use crate::model::note::AuthorType;
-  match event.author_type {
-    AuthorType::Agent => format!("{} (agent)", event.author),
-    AuthorType::Human => match &event.author_email {
-      Some(email) => format!("{} <{}>", event.author, email),
-      None => event.author.clone(),
-    },
-  }
-}
-
-fn format_event_description(event: &Event) -> String {
-  match &event.kind {
-    EventKind::PhaseChange {
-      from,
-      to,
-    } => {
-      let from_str = from.map_or("none".to_string(), |v| v.to_string());
-      let to_str = to.map_or("none".to_string(), |v| v.to_string());
-      format!("phase changed from {from_str} to {to_str}")
-    }
-    EventKind::PriorityChange {
-      from,
-      to,
-    } => {
-      let from_str = from.map_or("none".to_string(), |v| format!("P{v}"));
-      let to_str = to.map_or("none".to_string(), |v| format!("P{v}"));
-      format!("priority changed from {from_str} to {to_str}")
-    }
-    EventKind::StatusChange {
-      from,
-      to,
-    } => {
-      format!("status changed from {from} to {to}")
-    }
-  }
-}
-
-fn format_note_author(note: &Note) -> String {
-  use crate::model::note::AuthorType;
-  match note.author_type {
-    AuthorType::Agent => format!("{} (agent)", note.author),
-    AuthorType::Human => match &note.author_email {
-      Some(email) => format!("{} <{}>", note.author, email),
-      None => note.author.clone(),
-    },
-  }
-}
-
 /// Renders a grouped list of tasks with a status-breakdown summary.
 pub struct TaskListView<'a> {
   tasks: Vec<TaskViewData>,
@@ -313,6 +242,77 @@ pub struct TaskViewData {
   pub title: String,
 }
 
+enum TimelineEntry<'a> {
+  Event(&'a Event),
+  Note(&'a Note),
+}
+
+impl TimelineEntry<'_> {
+  fn created_at(&self) -> DateTime<Utc> {
+    match self {
+      Self::Event(e) => e.created_at,
+      Self::Note(n) => n.created_at,
+    }
+  }
+}
+
+fn build_timeline<'a>(notes: &'a [Note], events: &'a [Event]) -> Vec<TimelineEntry<'a>> {
+  let mut timeline: Vec<TimelineEntry<'a>> = Vec::with_capacity(notes.len() + events.len());
+  timeline.extend(notes.iter().map(TimelineEntry::Note));
+  timeline.extend(events.iter().map(TimelineEntry::Event));
+  timeline.sort_by_key(|e| e.created_at());
+  timeline
+}
+
+fn format_event_author(event: &Event) -> String {
+  use crate::model::note::AuthorType;
+  match event.author_type {
+    AuthorType::Agent => format!("{} (agent)", event.author),
+    AuthorType::Human => match &event.author_email {
+      Some(email) => format!("{} <{}>", event.author, email),
+      None => event.author.clone(),
+    },
+  }
+}
+
+fn format_event_description(event: &Event) -> String {
+  match &event.kind {
+    EventKind::PhaseChange {
+      from,
+      to,
+    } => {
+      let from_str = from.map_or("none".to_string(), |v| v.to_string());
+      let to_str = to.map_or("none".to_string(), |v| v.to_string());
+      format!("phase changed from {from_str} to {to_str}")
+    }
+    EventKind::PriorityChange {
+      from,
+      to,
+    } => {
+      let from_str = from.map_or("none".to_string(), |v| format!("P{v}"));
+      let to_str = to.map_or("none".to_string(), |v| format!("P{v}"));
+      format!("priority changed from {from_str} to {to_str}")
+    }
+    EventKind::StatusChange {
+      from,
+      to,
+    } => {
+      format!("status changed from {from} to {to}")
+    }
+  }
+}
+
+fn format_note_author(note: &Note) -> String {
+  use crate::model::note::AuthorType;
+  match note.author_type {
+    AuthorType::Agent => format!("{} (agent)", note.author),
+    AuthorType::Human => match &note.author_email {
+      Some(email) => format!("{} <{}>", note.author, email),
+      None => note.author.clone(),
+    },
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -370,6 +370,31 @@ mod tests {
       use super::*;
 
       #[test]
+      fn it_omits_activity_section_when_empty() {
+        let t = theme();
+        let view = TaskDetailView {
+          id: "abcd1234",
+          title: "test task",
+          status: "open",
+          priority: None,
+          phase: None,
+          assigned: None,
+          tags: &[],
+          links: vec![],
+          events: &[],
+          notes: &[],
+          body: None,
+          theme: &t,
+        };
+        let out = view.to_string();
+
+        assert!(
+          !out.contains("activity"),
+          "should not contain activity section when empty"
+        );
+      }
+
+      #[test]
       fn it_renders_all_fields() {
         let t = theme();
         let tags = vec!["adapter".to_string()];
@@ -399,29 +424,6 @@ mod tests {
         assert!(out.contains("#adapter"), "should contain tag");
         assert!(out.contains("blocked-by"), "should contain link relation");
         assert!(out.contains("description"), "should contain body section");
-      }
-
-      #[test]
-      fn it_renders_minimal() {
-        let t = theme();
-        let view = TaskDetailView {
-          id: "abcd1234",
-          title: "minimal task",
-          status: "open",
-          priority: None,
-          phase: None,
-          assigned: None,
-          tags: &[],
-          links: vec![],
-          events: &[],
-          notes: &[],
-          body: None,
-          theme: &t,
-        };
-        let out = view.to_string();
-
-        assert!(out.contains("minimal task"));
-        assert!(!out.contains("description"), "should not contain body section");
       }
 
       #[test]
@@ -517,11 +519,11 @@ mod tests {
       }
 
       #[test]
-      fn it_omits_activity_section_when_empty() {
+      fn it_renders_minimal() {
         let t = theme();
         let view = TaskDetailView {
           id: "abcd1234",
-          title: "test task",
+          title: "minimal task",
           status: "open",
           priority: None,
           phase: None,
@@ -535,10 +537,8 @@ mod tests {
         };
         let out = view.to_string();
 
-        assert!(
-          !out.contains("activity"),
-          "should not contain activity section when empty"
-        );
+        assert!(out.contains("minimal task"));
+        assert!(!out.contains("description"), "should not contain body section");
       }
     }
   }

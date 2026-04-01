@@ -32,7 +32,7 @@ use crate::{
   store,
 };
 
-// ── Type declarations ────────────────────────────────────────────────────────────────────────────
+// ── Type declarations ─────────────────────────────────────────────────────────
 
 /// A single search result for the JSON API.
 #[derive(serde::Serialize)]
@@ -181,6 +181,294 @@ fn render_markdown(input: &str) -> String {
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
+/// POST /api/render-markdown — render Markdown to HTML.
+pub async fn api_render_markdown(Json(payload): Json<RenderMarkdownBody>) -> Response {
+  let html_output = render_markdown(&payload.body);
+  (
+    [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
+    html_output,
+  )
+    .into_response()
+}
+
+/// GET /api/search?q=... — JSON search results.
+pub async fn api_search(State(state): State<ServerState>, Query(params): Query<SearchParams>) -> Response {
+  if params.q.is_empty() {
+    return Json(Vec::<ApiSearchResult>::new()).into_response();
+  }
+
+  let results = match store::search(&state.settings, &params.q, true) {
+    Ok(r) => r,
+    Err(e) => {
+      log::error!("api search failed: {e}");
+      return (StatusCode::INTERNAL_SERVER_ERROR, Json(Vec::<ApiSearchResult>::new())).into_response();
+    }
+  };
+
+  let mut items: Vec<ApiSearchResult> = Vec::new();
+  for task in results.tasks {
+    items.push(ApiSearchResult {
+      kind: "task".to_string(),
+      id: task.id.to_string(),
+      short_id: task.id.short(),
+      title: task.title,
+    });
+  }
+  for artifact in results.artifacts {
+    items.push(ApiSearchResult {
+      kind: "artifact".to_string(),
+      id: artifact.id.to_string(),
+      short_id: artifact.id.short(),
+      title: artifact.title,
+    });
+  }
+  for iteration in results.iterations {
+    items.push(ApiSearchResult {
+      kind: "iteration".to_string(),
+      id: iteration.id.to_string(),
+      short_id: iteration.id.short(),
+      title: iteration.title,
+    });
+  }
+
+  Json(items).into_response()
+}
+
+/// POST /artifacts/:id/archive — archive an artifact.
+pub async fn artifact_archive(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
+  let resolved = match store::resolve_artifact_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
+    }
+  };
+
+  match store::archive_artifact(&state.settings, &resolved) {
+    Ok(()) => Redirect::to("/artifacts").into_response(),
+    Err(e) => {
+      log::error!("failed to archive artifact {resolved}: {e}");
+      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
+    }
+  }
+}
+
+/// POST /artifacts — create a new artifact.
+pub async fn artifact_create(State(state): State<ServerState>, Form(form): Form<ArtifactFormData>) -> Response {
+  let title = form.title.trim().to_string();
+  if title.is_empty() {
+    return ArtifactCreateTemplate {
+      title: form.title,
+      kind: form.kind,
+      tags: form.tags,
+      body: form.body,
+      error: Some("Title is required.".to_string()),
+    }
+    .into_response();
+  }
+
+  let kind = {
+    let k = form.kind.trim().to_string();
+    if k.is_empty() { None } else { Some(k) }
+  };
+
+  let tags: Vec<String> = form
+    .tags
+    .split(',')
+    .map(|t| t.trim().to_string())
+    .filter(|t| !t.is_empty())
+    .collect();
+
+  let new = NewArtifact {
+    body: form.body,
+    kind,
+    metadata: yaml_serde::Mapping::new(),
+    tags,
+    title,
+  };
+
+  match store::create_artifact(&state.settings, new) {
+    Ok(artifact) => Redirect::to(&format!("/artifacts/{}", artifact.id)).into_response(),
+    Err(e) => {
+      log::error!("failed to create artifact: {e}");
+      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
+    }
+  }
+}
+
+/// GET /artifacts/new — render the create artifact form.
+pub async fn artifact_create_form() -> Response {
+  ArtifactCreateTemplate {
+    title: String::new(),
+    kind: String::new(),
+    tags: String::new(),
+    body: String::new(),
+    error: None,
+  }
+  .into_response()
+}
+
+/// GET /artifacts/:id — artifact detail with rendered Markdown.
+pub async fn artifact_detail(State(state): State<ServerState>, Path(id): Path<String>) -> Response {
+  let resolved = match store::resolve_artifact_id(&state.settings, &id, true) {
+    Ok(id) => id,
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
+    }
+  };
+
+  match store::read_artifact(&state.settings, &resolved) {
+    Ok(artifact) => {
+      let body_html = render_markdown(&artifact.body);
+      ArtifactDetailTemplate {
+        artifact,
+        body_html,
+      }
+      .into_response()
+    }
+    Err(e) => {
+      log::error!("failed to read artifact {resolved}: {e}");
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Html("<p>failed to load artifact</p>"),
+      )
+        .into_response()
+    }
+  }
+}
+
+/// GET /artifacts/:id/edit — render the edit artifact form.
+pub async fn artifact_edit_form(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
+  let resolved = match store::resolve_artifact_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
+    }
+  };
+
+  let artifact = match store::read_artifact(&state.settings, &resolved) {
+    Ok(a) => a,
+    Err(e) => {
+      log::error!("failed to read artifact {resolved}: {e}");
+      return (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response();
+    }
+  };
+
+  let tags = artifact.tags.join(", ");
+  let kind = artifact.kind.clone().unwrap_or_default();
+  ArtifactEditTemplate {
+    title: artifact.title.clone(),
+    kind,
+    tags,
+    body: artifact.body.clone(),
+    error: None,
+    artifact,
+  }
+  .into_response()
+}
+
+/// GET /artifacts — artifact list with status filtering.
+pub async fn artifact_list(State(state): State<ServerState>, Query(params): Query<ArtifactListParams>) -> Response {
+  let filter = ArtifactFilter {
+    all: true,
+    ..Default::default()
+  };
+
+  let all_artifacts = match store::list_artifacts(&state.settings, &filter) {
+    Ok(a) => a,
+    Err(e) => {
+      log::error!("failed to list artifacts: {e}");
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Html("<p>failed to load artifacts</p>"),
+      )
+        .into_response();
+    }
+  };
+
+  let open_count = all_artifacts.iter().filter(|a| a.archived_at.is_none()).count();
+  let archived_count = all_artifacts.iter().filter(|a| a.archived_at.is_some()).count();
+  let current_status = params.status.unwrap_or_else(|| "open".to_string());
+
+  let artifacts: Vec<_> = all_artifacts
+    .into_iter()
+    .filter(|a| match current_status.as_str() {
+      "archived" => a.archived_at.is_some(),
+      _ => a.archived_at.is_none(),
+    })
+    .collect();
+
+  ArtifactListTemplate {
+    artifacts,
+    open_count,
+    archived_count,
+    current_status,
+  }
+  .into_response()
+}
+
+/// POST /artifacts/:id — update an existing artifact.
+pub async fn artifact_update(
+  State(state): State<ServerState>,
+  Path(id_str): Path<String>,
+  Form(form): Form<ArtifactFormData>,
+) -> Response {
+  let resolved = match store::resolve_artifact_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
+    }
+  };
+
+  let title = form.title.trim().to_string();
+  if title.is_empty() {
+    let artifact = match store::read_artifact(&state.settings, &resolved) {
+      Ok(a) => a,
+      Err(e) => {
+        log::error!("failed to read artifact {resolved}: {e}");
+        return (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response();
+      }
+    };
+
+    return ArtifactEditTemplate {
+      title: form.title,
+      kind: form.kind,
+      tags: form.tags,
+      body: form.body,
+      error: Some("Title is required.".to_string()),
+      artifact,
+    }
+    .into_response();
+  }
+
+  let kind = {
+    let k = form.kind.trim().to_string();
+    if k.is_empty() { None } else { Some(k) }
+  };
+
+  let tags: Vec<String> = form
+    .tags
+    .split(',')
+    .map(|t| t.trim().to_string())
+    .filter(|t| !t.is_empty())
+    .collect();
+
+  let patch = ArtifactPatch {
+    body: Some(form.body),
+    kind,
+    metadata: None,
+    tags: Some(tags),
+    title: Some(title),
+  };
+
+  match store::update_artifact(&state.settings, &resolved, patch) {
+    Ok(_) => Redirect::to(&format!("/artifacts/{}", resolved)).into_response(),
+    Err(e) => {
+      log::error!("failed to update artifact {resolved}: {e}");
+      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
+    }
+  }
+}
+
 /// GET / — dashboard with entity counts and navigation.
 pub async fn dashboard(State(state): State<ServerState>) -> Response {
   let tasks = store::list_tasks(
@@ -217,59 +505,276 @@ pub async fn dashboard(State(state): State<ServerState>) -> Response {
   .into_response()
 }
 
-/// GET /tasks — task list filtered by status.
-pub async fn task_list(State(state): State<ServerState>, Query(params): Query<TaskListParams>) -> Response {
-  let all_tasks = match store::list_tasks(
-    &state.settings,
-    &TaskFilter {
-      all: true,
-      ..Default::default()
-    },
-  ) {
-    Ok(t) => t,
+/// GET /iterations/:id/board — iteration kanban board.
+pub async fn iteration_board(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
+  let id = match store::resolve_iteration_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response();
+    }
+  };
+
+  let iteration = match store::read_iteration(&state.settings, &id) {
+    Ok(it) => it,
     Err(e) => {
-      log::error!("failed to list tasks: {e}");
+      log::error!("failed to read iteration {id}: {e}");
       return (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response();
     }
   };
 
-  let open_count = all_tasks.iter().filter(|t| t.status == Status::Open).count();
-  let in_progress_count = all_tasks.iter().filter(|t| t.status == Status::InProgress).count();
-  let done_count = all_tasks.iter().filter(|t| t.status == Status::Done).count();
-  let cancelled_count = all_tasks.iter().filter(|t| t.status == Status::Cancelled).count();
+  let tasks = store::read_iteration_tasks(&state.settings, &iteration);
 
-  let current_status = match params.status.as_deref() {
-    Some("in_progress") => Status::InProgress,
-    Some("done") => Status::Done,
-    Some("cancelled") => Status::Cancelled,
-    _ => Status::Open,
+  let open_tasks: Vec<_> = tasks.iter().filter(|t| t.status == Status::Open).cloned().collect();
+  let in_progress_tasks: Vec<_> = tasks
+    .iter()
+    .filter(|t| t.status == Status::InProgress)
+    .cloned()
+    .collect();
+  let done_tasks: Vec<_> = tasks.iter().filter(|t| t.status == Status::Done).cloned().collect();
+  let cancelled_tasks: Vec<_> = tasks
+    .iter()
+    .filter(|t| t.status == Status::Cancelled)
+    .cloned()
+    .collect();
+
+  IterationBoardTemplate {
+    iteration,
+    open_tasks,
+    in_progress_tasks,
+    done_tasks,
+    cancelled_tasks,
+  }
+  .into_response()
+}
+
+/// GET /iterations/:id — iteration detail with phase graph.
+pub async fn iteration_detail(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
+  let id = match store::resolve_iteration_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response();
+    }
   };
 
-  let tasks: Vec<_> = all_tasks.into_iter().filter(|t| t.status == current_status).collect();
+  let iteration = match store::read_iteration(&state.settings, &id) {
+    Ok(it) => it,
+    Err(e) => {
+      log::error!("failed to read iteration {id}: {e}");
+      return (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response();
+    }
+  };
 
-  let blockings = store::resolve_blocking_batch(&state.settings, &tasks);
+  let tasks = store::read_iteration_tasks(&state.settings, &iteration);
 
-  let rows: Vec<TaskRow> = tasks
-    .iter()
-    .zip(blockings)
-    .map(|(task, blocking)| {
-      let is_blocked = !blocking.blocked_by_ids.is_empty();
-      TaskRow {
-        task: task.clone(),
-        blocking,
-        is_blocked,
-      }
+  let mut phase_map: BTreeMap<u16, Vec<crate::model::Task>> = BTreeMap::new();
+  for task in &tasks {
+    let phase = task.phase.unwrap_or(0);
+    phase_map.entry(phase).or_default().push(task.clone());
+  }
+  let phases: Vec<PhaseGroup> = phase_map
+    .into_iter()
+    .map(|(number, tasks)| PhaseGroup {
+      number,
+      tasks,
     })
     .collect();
 
-  TaskListTemplate {
+  IterationDetailTemplate {
+    iteration,
     tasks,
-    rows,
+    phases,
+  }
+  .into_response()
+}
+
+/// GET /iterations — iteration list filtered by status.
+pub async fn iteration_list(State(state): State<ServerState>, Query(params): Query<IterationListParams>) -> Response {
+  let filter = IterationFilter {
+    all: true,
+    ..Default::default()
+  };
+
+  let all_iterations = match store::list_iterations(&state.settings, &filter) {
+    Ok(iterations) => iterations,
+    Err(e) => {
+      log::error!("failed to list iterations: {e}");
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Html("<p>failed to load iterations</p>"),
+      )
+        .into_response();
+    }
+  };
+
+  let active_count = all_iterations
+    .iter()
+    .filter(|i| i.status == IterationStatus::Active)
+    .count();
+  let completed_count = all_iterations
+    .iter()
+    .filter(|i| i.status == IterationStatus::Completed)
+    .count();
+  let failed_count = all_iterations
+    .iter()
+    .filter(|i| i.status == IterationStatus::Failed)
+    .count();
+  let current_status = params.status.unwrap_or_else(|| "active".to_string());
+
+  let iterations: Vec<_> = all_iterations
+    .into_iter()
+    .filter(|i| i.status.as_str() == current_status)
+    .collect();
+
+  IterationListTemplate {
+    iterations,
     current_status,
-    open_count,
-    in_progress_count,
-    done_count,
-    cancelled_count,
+    active_count,
+    completed_count,
+    failed_count,
+  }
+  .into_response()
+}
+
+/// POST /tasks/:id/notes — add a note to a task.
+pub async fn note_add(
+  State(state): State<ServerState>,
+  Path(id_str): Path<String>,
+  Form(form): Form<NoteFormData>,
+) -> Response {
+  let id = match store::resolve_task_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response();
+    }
+  };
+
+  let body = form.body.trim().to_string();
+  if body.is_empty() {
+    return Redirect::to(&format!("/tasks/{id}")).into_response();
+  }
+
+  let (author, author_email, author_type) = {
+    match crate::cli::git::resolve_author() {
+      Some(git_author) => (git_author.name, git_author.email, AuthorType::Human),
+      None => ("web".to_string(), None, AuthorType::Human),
+    }
+  };
+
+  let new = crate::model::NewNote {
+    author,
+    author_email,
+    author_type,
+    body,
+  };
+
+  match store::note::add_note(&state.settings, &id, new) {
+    Ok(_) => Redirect::to(&format!("/tasks/{id}")).into_response(),
+    Err(e) => {
+      log::error!("failed to add note: {e}");
+      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
+    }
+  }
+}
+
+/// Fallback handler for unmatched routes.
+pub async fn not_found() -> Response {
+  (StatusCode::NOT_FOUND, Html("<p>404 — not found</p>")).into_response()
+}
+
+/// GET /search — search across all entity types.
+pub async fn search(State(state): State<ServerState>, Query(params): Query<SearchParams>) -> Response {
+  if params.q.is_empty() {
+    return SearchTemplate {
+      query: String::new(),
+      tasks: Vec::new(),
+      artifacts: Vec::new(),
+      iterations: Vec::new(),
+      task_count: 0,
+      artifact_count: 0,
+      iteration_count: 0,
+    }
+    .into_response();
+  }
+
+  let results = match store::search(&state.settings, &params.q, true) {
+    Ok(r) => r,
+    Err(e) => {
+      log::error!("search failed: {e}");
+      return (StatusCode::INTERNAL_SERVER_ERROR, Html("<p>search failed</p>")).into_response();
+    }
+  };
+  let task_count = results.tasks.len();
+  let artifact_count = results.artifacts.len();
+  let iteration_count = results.iterations.len();
+
+  SearchTemplate {
+    query: params.q,
+    tasks: results.tasks,
+    artifacts: results.artifacts,
+    iterations: results.iterations,
+    task_count,
+    artifact_count,
+    iteration_count,
+  }
+  .into_response()
+}
+
+/// POST /tasks — create a task.
+pub async fn task_create(State(state): State<ServerState>, body: Bytes) -> Response {
+  let form = TaskFormData::from_bytes(&body);
+  let title = form.title.trim().to_string();
+  if title.is_empty() {
+    return TaskCreateTemplate {
+      title: form.title,
+      description: form.description,
+      tags: form.tags,
+      priority: form.priority,
+      error: Some("Title is required".to_string()),
+    }
+    .into_response();
+  }
+
+  let tags: Vec<String> = form
+    .tags
+    .split(',')
+    .map(|s| s.trim().to_string())
+    .filter(|s| !s.is_empty())
+    .collect();
+
+  let priority: Option<u8> = if form.priority.trim().is_empty() {
+    None
+  } else {
+    form.priority.trim().parse().ok()
+  };
+
+  let links = parse_form_links(&form.link_rels, &form.link_refs);
+
+  let new_task = NewTask {
+    title,
+    description: form.description,
+    tags,
+    priority,
+    links,
+    ..Default::default()
+  };
+
+  match store::create_task(&state.settings, new_task) {
+    Ok(task) => Redirect::to(&format!("/tasks/{}", task.id)).into_response(),
+    Err(e) => {
+      log::error!("failed to create task: {e}");
+      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
+    }
+  }
+}
+
+/// GET /tasks/new — task create form.
+pub async fn task_create_form() -> Response {
+  TaskCreateTemplate {
+    title: String::new(),
+    description: String::new(),
+    tags: String::new(),
+    priority: String::new(),
+    error: None,
   }
   .into_response()
 }
@@ -396,66 +901,6 @@ pub async fn task_detail(State(state): State<ServerState>, Path(id_str): Path<St
   .into_response()
 }
 
-/// GET /tasks/new — task create form.
-pub async fn task_create_form() -> Response {
-  TaskCreateTemplate {
-    title: String::new(),
-    description: String::new(),
-    tags: String::new(),
-    priority: String::new(),
-    error: None,
-  }
-  .into_response()
-}
-
-/// POST /tasks — create a task.
-pub async fn task_create(State(state): State<ServerState>, body: Bytes) -> Response {
-  let form = TaskFormData::from_bytes(&body);
-  let title = form.title.trim().to_string();
-  if title.is_empty() {
-    return TaskCreateTemplate {
-      title: form.title,
-      description: form.description,
-      tags: form.tags,
-      priority: form.priority,
-      error: Some("Title is required".to_string()),
-    }
-    .into_response();
-  }
-
-  let tags: Vec<String> = form
-    .tags
-    .split(',')
-    .map(|s| s.trim().to_string())
-    .filter(|s| !s.is_empty())
-    .collect();
-
-  let priority: Option<u8> = if form.priority.trim().is_empty() {
-    None
-  } else {
-    form.priority.trim().parse().ok()
-  };
-
-  let links = parse_form_links(&form.link_rels, &form.link_refs);
-
-  let new_task = NewTask {
-    title,
-    description: form.description,
-    tags,
-    priority,
-    links,
-    ..Default::default()
-  };
-
-  match store::create_task(&state.settings, new_task) {
-    Ok(task) => Redirect::to(&format!("/tasks/{}", task.id)).into_response(),
-    Err(e) => {
-      log::error!("failed to create task: {e}");
-      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
-    }
-  }
-}
-
 /// GET /tasks/:id/edit — task edit form.
 pub async fn task_edit_form(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
   let id = match store::resolve_task_id(&state.settings, &id_str, true) {
@@ -483,6 +928,63 @@ pub async fn task_edit_form(State(state): State<ServerState>, Path(id_str): Path
     priority,
     error: None,
     task,
+  }
+  .into_response()
+}
+
+/// GET /tasks — task list filtered by status.
+pub async fn task_list(State(state): State<ServerState>, Query(params): Query<TaskListParams>) -> Response {
+  let all_tasks = match store::list_tasks(
+    &state.settings,
+    &TaskFilter {
+      all: true,
+      ..Default::default()
+    },
+  ) {
+    Ok(t) => t,
+    Err(e) => {
+      log::error!("failed to list tasks: {e}");
+      return (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response();
+    }
+  };
+
+  let open_count = all_tasks.iter().filter(|t| t.status == Status::Open).count();
+  let in_progress_count = all_tasks.iter().filter(|t| t.status == Status::InProgress).count();
+  let done_count = all_tasks.iter().filter(|t| t.status == Status::Done).count();
+  let cancelled_count = all_tasks.iter().filter(|t| t.status == Status::Cancelled).count();
+
+  let current_status = match params.status.as_deref() {
+    Some("in_progress") => Status::InProgress,
+    Some("done") => Status::Done,
+    Some("cancelled") => Status::Cancelled,
+    _ => Status::Open,
+  };
+
+  let tasks: Vec<_> = all_tasks.into_iter().filter(|t| t.status == current_status).collect();
+
+  let blockings = store::resolve_blocking_batch(&state.settings, &tasks);
+
+  let rows: Vec<TaskRow> = tasks
+    .iter()
+    .zip(blockings)
+    .map(|(task, blocking)| {
+      let is_blocked = !blocking.blocked_by_ids.is_empty();
+      TaskRow {
+        task: task.clone(),
+        blocking,
+        is_blocked,
+      }
+    })
+    .collect();
+
+  TaskListTemplate {
+    tasks,
+    rows,
+    current_status,
+    open_count,
+    in_progress_count,
+    done_count,
+    cancelled_count,
   }
   .into_response()
 }
@@ -554,508 +1056,4 @@ pub async fn task_update(State(state): State<ServerState>, Path(id_str): Path<St
       (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
     }
   }
-}
-
-/// GET /artifacts — artifact list with status filtering.
-pub async fn artifact_list(State(state): State<ServerState>, Query(params): Query<ArtifactListParams>) -> Response {
-  let filter = ArtifactFilter {
-    all: true,
-    ..Default::default()
-  };
-
-  let all_artifacts = match store::list_artifacts(&state.settings, &filter) {
-    Ok(a) => a,
-    Err(e) => {
-      log::error!("failed to list artifacts: {e}");
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Html("<p>failed to load artifacts</p>"),
-      )
-        .into_response();
-    }
-  };
-
-  let open_count = all_artifacts.iter().filter(|a| a.archived_at.is_none()).count();
-  let archived_count = all_artifacts.iter().filter(|a| a.archived_at.is_some()).count();
-  let current_status = params.status.unwrap_or_else(|| "open".to_string());
-
-  let artifacts: Vec<_> = all_artifacts
-    .into_iter()
-    .filter(|a| match current_status.as_str() {
-      "archived" => a.archived_at.is_some(),
-      _ => a.archived_at.is_none(),
-    })
-    .collect();
-
-  ArtifactListTemplate {
-    artifacts,
-    open_count,
-    archived_count,
-    current_status,
-  }
-  .into_response()
-}
-
-/// GET /artifacts/:id — artifact detail with rendered Markdown.
-pub async fn artifact_detail(State(state): State<ServerState>, Path(id): Path<String>) -> Response {
-  let resolved = match store::resolve_artifact_id(&state.settings, &id, true) {
-    Ok(id) => id,
-    Err(_) => {
-      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
-    }
-  };
-
-  match store::read_artifact(&state.settings, &resolved) {
-    Ok(artifact) => {
-      let body_html = render_markdown(&artifact.body);
-      ArtifactDetailTemplate {
-        artifact,
-        body_html,
-      }
-      .into_response()
-    }
-    Err(e) => {
-      log::error!("failed to read artifact {resolved}: {e}");
-      (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Html("<p>failed to load artifact</p>"),
-      )
-        .into_response()
-    }
-  }
-}
-
-/// GET /artifacts/new — render the create artifact form.
-pub async fn artifact_create_form() -> Response {
-  ArtifactCreateTemplate {
-    title: String::new(),
-    kind: String::new(),
-    tags: String::new(),
-    body: String::new(),
-    error: None,
-  }
-  .into_response()
-}
-
-/// POST /artifacts — create a new artifact.
-pub async fn artifact_create(State(state): State<ServerState>, Form(form): Form<ArtifactFormData>) -> Response {
-  let title = form.title.trim().to_string();
-  if title.is_empty() {
-    return ArtifactCreateTemplate {
-      title: form.title,
-      kind: form.kind,
-      tags: form.tags,
-      body: form.body,
-      error: Some("Title is required.".to_string()),
-    }
-    .into_response();
-  }
-
-  let kind = {
-    let k = form.kind.trim().to_string();
-    if k.is_empty() { None } else { Some(k) }
-  };
-
-  let tags: Vec<String> = form
-    .tags
-    .split(',')
-    .map(|t| t.trim().to_string())
-    .filter(|t| !t.is_empty())
-    .collect();
-
-  let new = NewArtifact {
-    body: form.body,
-    kind,
-    metadata: yaml_serde::Mapping::new(),
-    tags,
-    title,
-  };
-
-  match store::create_artifact(&state.settings, new) {
-    Ok(artifact) => Redirect::to(&format!("/artifacts/{}", artifact.id)).into_response(),
-    Err(e) => {
-      log::error!("failed to create artifact: {e}");
-      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
-    }
-  }
-}
-
-/// GET /artifacts/:id/edit — render the edit artifact form.
-pub async fn artifact_edit_form(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
-  let resolved = match store::resolve_artifact_id(&state.settings, &id_str, true) {
-    Ok(id) => id,
-    Err(_) => {
-      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
-    }
-  };
-
-  let artifact = match store::read_artifact(&state.settings, &resolved) {
-    Ok(a) => a,
-    Err(e) => {
-      log::error!("failed to read artifact {resolved}: {e}");
-      return (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response();
-    }
-  };
-
-  let tags = artifact.tags.join(", ");
-  let kind = artifact.kind.clone().unwrap_or_default();
-  ArtifactEditTemplate {
-    title: artifact.title.clone(),
-    kind,
-    tags,
-    body: artifact.body.clone(),
-    error: None,
-    artifact,
-  }
-  .into_response()
-}
-
-/// POST /artifacts/:id — update an existing artifact.
-pub async fn artifact_update(
-  State(state): State<ServerState>,
-  Path(id_str): Path<String>,
-  Form(form): Form<ArtifactFormData>,
-) -> Response {
-  let resolved = match store::resolve_artifact_id(&state.settings, &id_str, true) {
-    Ok(id) => id,
-    Err(_) => {
-      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
-    }
-  };
-
-  let title = form.title.trim().to_string();
-  if title.is_empty() {
-    let artifact = match store::read_artifact(&state.settings, &resolved) {
-      Ok(a) => a,
-      Err(e) => {
-        log::error!("failed to read artifact {resolved}: {e}");
-        return (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response();
-      }
-    };
-
-    return ArtifactEditTemplate {
-      title: form.title,
-      kind: form.kind,
-      tags: form.tags,
-      body: form.body,
-      error: Some("Title is required.".to_string()),
-      artifact,
-    }
-    .into_response();
-  }
-
-  let kind = {
-    let k = form.kind.trim().to_string();
-    if k.is_empty() { None } else { Some(k) }
-  };
-
-  let tags: Vec<String> = form
-    .tags
-    .split(',')
-    .map(|t| t.trim().to_string())
-    .filter(|t| !t.is_empty())
-    .collect();
-
-  let patch = ArtifactPatch {
-    body: Some(form.body),
-    kind,
-    metadata: None,
-    tags: Some(tags),
-    title: Some(title),
-  };
-
-  match store::update_artifact(&state.settings, &resolved, patch) {
-    Ok(_) => Redirect::to(&format!("/artifacts/{}", resolved)).into_response(),
-    Err(e) => {
-      log::error!("failed to update artifact {resolved}: {e}");
-      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
-    }
-  }
-}
-
-/// POST /artifacts/:id/archive — archive an artifact.
-pub async fn artifact_archive(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
-  let resolved = match store::resolve_artifact_id(&state.settings, &id_str, true) {
-    Ok(id) => id,
-    Err(_) => {
-      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
-    }
-  };
-
-  match store::archive_artifact(&state.settings, &resolved) {
-    Ok(()) => Redirect::to("/artifacts").into_response(),
-    Err(e) => {
-      log::error!("failed to archive artifact {resolved}: {e}");
-      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
-    }
-  }
-}
-
-/// GET /iterations — iteration list filtered by status.
-pub async fn iteration_list(State(state): State<ServerState>, Query(params): Query<IterationListParams>) -> Response {
-  let filter = IterationFilter {
-    all: true,
-    ..Default::default()
-  };
-
-  let all_iterations = match store::list_iterations(&state.settings, &filter) {
-    Ok(iterations) => iterations,
-    Err(e) => {
-      log::error!("failed to list iterations: {e}");
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Html("<p>failed to load iterations</p>"),
-      )
-        .into_response();
-    }
-  };
-
-  let active_count = all_iterations
-    .iter()
-    .filter(|i| i.status == IterationStatus::Active)
-    .count();
-  let completed_count = all_iterations
-    .iter()
-    .filter(|i| i.status == IterationStatus::Completed)
-    .count();
-  let failed_count = all_iterations
-    .iter()
-    .filter(|i| i.status == IterationStatus::Failed)
-    .count();
-  let current_status = params.status.unwrap_or_else(|| "active".to_string());
-
-  let iterations: Vec<_> = all_iterations
-    .into_iter()
-    .filter(|i| i.status.as_str() == current_status)
-    .collect();
-
-  IterationListTemplate {
-    iterations,
-    current_status,
-    active_count,
-    completed_count,
-    failed_count,
-  }
-  .into_response()
-}
-
-/// GET /iterations/:id — iteration detail with phase graph.
-pub async fn iteration_detail(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
-  let id = match store::resolve_iteration_id(&state.settings, &id_str, true) {
-    Ok(id) => id,
-    Err(_) => {
-      return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response();
-    }
-  };
-
-  let iteration = match store::read_iteration(&state.settings, &id) {
-    Ok(it) => it,
-    Err(e) => {
-      log::error!("failed to read iteration {id}: {e}");
-      return (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response();
-    }
-  };
-
-  let tasks = store::read_iteration_tasks(&state.settings, &iteration);
-
-  let mut phase_map: BTreeMap<u16, Vec<crate::model::Task>> = BTreeMap::new();
-  for task in &tasks {
-    let phase = task.phase.unwrap_or(0);
-    phase_map.entry(phase).or_default().push(task.clone());
-  }
-  let phases: Vec<PhaseGroup> = phase_map
-    .into_iter()
-    .map(|(number, tasks)| PhaseGroup {
-      number,
-      tasks,
-    })
-    .collect();
-
-  IterationDetailTemplate {
-    iteration,
-    tasks,
-    phases,
-  }
-  .into_response()
-}
-
-/// GET /iterations/:id/board — iteration kanban board.
-pub async fn iteration_board(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
-  let id = match store::resolve_iteration_id(&state.settings, &id_str, true) {
-    Ok(id) => id,
-    Err(_) => {
-      return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response();
-    }
-  };
-
-  let iteration = match store::read_iteration(&state.settings, &id) {
-    Ok(it) => it,
-    Err(e) => {
-      log::error!("failed to read iteration {id}: {e}");
-      return (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response();
-    }
-  };
-
-  let tasks = store::read_iteration_tasks(&state.settings, &iteration);
-
-  let open_tasks: Vec<_> = tasks.iter().filter(|t| t.status == Status::Open).cloned().collect();
-  let in_progress_tasks: Vec<_> = tasks
-    .iter()
-    .filter(|t| t.status == Status::InProgress)
-    .cloned()
-    .collect();
-  let done_tasks: Vec<_> = tasks.iter().filter(|t| t.status == Status::Done).cloned().collect();
-  let cancelled_tasks: Vec<_> = tasks
-    .iter()
-    .filter(|t| t.status == Status::Cancelled)
-    .cloned()
-    .collect();
-
-  IterationBoardTemplate {
-    iteration,
-    open_tasks,
-    in_progress_tasks,
-    done_tasks,
-    cancelled_tasks,
-  }
-  .into_response()
-}
-
-/// GET /search — search across all entity types.
-pub async fn search(State(state): State<ServerState>, Query(params): Query<SearchParams>) -> Response {
-  if params.q.is_empty() {
-    return SearchTemplate {
-      query: String::new(),
-      tasks: Vec::new(),
-      artifacts: Vec::new(),
-      iterations: Vec::new(),
-      task_count: 0,
-      artifact_count: 0,
-      iteration_count: 0,
-    }
-    .into_response();
-  }
-
-  let results = match store::search(&state.settings, &params.q, true) {
-    Ok(r) => r,
-    Err(e) => {
-      log::error!("search failed: {e}");
-      return (StatusCode::INTERNAL_SERVER_ERROR, Html("<p>search failed</p>")).into_response();
-    }
-  };
-  let task_count = results.tasks.len();
-  let artifact_count = results.artifacts.len();
-  let iteration_count = results.iterations.len();
-
-  SearchTemplate {
-    query: params.q,
-    tasks: results.tasks,
-    artifacts: results.artifacts,
-    iterations: results.iterations,
-    task_count,
-    artifact_count,
-    iteration_count,
-  }
-  .into_response()
-}
-
-// ── API endpoints ─────────────────────────────────────────────────────────────
-
-/// GET /api/search?q=... — JSON search results.
-pub async fn api_search(State(state): State<ServerState>, Query(params): Query<SearchParams>) -> Response {
-  if params.q.is_empty() {
-    return Json(Vec::<ApiSearchResult>::new()).into_response();
-  }
-
-  let results = match store::search(&state.settings, &params.q, true) {
-    Ok(r) => r,
-    Err(e) => {
-      log::error!("api search failed: {e}");
-      return (StatusCode::INTERNAL_SERVER_ERROR, Json(Vec::<ApiSearchResult>::new())).into_response();
-    }
-  };
-
-  let mut items: Vec<ApiSearchResult> = Vec::new();
-  for task in results.tasks {
-    items.push(ApiSearchResult {
-      kind: "task".to_string(),
-      id: task.id.to_string(),
-      short_id: task.id.short(),
-      title: task.title,
-    });
-  }
-  for artifact in results.artifacts {
-    items.push(ApiSearchResult {
-      kind: "artifact".to_string(),
-      id: artifact.id.to_string(),
-      short_id: artifact.id.short(),
-      title: artifact.title,
-    });
-  }
-  for iteration in results.iterations {
-    items.push(ApiSearchResult {
-      kind: "iteration".to_string(),
-      id: iteration.id.to_string(),
-      short_id: iteration.id.short(),
-      title: iteration.title,
-    });
-  }
-
-  Json(items).into_response()
-}
-
-/// POST /api/render-markdown — render Markdown to HTML.
-pub async fn api_render_markdown(Json(payload): Json<RenderMarkdownBody>) -> Response {
-  let html_output = render_markdown(&payload.body);
-  (
-    [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
-    html_output,
-  )
-    .into_response()
-}
-
-/// POST /tasks/:id/notes — add a note to a task.
-pub async fn note_add(
-  State(state): State<ServerState>,
-  Path(id_str): Path<String>,
-  Form(form): Form<NoteFormData>,
-) -> Response {
-  let id = match store::resolve_task_id(&state.settings, &id_str, true) {
-    Ok(id) => id,
-    Err(_) => {
-      return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response();
-    }
-  };
-
-  let body = form.body.trim().to_string();
-  if body.is_empty() {
-    return Redirect::to(&format!("/tasks/{id}")).into_response();
-  }
-
-  let (author, author_email, author_type) = {
-    match crate::cli::git::resolve_author() {
-      Some(git_author) => (git_author.name, git_author.email, AuthorType::Human),
-      None => ("web".to_string(), None, AuthorType::Human),
-    }
-  };
-
-  let new = crate::model::NewNote {
-    author,
-    author_email,
-    author_type,
-    body,
-  };
-
-  match store::note::add_note(&state.settings, &id, new) {
-    Ok(_) => Redirect::to(&format!("/tasks/{id}")).into_response(),
-    Err(e) => {
-      log::error!("failed to add note: {e}");
-      (StatusCode::INTERNAL_SERVER_ERROR, Html(format!("<p>error: {e}</p>"))).into_response()
-    }
-  }
-}
-
-/// Fallback handler for unmatched routes.
-pub async fn not_found() -> Response {
-  (StatusCode::NOT_FOUND, Html("<p>404 — not found</p>")).into_response()
 }

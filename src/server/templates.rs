@@ -16,7 +16,7 @@ use crate::{
   store::ResolvedBlocking,
 };
 
-// ── Artifacts ────────────────────────────────────────────────────────────────
+// ── Artifacts ─────────────────────────────────
 
 #[derive(Template)]
 #[template(path = "artifacts/create.html")]
@@ -79,7 +79,7 @@ impl IntoResponse for ArtifactListTemplate {
   }
 }
 
-// ── Dashboard ────────────────────────────────────────────────────────────────
+// ── Dashboard ─────────────────────────────────
 
 #[derive(Template)]
 #[template(path = "dashboard.html")]
@@ -99,7 +99,7 @@ impl IntoResponse for DashboardTemplate {
   }
 }
 
-// ── Display helpers ───────────────────────────────────────────────────────────
+// ── Display helpers ───────────────────────────────
 
 /// Pre-rendered event for display in the task detail template.
 pub struct DisplayEvent {
@@ -126,7 +126,7 @@ pub struct DisplayNote {
   pub is_agent: bool,
 }
 
-// ── Iterations ───────────────────────────────────────────────────────────────
+// ── Iterations ─────────────────────────────────
 
 #[derive(Template)]
 #[template(path = "iterations/board.html")]
@@ -179,7 +179,7 @@ pub struct PhaseGroup {
   pub tasks: Vec<Task>,
 }
 
-// ── Search ───────────────────────────────────────────────────────────────────
+// ── Search ──────────────────────────────────
 
 #[derive(Template)]
 #[template(path = "search.html")]
@@ -199,7 +199,7 @@ impl IntoResponse for SearchTemplate {
   }
 }
 
-// ── Tasks ────────────────────────────────────────────────────────────────────
+// ── Tasks ──────────────────────────────────
 
 #[derive(Template)]
 #[template(path = "tasks/create.html")]
@@ -281,7 +281,7 @@ pub enum TimelineEntry {
   Note(DisplayNote),
 }
 
-// ── Render helper ─────────────────────────────────────────────────────────────
+// ── Render helper ────────────────────────────────
 
 pub fn render(tmpl: &impl Template) -> Response {
   match tmpl.render() {

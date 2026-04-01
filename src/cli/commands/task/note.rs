@@ -15,15 +15,6 @@ pub struct Command {
   command: NoteCommand,
 }
 
-#[derive(Debug, Subcommand)]
-enum NoteCommand {
-  Add(add::Command),
-  Delete(delete::Command),
-  List(list::Command),
-  Show(show::Command),
-  Update(update::Command),
-}
-
 impl Command {
   /// Dispatch to the appropriate note subcommand.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
@@ -35,4 +26,13 @@ impl Command {
       NoteCommand::Update(cmd) => cmd.call(ctx),
     }
   }
+}
+
+#[derive(Debug, Subcommand)]
+enum NoteCommand {
+  Add(add::Command),
+  Delete(delete::Command),
+  List(list::Command),
+  Show(show::Command),
+  Update(update::Command),
 }

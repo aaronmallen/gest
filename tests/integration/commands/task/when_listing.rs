@@ -3,6 +3,13 @@ use predicates::prelude::*;
 use crate::support::helpers::GestCmd;
 
 #[test]
+fn it_lists_empty_when_no_tasks() {
+  let env = GestCmd::new();
+
+  env.run(&["task", "list"]).success();
+}
+
+#[test]
 fn it_lists_tasks() {
   let env = GestCmd::new();
 
@@ -12,13 +19,6 @@ fn it_lists_tasks() {
     .run(&["task", "list"])
     .success()
     .stdout(predicate::str::contains("List me please"));
-}
-
-#[test]
-fn it_lists_empty_when_no_tasks() {
-  let env = GestCmd::new();
-
-  env.run(&["task", "list"]).success();
 }
 
 #[test]

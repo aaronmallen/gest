@@ -22,6 +22,13 @@ fn create_task_and_get_id(env: &GestCmd, title: &str) -> String {
 }
 
 #[test]
+fn it_errors_on_nonexistent_task() {
+  let env = GestCmd::new();
+
+  env.run(&["task", "show", "00000000"]).failure();
+}
+
+#[test]
 fn it_shows_a_task() {
   let env = GestCmd::new();
   let id = create_task_and_get_id(&env, "Show me");
@@ -30,11 +37,4 @@ fn it_shows_a_task() {
     .run(&["task", "show", &id])
     .success()
     .stdout(predicate::str::contains("Show me"));
-}
-
-#[test]
-fn it_errors_on_nonexistent_task() {
-  let env = GestCmd::new();
-
-  env.run(&["task", "show", "00000000"]).failure();
 }

@@ -72,20 +72,20 @@ mod tests {
     }
 
     #[test]
-    fn it_returns_initial_content_with_noop_editor() {
-      with_var("VISUAL", Some("true"), || {
-        let content = edit_temp(Some("hello world"), ".md").unwrap();
-
-        assert_eq!(content, "hello world");
-      });
-    }
-
-    #[test]
     fn it_returns_initial_content_with_editor_fallback() {
       with_vars([("VISUAL", None::<&str>), ("EDITOR", Some("true"))], || {
         let content = edit_temp(Some("fallback test"), ".md").unwrap();
 
         assert_eq!(content, "fallback test");
+      });
+    }
+
+    #[test]
+    fn it_returns_initial_content_with_noop_editor() {
+      with_var("VISUAL", Some("true"), || {
+        let content = edit_temp(Some("hello world"), ".md").unwrap();
+
+        assert_eq!(content, "hello world");
       });
     }
   }

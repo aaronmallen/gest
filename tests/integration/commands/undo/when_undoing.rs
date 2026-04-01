@@ -3,6 +3,17 @@ use predicates::prelude::*;
 use crate::support::helpers::GestCmd;
 
 #[test]
+fn it_errors_with_no_history() {
+  let env = GestCmd::new();
+
+  // A freshly initialized project has no mutations to undo.
+  env
+    .run(&["undo"])
+    .failure()
+    .stderr(predicate::str::contains("Nothing to undo"));
+}
+
+#[test]
 fn it_undoes_a_mutation() {
   let env = GestCmd::new();
 
@@ -22,15 +33,4 @@ fn it_undoes_a_mutation() {
   env
     .run(&["task", "list"])
     .stdout(predicate::str::contains("no tasks found"));
-}
-
-#[test]
-fn it_errors_with_no_history() {
-  let env = GestCmd::new();
-
-  // A freshly initialized project has no mutations to undo.
-  env
-    .run(&["undo"])
-    .failure()
-    .stderr(predicate::str::contains("Nothing to undo"));
 }

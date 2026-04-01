@@ -4,7 +4,7 @@ use crate::{
   cli::{self, AppContext},
   model::Task,
   store,
-  ui::views::task::TaskDetailView,
+  ui::{theming::theme::Theme, views::task::TaskDetailView},
 };
 
 /// Find (or claim) the next available task in an iteration.
@@ -12,12 +12,12 @@ use crate::{
 pub struct Command {
   /// Iteration ID or unique prefix.
   pub id: String,
-  /// Claim the task (set to in-progress).
-  #[arg(long)]
-  pub claim: bool,
   /// Agent name for assignment (required with --claim).
   #[arg(long)]
   pub agent: Option<String>,
+  /// Claim the task (set to in-progress).
+  #[arg(long)]
+  pub claim: bool,
   /// Output as JSON.
   #[arg(short, long)]
   pub json: bool,
@@ -56,7 +56,7 @@ impl Command {
   }
 }
 
-fn print_task_detail(task: &Task, theme: &crate::ui::theming::theme::Theme) {
+fn print_task_detail(task: &Task, theme: &Theme) {
   let id_str = task.id.to_string();
   let status_str = task.status.as_str();
 
@@ -113,49 +113,6 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-
-    #[test]
-    fn it_returns_no_result_when_no_tasks() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        claim: false,
-        agent: None,
-        json: false,
-      };
-
-      let err = cmd.call(&ctx).unwrap_err();
-      assert_eq!(err.exit_code(), 2);
-      assert_eq!(err.to_string(), "no available tasks");
-    }
-
-    #[test]
-    fn it_peeks_at_next_task() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      task.phase = Some(1);
-      task.priority = Some(1);
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks.push(task.id.to_string());
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        claim: false,
-        agent: None,
-        json: false,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
 
     #[test]
     fn it_claims_next_task() {
@@ -226,6 +183,49 @@ mod tests {
       };
 
       cmd.call(&ctx).unwrap();
+    }
+
+    #[test]
+    fn it_peeks_at_next_task() {
+      let dir = tempfile::tempdir().unwrap();
+      let ctx = make_test_context(dir.path());
+
+      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      task.phase = Some(1);
+      task.priority = Some(1);
+      store::write_task(&ctx.settings, &task).unwrap();
+
+      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      iteration.tasks.push(task.id.to_string());
+      store::write_iteration(&ctx.settings, &iteration).unwrap();
+
+      let cmd = Command {
+        id: "zyxw".to_string(),
+        agent: None,
+        claim: false,
+        json: false,
+      };
+
+      cmd.call(&ctx).unwrap();
+    }
+
+    #[test]
+    fn it_returns_no_result_when_no_tasks() {
+      let dir = tempfile::tempdir().unwrap();
+      let ctx = make_test_context(dir.path());
+      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      store::write_iteration(&ctx.settings, &iteration).unwrap();
+
+      let cmd = Command {
+        id: "zyxw".to_string(),
+        agent: None,
+        claim: false,
+        json: false,
+      };
+
+      let err = cmd.call(&ctx).unwrap_err();
+      assert_eq!(err.exit_code(), 2);
+      assert_eq!(err.to_string(), "no available tasks");
     }
   }
 }

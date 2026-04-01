@@ -15,27 +15,6 @@ fn it_creates_an_artifact() {
 }
 
 #[test]
-fn it_creates_with_type_spec() {
-  let env = GestCmd::new();
-
-  env
-    .cmd()
-    .args([
-      "artifact",
-      "create",
-      "--title",
-      "Spec Artifact",
-      "--body",
-      "spec body",
-      "--type",
-      "spec",
-    ])
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("created artifact"));
-}
-
-#[test]
 fn it_creates_with_type_adr() {
   let env = GestCmd::new();
 
@@ -71,6 +50,27 @@ fn it_creates_with_type_rfc() {
       "rfc body",
       "--type",
       "rfc",
+    ])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("created artifact"));
+}
+
+#[test]
+fn it_creates_with_type_spec() {
+  let env = GestCmd::new();
+
+  env
+    .cmd()
+    .args([
+      "artifact",
+      "create",
+      "--title",
+      "Spec Artifact",
+      "--body",
+      "spec body",
+      "--type",
+      "spec",
     ])
     .assert()
     .success()

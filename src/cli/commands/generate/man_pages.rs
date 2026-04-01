@@ -1,6 +1,6 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use clap::{Args, CommandFactory};
+use clap::{Args, Command as ClapCommand, CommandFactory};
 
 use crate::cli;
 
@@ -25,7 +25,7 @@ impl Command {
 }
 
 /// Recursively render a `.1` man page for `cmd` and each visible subcommand.
-fn generate_man_pages(cmd: &clap::Command, dir: &std::path::Path, prefix: &str) -> cli::Result<()> {
+fn generate_man_pages(cmd: &ClapCommand, dir: &Path, prefix: &str) -> cli::Result<()> {
   let man = clap_mangen::Man::new(cmd.clone());
   let filename = format!("{prefix}.1");
   let path = dir.join(&filename);

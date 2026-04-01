@@ -28,16 +28,6 @@ impl Display for Value {
 mod tests {
   use super::*;
 
-  mod new {
-    use super::*;
-
-    #[test]
-    fn it_accepts_string_and_str() {
-      let _from_str = Value::new("ok", Style::default());
-      let _from_string = Value::new(String::from("ok"), Style::default());
-    }
-  }
-
   mod display {
     use super::*;
 
@@ -46,6 +36,16 @@ mod tests {
       let value = Value::new("in-progress", Style::new().bold());
       let rendered = format!("{value}");
       assert!(rendered.contains("in-progress"));
+    }
+  }
+
+  mod new {
+    use super::*;
+
+    #[test]
+    fn it_accepts_string_and_str() {
+      let _from_str = Value::new("ok", Style::default());
+      let _from_string = Value::new(String::from("ok"), Style::default());
     }
   }
 }

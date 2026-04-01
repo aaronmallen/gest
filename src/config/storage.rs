@@ -61,117 +61,6 @@ impl Settings {
     &self.resolved_project_dir
   }
 
-  /// The resolved state directory (event store, undo log).
-  pub fn state_dir(&self) -> &Path {
-    &self.resolved_state_dir
-  }
-
-  /// The resolved task storage directory.
-  pub fn task_dir(&self) -> &Path {
-    &self.resolved_task_dir
-  }
-
-  /// Resolve all storage paths from the working directory.
-  ///
-  /// Called during config loading so the settings are ready to use immediately.
-  pub(crate) fn resolve(&mut self, cwd: PathBuf) -> Result<(), Error> {
-    self.resolved_state_dir = self.resolve_state_dir(&cwd)?;
-    self.resolved_data_dir = self.resolve_data_dir()?;
-    self.resolved_project_dir = self.resolve_project_dir(&cwd)?;
-    let project_dir = self.resolved_project_dir.clone();
-    self.resolved_artifact_dir = self.resolve_artifact_dir_from(&project_dir);
-    self.resolved_iteration_dir = self.resolve_iteration_dir_from(&project_dir);
-    self.resolved_task_dir = self.resolve_task_dir_from(&project_dir);
-    Ok(())
-  }
-
-  /// Set storage paths for an already-known project directory, skipping discovery.
-  #[cfg(test)]
-  pub fn resolve_at(&mut self, project_dir: PathBuf) {
-    self.resolved_project_dir = project_dir;
-    let base = self.resolved_project_dir.clone();
-    self.resolved_artifact_dir = self.resolve_artifact_dir_from(&base);
-    self.resolved_iteration_dir = self.resolve_iteration_dir_from(&base);
-    self.resolved_task_dir = self.resolve_task_dir_from(&base);
-  }
-
-  /// Set the state directory path directly, skipping env-var/fallback discovery.
-  #[cfg(test)]
-  pub fn resolve_state_at(&mut self, state_dir: PathBuf) {
-    self.resolved_state_dir = state_dir;
-  }
-
-  /// Resolve the artifact directory for a given base project directory.
-  pub(crate) fn resolve_artifact_dir_from(&self, project_dir: &Path) -> PathBuf {
-    resolve_entity_dir(
-      &super::env::GEST_ARTIFACT_DIR,
-      self.artifact_dir.as_deref(),
-      project_dir,
-      "artifacts",
-    )
-  }
-
-  /// Resolve the iteration directory for a given base project directory.
-  pub(crate) fn resolve_iteration_dir_from(&self, project_dir: &Path) -> PathBuf {
-    resolve_entity_dir(
-      &super::env::GEST_ITERATION_DIR,
-      self.iteration_dir.as_deref(),
-      project_dir,
-      "iterations",
-    )
-  }
-
-  /// Resolve the task directory for a given base project directory.
-  pub(crate) fn resolve_task_dir_from(&self, project_dir: &Path) -> PathBuf {
-    resolve_entity_dir(
-      &super::env::GEST_TASK_DIR,
-      self.task_dir.as_deref(),
-      project_dir,
-      "tasks",
-    )
-  }
-
-  /// Resolves the absolute path to the state directory for the given working directory.
-  ///
-  /// Checks `$GEST_STATE_DIR`, then falls back to the platform's global state home
-  /// with a path-derived hash. The state directory is always global (never in-repo).
-  pub fn resolve_state_dir(&self, cwd: &Path) -> Result<PathBuf, Error> {
-    if let Ok(path) = super::env::GEST_STATE_DIR.value() {
-      if path.is_absolute() {
-        log::debug!("$GEST_STATE_DIR is set");
-        log::trace!("state directory resolved to {}", path.display());
-        return Ok(path);
-      }
-      log::debug!("$GEST_STATE_DIR is set, but is not an absolute path");
-      log::warn!("$GEST_STATE_DIR must be an absolute path");
-      log::trace!("ignoring $GEST_STATE_DIR: {}", path.display());
-    }
-
-    if let Some(path) = &self.state_dir {
-      if path.is_absolute() && path.is_dir() {
-        log::debug!("config specifies storage.state_dir");
-        log::trace!("state directory resolved to {}", path.display());
-        return Ok(path.clone());
-      } else if path.is_dir() {
-        log::debug!("config specifies state_dir, but is not an absolute path");
-        log::warn!("storage.state_dir must be an absolute path");
-        log::trace!("ignoring storage.state_dir: {}", path.display());
-      } else if path.is_absolute() {
-        return Err(Error::NotADirectory(path.clone()));
-      }
-    }
-
-    let global_state_dir = dir_spec::state_home()
-      .map(|p| p.join("gest"))
-      .ok_or(Error::DirectoryNotFound("state"))?;
-
-    let global_project_state_dir = global_state_dir.join(path_hash(cwd));
-    log::debug!("no state directory override found");
-    log::trace!("state directory resolved to {}", global_project_state_dir.display());
-
-    Ok(global_project_state_dir)
-  }
-
   /// Resolves the global data root directory.
   ///
   /// Checks `$GEST_DATA_DIR`, then the configured `data_dir`, then falls back to
@@ -262,6 +151,117 @@ impl Settings {
     log::trace!("project directory resolved to {}", global_project_dir.display());
 
     Ok(global_project_dir)
+  }
+
+  /// Resolves the absolute path to the state directory for the given working directory.
+  ///
+  /// Checks `$GEST_STATE_DIR`, then falls back to the platform's global state home
+  /// with a path-derived hash. The state directory is always global (never in-repo).
+  pub fn resolve_state_dir(&self, cwd: &Path) -> Result<PathBuf, Error> {
+    if let Ok(path) = super::env::GEST_STATE_DIR.value() {
+      if path.is_absolute() {
+        log::debug!("$GEST_STATE_DIR is set");
+        log::trace!("state directory resolved to {}", path.display());
+        return Ok(path);
+      }
+      log::debug!("$GEST_STATE_DIR is set, but is not an absolute path");
+      log::warn!("$GEST_STATE_DIR must be an absolute path");
+      log::trace!("ignoring $GEST_STATE_DIR: {}", path.display());
+    }
+
+    if let Some(path) = &self.state_dir {
+      if path.is_absolute() && path.is_dir() {
+        log::debug!("config specifies storage.state_dir");
+        log::trace!("state directory resolved to {}", path.display());
+        return Ok(path.clone());
+      } else if path.is_dir() {
+        log::debug!("config specifies state_dir, but is not an absolute path");
+        log::warn!("storage.state_dir must be an absolute path");
+        log::trace!("ignoring storage.state_dir: {}", path.display());
+      } else if path.is_absolute() {
+        return Err(Error::NotADirectory(path.clone()));
+      }
+    }
+
+    let global_state_dir = dir_spec::state_home()
+      .map(|p| p.join("gest"))
+      .ok_or(Error::DirectoryNotFound("state"))?;
+
+    let global_project_state_dir = global_state_dir.join(path_hash(cwd));
+    log::debug!("no state directory override found");
+    log::trace!("state directory resolved to {}", global_project_state_dir.display());
+
+    Ok(global_project_state_dir)
+  }
+
+  /// The resolved state directory (event store, undo log).
+  pub fn state_dir(&self) -> &Path {
+    &self.resolved_state_dir
+  }
+
+  /// The resolved task storage directory.
+  pub fn task_dir(&self) -> &Path {
+    &self.resolved_task_dir
+  }
+
+  /// Resolve all storage paths from the working directory.
+  ///
+  /// Called during config loading so the settings are ready to use immediately.
+  pub(crate) fn resolve(&mut self, cwd: PathBuf) -> Result<(), Error> {
+    self.resolved_state_dir = self.resolve_state_dir(&cwd)?;
+    self.resolved_data_dir = self.resolve_data_dir()?;
+    self.resolved_project_dir = self.resolve_project_dir(&cwd)?;
+    let project_dir = self.resolved_project_dir.clone();
+    self.resolved_artifact_dir = self.resolve_artifact_dir_from(&project_dir);
+    self.resolved_iteration_dir = self.resolve_iteration_dir_from(&project_dir);
+    self.resolved_task_dir = self.resolve_task_dir_from(&project_dir);
+    Ok(())
+  }
+
+  /// Resolve the artifact directory for a given base project directory.
+  pub(crate) fn resolve_artifact_dir_from(&self, project_dir: &Path) -> PathBuf {
+    resolve_entity_dir(
+      &super::env::GEST_ARTIFACT_DIR,
+      self.artifact_dir.as_deref(),
+      project_dir,
+      "artifacts",
+    )
+  }
+
+  /// Resolve the iteration directory for a given base project directory.
+  pub(crate) fn resolve_iteration_dir_from(&self, project_dir: &Path) -> PathBuf {
+    resolve_entity_dir(
+      &super::env::GEST_ITERATION_DIR,
+      self.iteration_dir.as_deref(),
+      project_dir,
+      "iterations",
+    )
+  }
+
+  /// Resolve the task directory for a given base project directory.
+  pub(crate) fn resolve_task_dir_from(&self, project_dir: &Path) -> PathBuf {
+    resolve_entity_dir(
+      &super::env::GEST_TASK_DIR,
+      self.task_dir.as_deref(),
+      project_dir,
+      "tasks",
+    )
+  }
+
+  /// Set storage paths for an already-known project directory, skipping discovery.
+  #[cfg(test)]
+  pub fn resolve_at(&mut self, project_dir: PathBuf) {
+    self.resolved_project_dir = project_dir;
+    let base = self.resolved_project_dir.clone();
+    self.resolved_artifact_dir = self.resolve_artifact_dir_from(&base);
+    self.resolved_iteration_dir = self.resolve_iteration_dir_from(&base);
+    self.resolved_task_dir = self.resolve_task_dir_from(&base);
+  }
+
+  /// Set the state directory path directly, skipping env-var/fallback discovery.
+  #[cfg(test)]
+  pub fn resolve_state_at(&mut self, state_dir: PathBuf) {
+    self.resolved_state_dir = state_dir;
   }
 }
 

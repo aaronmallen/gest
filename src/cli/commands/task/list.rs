@@ -3,8 +3,7 @@ use clap::Args;
 use crate::{
   cli::{self, AppContext},
   model::{TaskFilter, task::Status},
-  store,
-  store::ResolvedBlocking,
+  store::{self, ResolvedBlocking},
   ui::{
     composites::empty_list::EmptyList,
     views::task::{TaskListView, TaskViewData},
@@ -14,6 +13,9 @@ use crate::{
 /// List tasks, optionally filtered by status or tag.
 #[derive(Debug, Args)]
 pub struct Command {
+  /// Filter by assigned-to name.
+  #[arg(long)]
+  pub assigned_to: Option<String>,
   /// Output task list as JSON.
   #[arg(short, long)]
   pub json: bool,
@@ -26,9 +28,6 @@ pub struct Command {
   /// Filter by tag.
   #[arg(long)]
   pub tag: Option<String>,
-  /// Filter by assigned-to name.
-  #[arg(long)]
-  pub assigned_to: Option<String>,
 }
 
 impl Command {
@@ -64,13 +63,13 @@ impl Command {
       .into_iter()
       .enumerate()
       .map(|(i, t)| TaskViewData {
-        status: t.status.as_str().into(),
-        id: t.id.to_string(),
-        title: t.title,
-        priority: t.priority,
-        tags: t.tags,
-        is_blocking: resolved[i].is_blocking,
         blocked_by: resolved[i].blocked_by_ids.first().cloned(),
+        id: t.id.to_string(),
+        is_blocking: resolved[i].is_blocking,
+        priority: t.priority,
+        status: t.status.as_str().into(),
+        tags: t.tags,
+        title: t.title,
       })
       .collect();
 
@@ -111,11 +110,11 @@ mod tests {
       .unwrap();
 
       let cmd = Command {
-        show_all: false,
+        assigned_to: None,
         json: false,
+        show_all: false,
         status: Some("in-progress".to_string()),
         tag: None,
-        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();
@@ -127,11 +126,11 @@ mod tests {
       let ctx = make_test_context(dir.path());
 
       let cmd = Command {
-        show_all: false,
+        assigned_to: None,
         json: false,
+        show_all: false,
         status: None,
         tag: None,
-        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();
@@ -145,11 +144,11 @@ mod tests {
       store::write_task(&ctx.settings, &task).unwrap();
 
       let cmd = Command {
-        show_all: false,
+        assigned_to: None,
         json: false,
+        show_all: false,
         status: None,
         tag: None,
-        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();
@@ -163,11 +162,11 @@ mod tests {
       store::write_task(&ctx.settings, &task).unwrap();
 
       let cmd = Command {
-        show_all: false,
+        assigned_to: None,
         json: true,
+        show_all: false,
         status: None,
         tag: None,
-        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();
@@ -186,11 +185,11 @@ mod tests {
       store::write_task(&ctx.settings, &task).unwrap();
 
       let cmd = Command {
-        show_all: false,
+        assigned_to: None,
         json: false,
+        show_all: false,
         status: None,
         tag: None,
-        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();
@@ -209,11 +208,11 @@ mod tests {
       store::write_task(&ctx.settings, &task).unwrap();
 
       let cmd = Command {
-        show_all: false,
+        assigned_to: None,
         json: false,
+        show_all: false,
         status: None,
         tag: None,
-        assigned_to: None,
       };
 
       cmd.call(&ctx).unwrap();

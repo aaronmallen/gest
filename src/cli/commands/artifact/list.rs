@@ -36,9 +36,9 @@ impl Command {
     let config = &ctx.settings;
     let theme = &ctx.theme;
     let filter = ArtifactFilter {
+      all: self.show_all,
       kind: self.kind.clone(),
       only_archived: self.archived,
-      all: self.show_all,
       tag: self.tag.clone(),
     };
 

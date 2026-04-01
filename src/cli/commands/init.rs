@@ -4,6 +4,7 @@ use clap::Args;
 
 use crate::{
   cli::{self, AppContext},
+  config::storage::Settings,
   ui::{theming::theme::Theme, views::system::InitView},
 };
 
@@ -33,12 +34,7 @@ impl Command {
 ///
 /// Uses the storage settings to resolve which directories to create,
 /// including per-entity overrides from config or environment variables.
-fn init_at(
-  base: &Path,
-  storage: &crate::config::storage::Settings,
-  config_path: Option<&str>,
-  theme: &Theme,
-) -> cli::Result<()> {
+fn init_at(base: &Path, storage: &Settings, config_path: Option<&str>, theme: &Theme) -> cli::Result<()> {
   if !base.exists() {
     std::fs::create_dir_all(base)?;
   }
@@ -61,8 +57,8 @@ fn init_at(
 mod tests {
   use super::*;
 
-  fn default_storage() -> crate::config::storage::Settings {
-    crate::config::storage::Settings::default()
+  fn default_storage() -> Settings {
+    Settings::default()
   }
 
   mod init_at {

@@ -273,6 +273,15 @@ impl Theme {
     }
   }
 
+  /// Build a theme from color settings alone (palette + overrides), without full app config.
+  #[cfg(test)]
+  fn from_config_colors(colors: &crate::config::colors::Settings) -> Self {
+    let mut theme = Self::default();
+    theme.apply_palette(colors);
+    theme.apply_overrides(colors);
+    theme
+  }
+
   /// Cascade palette color overrides to all tokens referencing each slot.
   ///
   /// Palette values are color-only: they replace the fg color but preserve
@@ -289,15 +298,6 @@ impl Theme {
         *style = style.fg(color);
       }
     }
-  }
-
-  /// Build a theme from color settings alone (palette + overrides), without full app config.
-  #[cfg(test)]
-  fn from_config_colors(colors: &crate::config::colors::Settings) -> Self {
-    let mut theme = Self::default();
-    theme.apply_palette(colors);
-    theme.apply_overrides(colors);
-    theme
   }
 
   /// Return a mutable reference to the style field for the given token key.

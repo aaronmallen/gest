@@ -12,54 +12,6 @@ pub struct SearchResults {
   pub tasks: Vec<Task>,
 }
 
-/// Check whether `haystack` contains `needle` case-insensitively, without
-/// allocating a lowercase copy of the haystack.  `needle` **must** already be
-/// lowercase.
-fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
-  if needle.is_empty() {
-    return true;
-  }
-
-  let needle_len = needle.len();
-  if haystack.len() < needle_len {
-    return false;
-  }
-
-  // Slide a byte-length window over the haystack.  Because `to_lowercase` can
-  // change the byte-length of a char, we iterate by character boundaries and
-  // compare lowercased chars from the haystack against the needle chars.
-  'outer: for (byte_offset, _) in haystack.char_indices() {
-    let remaining = &haystack[byte_offset..];
-    let mut hay_chars = remaining.chars();
-    let mut needle_chars = needle.chars();
-
-    loop {
-      match needle_chars.next() {
-        None => return true, // entire needle matched
-        Some(nc) => match hay_chars.next() {
-          None => break, // haystack exhausted for this starting position
-          Some(hc) => {
-            // Compare lowercased chars.  `to_lowercase` returns an iterator
-            // (multi-char mappings exist, e.g. 'ß' -> "ss"), so we must
-            // compare element-by-element.
-            let mut h_lower = hc.to_lowercase();
-            let mut n_lower = nc.to_lowercase(); // needle is already lowercase, but keeps correctness
-            loop {
-              match (h_lower.next(), n_lower.next()) {
-                (Some(a), Some(b)) if a == b => continue,
-                (None, None) => break, // this char matched
-                _ => continue 'outer,  // mismatch
-              }
-            }
-          }
-        },
-      }
-    }
-  }
-
-  false
-}
-
 /// Perform a case-insensitive full-text search across tasks and artifacts.
 ///
 /// Supports the `tag:<name>` prefix to filter by exact tag match.
@@ -141,6 +93,54 @@ pub fn search(config: &Settings, query: &str, show_all: bool) -> super::Result<S
   })
 }
 
+/// Check whether `haystack` contains `needle` case-insensitively, without
+/// allocating a lowercase copy of the haystack.  `needle` **must** already be
+/// lowercase.
+fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
+  if needle.is_empty() {
+    return true;
+  }
+
+  let needle_len = needle.len();
+  if haystack.len() < needle_len {
+    return false;
+  }
+
+  // Slide a byte-length window over the haystack.  Because `to_lowercase` can
+  // change the byte-length of a char, we iterate by character boundaries and
+  // compare lowercased chars from the haystack against the needle chars.
+  'outer: for (byte_offset, _) in haystack.char_indices() {
+    let remaining = &haystack[byte_offset..];
+    let mut hay_chars = remaining.chars();
+    let mut needle_chars = needle.chars();
+
+    loop {
+      match needle_chars.next() {
+        None => return true, // entire needle matched
+        Some(nc) => match hay_chars.next() {
+          None => break, // haystack exhausted for this starting position
+          Some(hc) => {
+            // Compare lowercased chars.  `to_lowercase` returns an iterator
+            // (multi-char mappings exist, e.g. 'ß' -> "ss"), so we must
+            // compare element-by-element.
+            let mut h_lower = hc.to_lowercase();
+            let mut n_lower = nc.to_lowercase(); // needle is already lowercase, but keeps correctness
+            loop {
+              match (h_lower.next(), n_lower.next()) {
+                (Some(a), Some(b)) if a == b => continue,
+                (None, None) => break, // this char matched
+                _ => continue 'outer,  // mismatch
+              }
+            }
+          }
+        },
+      }
+    }
+  }
+
+  false
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -197,6 +197,68 @@ mod tests {
     }
 
     #[test]
+    fn it_finds_iterations_by_description() {
+      let dir = tempfile::tempdir().unwrap();
+      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Sprint One");
+      iteration.description = "This iteration focuses on the backend refactor".to_string();
+      crate::store::write_iteration(
+        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
+        &iteration,
+      )
+      .unwrap();
+
+      let results = super::super::search(
+        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
+        "refactor",
+        false,
+      )
+      .unwrap();
+      assert_eq!(results.iterations.len(), 1);
+      assert_eq!(results.iterations[0].title, "Sprint One");
+    }
+
+    #[test]
+    fn it_finds_iterations_by_tag_prefix() {
+      let dir = tempfile::tempdir().unwrap();
+      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Tagged Iteration");
+      iteration.tags = vec!["release".to_string()];
+      crate::store::write_iteration(
+        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
+        &iteration,
+      )
+      .unwrap();
+
+      let results = super::super::search(
+        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
+        "tag:release",
+        false,
+      )
+      .unwrap();
+      assert_eq!(results.iterations.len(), 1);
+      assert_eq!(results.iterations[0].title, "Tagged Iteration");
+    }
+
+    #[test]
+    fn it_finds_iterations_by_title() {
+      let dir = tempfile::tempdir().unwrap();
+      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Sprint Alpha");
+      crate::store::write_iteration(
+        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
+        &iteration,
+      )
+      .unwrap();
+
+      let results = super::super::search(
+        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
+        "sprint",
+        false,
+      )
+      .unwrap();
+      assert_eq!(results.iterations.len(), 1);
+      assert_eq!(results.iterations[0].title, "Sprint Alpha");
+    }
+
+    #[test]
     fn it_finds_tasks_by_title() {
       let dir = tempfile::tempdir().unwrap();
       let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Important Feature");
@@ -242,68 +304,6 @@ mod tests {
       assert_eq!(results.tasks.len(), 0);
       assert_eq!(results.artifacts.len(), 0);
       assert_eq!(results.iterations.len(), 0);
-    }
-
-    #[test]
-    fn it_finds_iterations_by_title() {
-      let dir = tempfile::tempdir().unwrap();
-      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Sprint Alpha");
-      crate::store::write_iteration(
-        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
-        &iteration,
-      )
-      .unwrap();
-
-      let results = super::super::search(
-        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
-        "sprint",
-        false,
-      )
-      .unwrap();
-      assert_eq!(results.iterations.len(), 1);
-      assert_eq!(results.iterations[0].title, "Sprint Alpha");
-    }
-
-    #[test]
-    fn it_finds_iterations_by_description() {
-      let dir = tempfile::tempdir().unwrap();
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Sprint One");
-      iteration.description = "This iteration focuses on the backend refactor".to_string();
-      crate::store::write_iteration(
-        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
-        &iteration,
-      )
-      .unwrap();
-
-      let results = super::super::search(
-        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
-        "refactor",
-        false,
-      )
-      .unwrap();
-      assert_eq!(results.iterations.len(), 1);
-      assert_eq!(results.iterations[0].title, "Sprint One");
-    }
-
-    #[test]
-    fn it_finds_iterations_by_tag_prefix() {
-      let dir = tempfile::tempdir().unwrap();
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Tagged Iteration");
-      iteration.tags = vec!["release".to_string()];
-      crate::store::write_iteration(
-        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
-        &iteration,
-      )
-      .unwrap();
-
-      let results = super::super::search(
-        &crate::test_helpers::make_test_config(dir.path().to_path_buf()),
-        "tag:release",
-        false,
-      )
-      .unwrap();
-      assert_eq!(results.iterations.len(), 1);
-      assert_eq!(results.iterations[0].title, "Tagged Iteration");
     }
   }
 }

@@ -3,6 +3,7 @@ use clap::Args;
 use crate::{
   cli::{self, AppContext},
   store,
+  ui::views::note::NoteListView,
 };
 
 /// List all notes on a task.
@@ -34,7 +35,6 @@ impl Command {
       return Ok(());
     }
 
-    use crate::ui::views::note::NoteListView;
     let view = NoteListView {
       notes: &notes,
       theme,

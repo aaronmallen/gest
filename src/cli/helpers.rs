@@ -1,68 +1,5 @@
 use std::{fmt::Display, io::IsTerminal, str::FromStr};
 
-/// Open `$EDITOR` with a temporary file and return the content, or fall back to an empty string.
-///
-/// If `explicit` is `Some`, that value is returned immediately (no editor opened).
-/// Otherwise, when stdin is a terminal and `$EDITOR` is set, a temp file is opened.
-/// Returns an error with `abort_message` if the user saves an empty file.
-/// Falls back to an empty string when stdin is not a terminal or no editor is configured.
-pub fn read_from_editor(
-  explicit: Option<&str>,
-  file_extension: &str,
-  abort_message: &str,
-) -> crate::cli::Result<String> {
-  if let Some(value) = explicit {
-    return Ok(value.to_string());
-  }
-
-  if std::io::stdin().is_terminal()
-    && let Some(_editor) = crate::cli::editor::resolve_editor()
-  {
-    let content = crate::cli::editor::edit_temp(None, file_extension)?;
-    if content.trim().is_empty() {
-      return Err(crate::cli::Error::generic(abort_message));
-    }
-    return Ok(content);
-  }
-
-  Ok(String::new())
-}
-
-/// Parse an optional status string into a typed status value.
-///
-/// Returns `Ok(None)` when the input is `None`, `Ok(Some(status))` on a valid parse,
-/// or a `cli::Error` when the string is not a recognised status.
-pub fn parse_optional_status<T>(raw: Option<&str>) -> crate::cli::Result<Option<T>>
-where
-  T: FromStr,
-  T::Err: Display,
-{
-  raw
-    .map(|s| s.parse::<T>().map_err(|e| crate::cli::Error::generic(e.to_string())))
-    .transpose()
-}
-
-/// Split a comma-separated string into trimmed, non-empty tag strings.
-pub fn parse_tags(s: &str) -> Vec<String> {
-  s.split(',')
-    .map(|s| s.trim().to_string())
-    .filter(|s| !s.is_empty())
-    .collect()
-}
-
-/// Parse `"key=value"` strings into `(key, value)` pairs, returning an error on missing `=`.
-pub fn split_key_value_pairs(pairs: &[String]) -> crate::cli::Result<Vec<(String, String)>> {
-  pairs
-    .iter()
-    .map(|pair| {
-      pair
-        .split_once('=')
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .ok_or_else(|| crate::cli::Error::generic(format!("Invalid metadata format '{pair}', expected key=value")))
-    })
-    .collect()
-}
-
 /// Build a `toml::Table` from `"key=value"` CLI strings.
 pub fn build_toml_metadata(pairs: &[String]) -> crate::cli::Result<toml::Table> {
   let kvs = split_key_value_pairs(pairs)?;
@@ -93,6 +30,69 @@ pub fn merge_toml_metadata(pairs: &[String], mut existing: toml::Table) -> crate
     existing.insert(key, toml::Value::String(value));
   }
   Ok(Some(existing))
+}
+
+/// Parse an optional status string into a typed status value.
+///
+/// Returns `Ok(None)` when the input is `None`, `Ok(Some(status))` on a valid parse,
+/// or a `cli::Error` when the string is not a recognised status.
+pub fn parse_optional_status<T>(raw: Option<&str>) -> crate::cli::Result<Option<T>>
+where
+  T: FromStr,
+  T::Err: Display,
+{
+  raw
+    .map(|s| s.parse::<T>().map_err(|e| crate::cli::Error::generic(e.to_string())))
+    .transpose()
+}
+
+/// Split a comma-separated string into trimmed, non-empty tag strings.
+pub fn parse_tags(s: &str) -> Vec<String> {
+  s.split(',')
+    .map(|s| s.trim().to_string())
+    .filter(|s| !s.is_empty())
+    .collect()
+}
+
+/// Open `$EDITOR` with a temporary file and return the content, or fall back to an empty string.
+///
+/// If `explicit` is `Some`, that value is returned immediately (no editor opened).
+/// Otherwise, when stdin is a terminal and `$EDITOR` is set, a temp file is opened.
+/// Returns an error with `abort_message` if the user saves an empty file.
+/// Falls back to an empty string when stdin is not a terminal or no editor is configured.
+pub fn read_from_editor(
+  explicit: Option<&str>,
+  file_extension: &str,
+  abort_message: &str,
+) -> crate::cli::Result<String> {
+  if let Some(value) = explicit {
+    return Ok(value.to_string());
+  }
+
+  if std::io::stdin().is_terminal()
+    && let Some(_editor) = crate::cli::editor::resolve_editor()
+  {
+    let content = crate::cli::editor::edit_temp(None, file_extension)?;
+    if content.trim().is_empty() {
+      return Err(crate::cli::Error::generic(abort_message));
+    }
+    return Ok(content);
+  }
+
+  Ok(String::new())
+}
+
+/// Parse `"key=value"` strings into `(key, value)` pairs, returning an error on missing `=`.
+pub fn split_key_value_pairs(pairs: &[String]) -> crate::cli::Result<Vec<(String, String)>> {
+  pairs
+    .iter()
+    .map(|pair| {
+      pair
+        .split_once('=')
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .ok_or_else(|| crate::cli::Error::generic(format!("Invalid metadata format '{pair}', expected key=value")))
+    })
+    .collect()
 }
 
 #[cfg(test)]

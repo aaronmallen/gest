@@ -91,7 +91,11 @@ pub struct Task {
   pub phase: Option<u16>,
   #[serde(default)]
   pub priority: Option<u8>,
-  #[serde(with = "super::optional_datetime")]
+  #[serde(
+    default,
+    skip_serializing_if = "Option::is_none",
+    deserialize_with = "super::deserialize_optional_datetime"
+  )]
   pub resolved_at: Option<DateTime<Utc>>,
   pub status: Status,
   #[serde(default)]
@@ -183,6 +187,46 @@ mod tests {
 
         let task: Task = toml::from_str(toml_str).unwrap();
         assert!(task.events.is_empty());
+      }
+
+      #[test]
+      fn it_deserializes_without_resolved_at_field() {
+        let toml_str = r#"
+          created_at = "2026-04-01T12:00:00Z"
+          description = "A task"
+          id = "zyxwvutsrqponmlkzyxwvutsrqponmlk"
+          status = "open"
+          title = "Test"
+          updated_at = "2026-04-01T12:00:00Z"
+        "#;
+
+        let task: Task = toml::from_str(toml_str).unwrap();
+        assert_eq!(task.resolved_at, None);
+      }
+
+      #[test]
+      fn it_omits_resolved_at_when_none() {
+        let now = Utc::now();
+        let task = Task {
+          assigned_to: None,
+          created_at: now,
+          description: "A task".to_string(),
+          events: vec![],
+          id: "zyxwvutsrqponmlkzyxwvutsrqponmlk".parse().unwrap(),
+          links: vec![],
+          metadata: toml::Table::new(),
+          notes: vec![],
+          phase: None,
+          priority: None,
+          resolved_at: None,
+          status: Status::Open,
+          tags: vec![],
+          title: "Test".to_string(),
+          updated_at: now,
+        };
+
+        let toml_str = toml::to_string(&task).unwrap();
+        assert!(!toml_str.contains("resolved_at"));
       }
 
       #[test]

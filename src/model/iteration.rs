@@ -11,7 +11,11 @@ use super::{event::Event, id::Id, link::Link};
 /// A time-boxed planning container that groups related tasks.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Iteration {
-  #[serde(with = "super::optional_datetime")]
+  #[serde(
+    default,
+    skip_serializing_if = "Option::is_none",
+    deserialize_with = "super::deserialize_optional_datetime"
+  )]
   pub completed_at: Option<DateTime<Utc>>,
   pub created_at: DateTime<Utc>,
   pub description: String,
@@ -123,6 +127,21 @@ mod tests {
       use super::*;
 
       #[test]
+      fn it_deserializes_without_completed_at_field() {
+        let toml_str = r#"
+          created_at = "2026-04-01T12:00:00Z"
+          description = "An iteration"
+          id = "zyxwvutsrqponmlkzyxwvutsrqponmlk"
+          status = "active"
+          title = "Test"
+          updated_at = "2026-04-01T12:00:00Z"
+        "#;
+
+        let iteration: Iteration = toml::from_str(toml_str).unwrap();
+        assert_eq!(iteration.completed_at, None);
+      }
+
+      #[test]
       fn it_deserializes_without_events_field() {
         let toml_str = r#"
           completed_at = ""
@@ -136,6 +155,29 @@ mod tests {
 
         let iteration: Iteration = toml::from_str(toml_str).unwrap();
         assert!(iteration.events.is_empty());
+      }
+
+      #[test]
+      fn it_omits_completed_at_when_none() {
+        let now = Utc::now();
+        let iteration = Iteration {
+          completed_at: None,
+          created_at: now,
+          description: "An iteration".to_string(),
+          events: vec![],
+          id: "zyxwvutsrqponmlkzyxwvutsrqponmlk".parse().unwrap(),
+          links: vec![],
+          metadata: toml::Table::new(),
+          phase_count: None,
+          status: Status::Active,
+          tags: vec![],
+          tasks: vec![],
+          title: "Test".to_string(),
+          updated_at: now,
+        };
+
+        let toml_str = toml::to_string(&iteration).unwrap();
+        assert!(!toml_str.contains("completed_at"));
       }
 
       #[test]

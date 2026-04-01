@@ -3,6 +3,7 @@ mod when_linking;
 mod when_listing;
 mod when_listing_resolved;
 mod when_managing_metadata;
+mod when_serializing_to_toml;
 mod when_showing;
 mod when_tagging;
 mod when_untagging;

@@ -38,6 +38,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup
+      - name: Configure git identity
+        run: |
+          git config --global user.name "gest-ci"
+          git config --global user.email "gest-ci@localhost"
       - name: Integration Test
         run: mise run test:integration
   package:

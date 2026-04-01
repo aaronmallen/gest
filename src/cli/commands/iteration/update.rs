@@ -53,12 +53,19 @@ impl Command {
       title: self.title.clone(),
     };
 
-    let author = crate::cli::git::resolve_author().map(|a| AuthorInfo {
-      author: a.name,
-      author_email: a.email,
-      author_type: AuthorType::Human,
-    });
-    let iteration = store::update_iteration(config, &id, patch, author.as_ref())?;
+    let author = match crate::cli::git::resolve_author() {
+      Some(a) => AuthorInfo {
+        author: a.name,
+        author_email: a.email,
+        author_type: AuthorType::Human,
+      },
+      None => AuthorInfo {
+        author: "unknown".to_string(),
+        author_email: None,
+        author_type: AuthorType::Human,
+      },
+    };
+    let iteration = store::update_iteration(config, &id, patch, Some(&author))?;
 
     let msg = format!("Updated iteration {}", iteration.id);
     println!("{}", SuccessMessage::new(&msg, theme));

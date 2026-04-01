@@ -37,6 +37,23 @@
     <div id="body-preview" class="md-preview md-content"></div>
   </div>
 
+  <div class="form-group">
+    <button type="button" id="rel-toggle" class="btn" aria-expanded="false" aria-controls="rel-modal">Relationships</button>
+    <div id="rel-modal" class="rel-modal" role="dialog" aria-label="Add relationship">
+      <div class="rel-types">
+        <button type="button" class="rel-type-btn" data-rel="relates-to">relates to</button>
+        <button type="button" class="rel-type-btn" data-rel="blocks">blocks</button>
+        <button type="button" class="rel-type-btn" data-rel="blocked-by">blocked by</button>
+        <button type="button" class="rel-type-btn" data-rel="parent-of">parent of</button>
+        <button type="button" class="rel-type-btn" data-rel="child-of">child of</button>
+      </div>
+      <input type="text" class="form-input rel-search-input" placeholder="Search tasks and artifacts…" aria-label="Search tasks and artifacts">
+      <div class="rel-results"></div>
+      <div class="rel-pending"></div>
+      <div class="rel-hidden-inputs"></div>
+    </div>
+  </div>
+
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">Save Changes</button>
   </div>

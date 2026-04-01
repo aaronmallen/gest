@@ -67,8 +67,8 @@
       </div>
 
       <div class="form-group">
-        <button type="button" id="rel-toggle" class="btn">Relationships</button>
-        <div id="rel-modal" class="rel-modal">
+        <button type="button" id="rel-toggle" class="btn" aria-expanded="false" aria-controls="rel-modal">Relationships</button>
+        <div id="rel-modal" class="rel-modal" role="dialog" aria-label="Add relationship">
           <div class="rel-types">
             <button type="button" class="rel-type-btn" data-rel="relates-to">relates to</button>
             <button type="button" class="rel-type-btn" data-rel="blocks">blocks</button>

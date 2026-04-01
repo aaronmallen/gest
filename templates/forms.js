@@ -47,9 +47,64 @@
   var selectedType = "relates-to";
   var debounceTimer = null;
 
+  // ── ARIA: set up trigger attributes ───────────────────────────────
+  toggleBtn.setAttribute("aria-expanded", "false");
+  toggleBtn.setAttribute("aria-controls", "rel-modal");
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-label", "Add relationship");
+
+  function openModal() {
+    modal.classList.add("open");
+    toggleBtn.setAttribute("aria-expanded", "true");
+    searchInput.focus();
+    document.addEventListener("keydown", modalKeyHandler);
+  }
+
+  function closeModal() {
+    modal.classList.remove("open");
+    toggleBtn.setAttribute("aria-expanded", "false");
+    document.removeEventListener("keydown", modalKeyHandler);
+    toggleBtn.focus();
+  }
+
+  function getFocusableElements() {
+    return modal.querySelectorAll(
+      'button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+  }
+
+  function modalKeyHandler(e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeModal();
+      return;
+    }
+    if (e.key === "Tab") {
+      var focusable = getFocusableElements();
+      if (focusable.length === 0) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+  }
+
   toggleBtn.addEventListener("click", function (e) {
     e.preventDefault();
-    modal.classList.toggle("open");
+    if (modal.classList.contains("open")) {
+      closeModal();
+    } else {
+      openModal();
+    }
   });
 
   typeButtons.forEach(function (btn) {
@@ -78,16 +133,18 @@
         .then(function (items) {
           resultsDiv.innerHTML = "";
           items.forEach(function (item) {
-            var div = document.createElement("div");
-            div.className = "rel-result-item";
-            div.innerHTML = '<span class="c-dim">' + item.type + "</span>" +
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "rel-result-item";
+            btn.innerHTML = '<span class="c-dim">' + item.type + "</span>" +
               '<span class="c-azure">' + item.short_id + "</span> " + escapeHtml(item.title);
-            div.addEventListener("click", function () {
+            btn.addEventListener("click", function () {
               addPendingLink(selectedType, item.type, item.id, item.short_id, item.title);
               resultsDiv.innerHTML = "";
               searchInput.value = "";
+              searchInput.focus();
             });
-            resultsDiv.appendChild(div);
+            resultsDiv.appendChild(btn);
           });
         });
     }, 300);

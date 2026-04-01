@@ -5,7 +5,7 @@ mod init;
 mod iteration;
 mod search;
 mod self_update;
-mod tags;
+mod tag;
 mod task;
 mod task_note;
 mod undo;

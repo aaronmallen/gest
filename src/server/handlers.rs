@@ -278,7 +278,9 @@ pub async fn task_list(State(state): State<ServerState>, Query(params): Query<Ta
 pub async fn task_detail(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
   let id = match store::resolve_task_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response();
+    }
   };
 
   let task = match store::read_task(&state.settings, &id) {
@@ -458,7 +460,9 @@ pub async fn task_create(State(state): State<ServerState>, body: Bytes) -> Respo
 pub async fn task_edit_form(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
   let id = match store::resolve_task_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response();
+    }
   };
 
   let task = match store::read_task(&state.settings, &id) {
@@ -488,7 +492,9 @@ pub async fn task_update(State(state): State<ServerState>, Path(id_str): Path<St
   let form = TaskFormData::from_bytes(&body);
   let id = match store::resolve_task_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response();
+    }
   };
 
   let title = form.title.trim().to_string();
@@ -594,7 +600,9 @@ pub async fn artifact_list(State(state): State<ServerState>, Query(params): Quer
 pub async fn artifact_detail(State(state): State<ServerState>, Path(id): Path<String>) -> Response {
   let resolved = match store::resolve_artifact_id(&state.settings, &id, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
+    }
   };
 
   match store::read_artifact(&state.settings, &resolved) {
@@ -676,7 +684,9 @@ pub async fn artifact_create(State(state): State<ServerState>, Form(form): Form<
 pub async fn artifact_edit_form(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
   let resolved = match store::resolve_artifact_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
+    }
   };
 
   let artifact = match store::read_artifact(&state.settings, &resolved) {
@@ -708,7 +718,9 @@ pub async fn artifact_update(
 ) -> Response {
   let resolved = match store::resolve_artifact_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
+    }
   };
 
   let title = form.title.trim().to_string();
@@ -765,7 +777,9 @@ pub async fn artifact_update(
 pub async fn artifact_archive(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
   let resolved = match store::resolve_artifact_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response();
+    }
   };
 
   match store::archive_artifact(&state.settings, &resolved) {
@@ -829,7 +843,9 @@ pub async fn iteration_list(State(state): State<ServerState>, Query(params): Que
 pub async fn iteration_detail(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
   let id = match store::resolve_iteration_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response();
+    }
   };
 
   let iteration = match store::read_iteration(&state.settings, &id) {
@@ -867,7 +883,9 @@ pub async fn iteration_detail(State(state): State<ServerState>, Path(id_str): Pa
 pub async fn iteration_board(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
   let id = match store::resolve_iteration_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response();
+    }
   };
 
   let iteration = match store::read_iteration(&state.settings, &id) {
@@ -1004,7 +1022,9 @@ pub async fn note_add(
 ) -> Response {
   let id = match store::resolve_task_id(&state.settings, &id_str, true) {
     Ok(id) => id,
-    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response(),
+    Err(_) => {
+      return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response();
+    }
   };
 
   let body = form.body.trim().to_string();

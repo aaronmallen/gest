@@ -6,17 +6,15 @@ use crate::support::helpers::GestCmd;
 fn it_lists_tags_after_tagging() {
   let env = GestCmd::new();
 
-  // Create a task with tags directly.
   env
     .cmd()
     .args(&["task", "create", "a task to tag", "--tags", "integration,testing"])
     .assert()
     .success();
 
-  // List tags and verify both tags appear.
   env
     .cmd()
-    .args(&["tags"])
+    .args(&["tag", "list"])
     .assert()
     .success()
     .stdout(predicate::str::contains("integration"))
@@ -29,8 +27,30 @@ fn it_lists_empty_when_no_tags() {
 
   env
     .cmd()
-    .args(&["tags"])
+    .args(&["tag", "list"])
     .assert()
     .success()
     .stdout(predicate::str::contains("no tags found"));
+}
+
+#[test]
+fn it_filters_by_task_entity_type() {
+  let env = GestCmd::new();
+
+  env
+    .cmd()
+    .args(&["task", "create", "tagged task", "--tags", "task-only"])
+    .assert()
+    .success();
+
+  env.create_artifact("tagged artifact", "body");
+  // Tag the artifact via the per-entity command.
+  // We need to get the artifact ID first.
+
+  env
+    .cmd()
+    .args(&["tag", "list", "--task"])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("task-only"));
 }

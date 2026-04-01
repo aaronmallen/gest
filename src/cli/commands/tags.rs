@@ -1,5 +1,3 @@
-pub mod list;
-
 use chrono::{DateTime, Utc};
 
 use crate::{

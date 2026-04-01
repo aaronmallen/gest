@@ -4,6 +4,7 @@ mod graph;
 mod link;
 mod list;
 mod meta;
+mod next;
 mod remove;
 mod show;
 mod status;
@@ -30,6 +31,7 @@ enum IterationCommand {
   Link(link::Command),
   List(list::Command),
   Meta(meta::Command),
+  Next(next::Command),
   Remove(remove::Command),
   Show(show::Command),
   Status(status::Command),
@@ -48,6 +50,7 @@ impl Command {
       IterationCommand::Link(cmd) => cmd.call(ctx),
       IterationCommand::List(cmd) => cmd.call(ctx),
       IterationCommand::Meta(cmd) => cmd.call(ctx),
+      IterationCommand::Next(cmd) => cmd.call(ctx),
       IterationCommand::Remove(cmd) => cmd.call(ctx),
       IterationCommand::Show(cmd) => cmd.call(ctx),
       IterationCommand::Status(cmd) => cmd.call(ctx),

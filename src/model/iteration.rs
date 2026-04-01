@@ -6,7 +6,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::{id::Id, link::Link};
+use super::{event::Event, id::Id, link::Link};
 
 /// A time-boxed planning container that groups related tasks.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -15,6 +15,8 @@ pub struct Iteration {
   pub completed_at: Option<DateTime<Utc>>,
   pub created_at: DateTime<Utc>,
   pub description: String,
+  #[serde(default)]
+  pub events: Vec<Event>,
   pub id: Id,
   #[serde(default)]
   pub links: Vec<Link>,
@@ -121,12 +123,29 @@ mod tests {
       use super::*;
 
       #[test]
+      fn it_deserializes_without_events_field() {
+        let toml_str = r#"
+          completed_at = ""
+          created_at = "2026-04-01T12:00:00Z"
+          description = "An iteration"
+          id = "zyxwvutsrqponmlkzyxwvutsrqponmlk"
+          status = "active"
+          title = "Test"
+          updated_at = "2026-04-01T12:00:00Z"
+        "#;
+
+        let iteration: Iteration = toml::from_str(toml_str).unwrap();
+        assert!(iteration.events.is_empty());
+      }
+
+      #[test]
       fn it_roundtrips_through_toml() {
         let now = Utc::now();
         let iteration = Iteration {
           completed_at: None,
           created_at: now,
           description: "An iteration description".to_string(),
+          events: vec![],
           id: "zyxwvutsrqponmlkzyxwvutsrqponmlk".parse().unwrap(),
           links: vec![Link {
             ref_: "artifacts/zyxwvutsrqponmlkzyxwvutsrqponmlk".to_string(),

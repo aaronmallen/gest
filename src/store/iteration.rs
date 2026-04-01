@@ -44,6 +44,7 @@ pub fn create_iteration(config: &Settings, new: NewIteration) -> super::Result<I
     completed_at: None,
     created_at: now,
     description: new.description,
+    events: Vec::new(),
     id: Id::new(),
     links: new.links,
     metadata: new.metadata,

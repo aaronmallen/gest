@@ -1,6 +1,7 @@
 //! Domain model types for tasks, iterations, artifacts, and their identifiers.
 
 pub mod artifact;
+pub mod event;
 pub mod id;
 pub mod iteration;
 pub mod link;

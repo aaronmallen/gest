@@ -6,7 +6,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::{id::Id, link::Link, note::Note};
+use super::{event::Event, id::Id, link::Link, note::Note};
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct NewTask {
@@ -78,6 +78,8 @@ pub struct Task {
   pub assigned_to: Option<String>,
   pub created_at: DateTime<Utc>,
   pub description: String,
+  #[serde(default)]
+  pub events: Vec<Event>,
   pub id: Id,
   #[serde(default)]
   pub links: Vec<Link>,
@@ -168,13 +170,29 @@ mod tests {
       use super::*;
 
       #[test]
+      fn it_deserializes_without_events_field() {
+        let toml_str = r#"
+          created_at = "2026-04-01T12:00:00Z"
+          description = "A task"
+          id = "zyxwvutsrqponmlkzyxwvutsrqponmlk"
+          status = "open"
+          title = "Test"
+          updated_at = "2026-04-01T12:00:00Z"
+          resolved_at = ""
+        "#;
+
+        let task: Task = toml::from_str(toml_str).unwrap();
+        assert!(task.events.is_empty());
+      }
+
+      #[test]
       fn it_roundtrips_through_toml() {
         let now = Utc::now();
         let task = Task {
           assigned_to: Some("agent-1".to_string()),
-          resolved_at: None,
           created_at: now,
           description: "A test task description".to_string(),
+          events: vec![],
           id: "zyxwvutsrqponmlkzyxwvutsrqponmlk".parse().unwrap(),
           links: vec![Link {
             ref_: "https://example.com".to_string(),
@@ -188,6 +206,7 @@ mod tests {
           notes: vec![],
           phase: Some(2),
           priority: Some(1),
+          resolved_at: None,
           status: Status::Open,
           tags: vec!["test".to_string(), "example".to_string()],
           title: "Test Task".to_string(),

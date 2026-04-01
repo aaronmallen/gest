@@ -159,6 +159,31 @@ GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task meta set <i
 GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task meta get <id> <key>
 ```
 
+### Notes
+
+Notes are timestamped, attributed entries for recording decisions, progress updates, and observations.
+
+```sh
+# Add a note (human author from git config)
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task note add <task-id> --body "<text>"
+# Add an agent-attributed note
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task note add <task-id> --agent <name> --body "<text>"
+# List notes
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task note list <task-id>
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task note list <task-id> --json
+# Show a single note
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task note show <task-id> <note-id>
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task note show <task-id> <note-id> --json
+# Update a note
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task note update <task-id> <note-id> --body "<new text>"
+# Delete a note
+GEST_DATA_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task note delete <task-id> <note-id>
+```
+
+Author resolution: `--agent <name>` sets `author_type: agent`. Without `--agent`, author comes from
+`git config user.name` / `user.email` with `author_type: human`. Notes appear in `task show` output
+and `task show --json`.
+
 ### Tags
 
 ```sh

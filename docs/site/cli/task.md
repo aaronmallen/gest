@@ -21,6 +21,7 @@ gest task <COMMAND> [OPTIONS]
 | [`untag`](#task-untag) | Remove tags from a task |
 | [`link`](#task-link) | Create a relationship between entities |
 | [`meta`](#task-meta) | Read or write metadata fields |
+| [`note`](#task-note) | Manage notes on a task |
 
 ---
 
@@ -300,4 +301,117 @@ gest task meta set abc123 estimate "3 hours"
 
 # Read it back
 gest task meta get abc123 estimate
+```
+
+---
+
+## task note
+
+Manage notes on a task. Notes are timestamped, attributed entries for recording decisions,
+progress updates, and observations — analogous to comments on a GitHub issue.
+
+```text
+gest task note <COMMAND>
+```
+
+### note add
+
+Add a note to a task. Author defaults to `git config user.name` / `user.email`.
+
+```text
+gest task note add [OPTIONS] <ID>
+```
+
+| Argument | Description |
+| --- | --- |
+| `<ID>` | Task ID or unique prefix |
+
+| Flag | Description |
+| --- | --- |
+| `-b, --body <BODY>` | Note body text (opens `$EDITOR` if omitted and stdin is a terminal) |
+| `--agent <NAME>` | Agent name for attribution (mutually exclusive with git-derived authorship) |
+
+### note list
+
+List all notes on a task.
+
+```text
+gest task note list [OPTIONS] <ID>
+```
+
+| Argument | Description |
+| --- | --- |
+| `<ID>` | Task ID or unique prefix |
+
+| Flag | Description |
+| --- | --- |
+| `--json` | Output as JSON |
+
+### note show
+
+Show a single note with full attribution and rendered markdown body.
+
+```text
+gest task note show [OPTIONS] <TASK_ID> <NOTE_ID>
+```
+
+| Argument | Description |
+| --- | --- |
+| `<TASK_ID>` | Task ID or unique prefix |
+| `<NOTE_ID>` | Note ID or unique prefix |
+
+| Flag | Description |
+| --- | --- |
+| `--json` | Output as JSON |
+
+### note update
+
+Update a note's body.
+
+```text
+gest task note update [OPTIONS] <TASK_ID> <NOTE_ID>
+```
+
+| Argument | Description |
+| --- | --- |
+| `<TASK_ID>` | Task ID or unique prefix |
+| `<NOTE_ID>` | Note ID or unique prefix |
+
+| Flag | Description |
+| --- | --- |
+| `-b, --body <BODY>` | New body text (opens `$EDITOR` pre-filled if omitted and stdin is a terminal) |
+
+### note delete
+
+Delete a note from a task.
+
+```text
+gest task note delete <TASK_ID> <NOTE_ID>
+```
+
+| Argument | Description |
+| --- | --- |
+| `<TASK_ID>` | Task ID or unique prefix |
+| `<NOTE_ID>` | Note ID or unique prefix |
+
+### Examples
+
+```sh
+# Add a human note (author from git config)
+gest task note add abc123 --body "Found the root cause in the parser"
+
+# Add an agent note
+gest task note add abc123 --agent claude --body "Completed code review, no issues found"
+
+# List notes
+gest task note list abc123
+
+# Show a specific note
+gest task note show abc123 nfkbqmrx
+
+# Update a note
+gest task note update abc123 nfkbqmrx --body "Updated analysis"
+
+# Delete a note
+gest task note delete abc123 nfkbqmrx
 ```

@@ -8,6 +8,7 @@ mod fs;
 mod helpers;
 mod iteration;
 pub mod meta;
+mod orchestration;
 mod search;
 mod task;
 
@@ -47,6 +48,10 @@ pub use iteration::{
   add_task as add_iteration_task, create_iteration, is_iteration_resolved, list_iterations, read_iteration,
   read_iteration_tasks, remove_task as remove_iteration_task, resolve_iteration, resolve_iteration_id,
   update_iteration, write_iteration,
+};
+pub use orchestration::{
+  AdvanceSummary, IterationProgress, OverallProgress, PhaseProgress, advance_phase, claim_task, iteration_status,
+  next_available_task,
 };
 pub use search::{SearchResults, search};
 pub use task::{

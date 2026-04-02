@@ -1,4 +1,7 @@
+use std::io::{BufRead, IsTerminal};
+
 use clap::Args;
+use serde::Deserialize;
 
 use crate::{
   cli::{self, AppContext},
@@ -10,6 +13,9 @@ use crate::{
 /// Create a new artifact from inline text, a source file, an editor, or stdin.
 #[derive(Debug, Args)]
 pub struct Command {
+  /// Read NDJSON from stdin (one artifact per line).
+  #[arg(long, conflicts_with_all = ["body", "iteration", "kind", "metadata", "source", "tag", "title"])]
+  pub batch: bool,
   /// Body content as an inline string (skips editor and stdin).
   #[arg(short, long)]
   pub body: Option<String>,
@@ -40,9 +46,28 @@ pub struct Command {
   pub title: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct BatchArtifactInput {
+  title: String,
+  #[serde(default)]
+  body: Option<String>,
+  #[serde(default)]
+  iteration: Option<String>,
+  #[serde(default)]
+  metadata: std::collections::HashMap<String, String>,
+  #[serde(default)]
+  tags: Vec<String>,
+  #[serde(default, rename = "type")]
+  kind: Option<String>,
+}
+
 impl Command {
   /// Build a `NewArtifact`, persist it, and print the creation summary.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
+    if self.batch {
+      return self.batch_call(ctx);
+    }
+
     let config = &ctx.settings;
     let theme = &ctx.theme;
     let metadata = crate::cli::helpers::build_yaml_metadata(&self.metadata)?;
@@ -99,6 +124,58 @@ impl Command {
     println!("{view}");
     Ok(())
   }
+
+  fn batch_call(&self, ctx: &AppContext) -> cli::Result<()> {
+    let config = &ctx.settings;
+    let stdin = std::io::stdin();
+
+    if stdin.is_terminal() {
+      return Err(cli::Error::InvalidInput("--batch requires piped stdin".into()));
+    }
+
+    for (line_num, line) in stdin.lock().lines().enumerate() {
+      let line = line.map_err(|e| cli::Error::InvalidInput(format!("line {}: {e}", line_num + 1)))?;
+      if line.trim().is_empty() {
+        continue;
+      }
+
+      let input: BatchArtifactInput =
+        serde_json::from_str(&line).map_err(|e| cli::Error::InvalidInput(format!("line {}: {e}", line_num + 1)))?;
+
+      let mut metadata = yaml_serde::Mapping::new();
+      for (k, v) in &input.metadata {
+        metadata.insert(
+          yaml_serde::Value::String(k.clone()),
+          yaml_serde::Value::String(v.clone()),
+        );
+      }
+
+      let new = NewArtifact {
+        body: input.body.unwrap_or_default(),
+        kind: input.kind,
+        metadata,
+        tags: input.tags,
+        title: input.title,
+      };
+
+      let artifact = store::create_artifact(config, new)?;
+
+      if let Some(ref iter_prefix) = input.iteration {
+        let iter_id = store::resolve_iteration_id(config, iter_prefix, false)?;
+        let artifact_ref = format!("artifacts/{}", artifact.id);
+        store::add_iteration_task(config, &iter_id, &artifact_ref)?;
+      }
+
+      if self.quiet {
+        println!("{}", artifact.id);
+      } else {
+        let json = serde_json::to_string(&artifact)?;
+        println!("{json}");
+      }
+    }
+
+    Ok(())
+  }
 }
 
 fn extract_title(body: &str) -> Option<String> {
@@ -132,6 +209,7 @@ mod tests {
       std::fs::write(&source_path, "# From File\n\nFile content.").unwrap();
 
       let cmd = Command {
+        batch: false,
         body: None,
         iteration: None,
         json: false,
@@ -157,6 +235,7 @@ mod tests {
       let ctx = make_test_context(dir.path());
 
       let cmd = Command {
+        batch: false,
         body: Some("# Content\n\nSome body text.".to_string()),
         iteration: None,
         json: false,
@@ -187,6 +266,7 @@ mod tests {
       let ctx = make_test_context(dir.path());
 
       let cmd = Command {
+        batch: false,
         body: None,
         iteration: None,
         json: false,
@@ -212,6 +292,7 @@ mod tests {
       let ctx = make_test_context(dir.path());
 
       let cmd = Command {
+        batch: false,
         body: Some("No heading here".to_string()),
         iteration: None,
         json: false,
@@ -235,6 +316,7 @@ mod tests {
       let ctx = make_test_context(dir.path());
 
       let cmd = Command {
+        batch: false,
         body: Some("# Auto Title\n\nBody text.".to_string()),
         iteration: None,
         json: false,

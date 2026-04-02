@@ -1,4 +1,7 @@
+use std::io::{BufRead, IsTerminal};
+
 use clap::Args;
+use serde::Deserialize;
 
 use crate::{
   action,
@@ -12,10 +15,14 @@ use crate::{
 #[derive(Debug, Args)]
 pub struct Command {
   /// Task title.
-  pub title: String,
+  #[arg(required_unless_present = "batch")]
+  pub title: Option<String>,
   /// Actor assigned to this task.
   #[arg(long)]
   pub assigned_to: Option<String>,
+  /// Read NDJSON from stdin (one task per line).
+  #[arg(long, conflicts_with_all = ["title", "assigned_to", "description", "iteration", "link", "metadata", "phase", "priority", "status", "tag"])]
+  pub batch: bool,
   /// Description text (opens `$EDITOR` if omitted and stdin is a terminal).
   #[arg(short, long)]
   pub description: Option<String>,
@@ -49,11 +56,39 @@ pub struct Command {
   pub tag: Vec<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct BatchTaskInput {
+  title: String,
+  #[serde(default)]
+  assigned_to: Option<String>,
+  #[serde(default)]
+  description: Option<String>,
+  #[serde(default)]
+  iteration: Option<String>,
+  #[serde(default)]
+  links: Vec<String>,
+  #[serde(default)]
+  metadata: std::collections::HashMap<String, serde_json::Value>,
+  #[serde(default)]
+  phase: Option<u16>,
+  #[serde(default)]
+  priority: Option<u8>,
+  #[serde(default)]
+  status: Option<String>,
+  #[serde(default)]
+  tags: Vec<String>,
+}
+
 impl Command {
   /// Persist a new task and print a confirmation view.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
+    if self.batch {
+      return self.batch_call(ctx);
+    }
+
     let config = &ctx.settings;
     let theme = &ctx.theme;
+    let title = self.title.clone().unwrap_or_default();
     let status = match &self.status {
       Some(s) => s.parse::<Status>().map_err(cli::Error::InvalidInput)?,
       None => Status::Open,
@@ -75,7 +110,7 @@ impl Command {
       priority: self.priority,
       status,
       tags,
-      title: self.title.clone(),
+      title,
     };
 
     let task = store::create_task(config, new)?;
@@ -83,15 +118,7 @@ impl Command {
 
     // Process --link flags
     for link_arg in &self.link {
-      let (rel_str, target_id) = link_arg.split_once(':').ok_or_else(|| {
-        cli::Error::InvalidInput(format!(
-          "Invalid --link format '{link_arg}', expected <rel>:<target_id>"
-        ))
-      })?;
-      let rel: RelationshipType = rel_str.parse().map_err(|e: String| cli::Error::InvalidInput(e))?;
-      let is_artifact = store::resolve_artifact_id(config, target_id, true).is_ok()
-        && store::resolve_task_id(config, target_id, true).is_err();
-      action::link::link::<Task>(config, &task_id_str, target_id, &rel, is_artifact)?;
+      process_link(config, &task_id_str, link_arg)?;
     }
 
     // Process --iteration flag
@@ -131,6 +158,105 @@ impl Command {
     println!("{view}");
     Ok(())
   }
+
+  fn batch_call(&self, ctx: &AppContext) -> cli::Result<()> {
+    let config = &ctx.settings;
+    let stdin = std::io::stdin();
+
+    if stdin.is_terminal() {
+      return Err(cli::Error::InvalidInput("--batch requires piped stdin".into()));
+    }
+
+    for (line_num, line) in stdin.lock().lines().enumerate() {
+      let line = line.map_err(|e| cli::Error::InvalidInput(format!("line {}: {e}", line_num + 1)))?;
+      if line.trim().is_empty() {
+        continue;
+      }
+
+      let input: BatchTaskInput =
+        serde_json::from_str(&line).map_err(|e| cli::Error::InvalidInput(format!("line {}: {e}", line_num + 1)))?;
+
+      let status = match &input.status {
+        Some(s) => s.parse::<Status>().map_err(cli::Error::InvalidInput)?,
+        None => Status::Open,
+      };
+
+      let mut metadata = toml::Table::new();
+      for (k, v) in &input.metadata {
+        metadata.insert(k.clone(), json_value_to_toml(v));
+      }
+
+      let new = NewTask {
+        assigned_to: input.assigned_to,
+        description: input.description.unwrap_or_default(),
+        links: vec![],
+        metadata,
+        phase: input.phase,
+        priority: input.priority,
+        status,
+        tags: input.tags,
+        title: input.title,
+      };
+
+      let task = store::create_task(config, new)?;
+      let task_id_str = task.id.to_string();
+
+      for link_arg in &input.links {
+        process_link(config, &task_id_str, link_arg)?;
+      }
+
+      if let Some(ref iter_prefix) = input.iteration {
+        let iter_id = store::resolve_iteration_id(config, iter_prefix, false)?;
+        let task_ref = format!("tasks/{}", task.id);
+        store::add_iteration_task(config, &iter_id, &task_ref)?;
+      }
+
+      let task = if !input.links.is_empty() {
+        store::read_task(config, &task.id)?
+      } else {
+        task
+      };
+
+      if self.quiet {
+        println!("{}", task.id);
+      } else {
+        let json = serde_json::to_string(&task)?;
+        println!("{json}");
+      }
+    }
+
+    Ok(())
+  }
+}
+
+fn json_value_to_toml(v: &serde_json::Value) -> toml::Value {
+  match v {
+    serde_json::Value::Bool(b) => toml::Value::Boolean(*b),
+    serde_json::Value::Number(n) => {
+      if let Some(i) = n.as_i64() {
+        toml::Value::Integer(i)
+      } else if let Some(f) = n.as_f64() {
+        toml::Value::Float(f)
+      } else {
+        toml::Value::String(n.to_string())
+      }
+    }
+    serde_json::Value::String(s) => toml::Value::String(s.clone()),
+    _ => toml::Value::String(v.to_string()),
+  }
+}
+
+fn process_link(config: &crate::config::Settings, task_id_str: &str, link_arg: &str) -> cli::Result<()> {
+  let (rel_str, target_id) = link_arg.split_once(':').ok_or_else(|| {
+    cli::Error::InvalidInput(format!(
+      "Invalid --link format '{link_arg}', expected <rel>:<target_id>"
+    ))
+  })?;
+  let rel: RelationshipType = rel_str.parse().map_err(|e: String| cli::Error::InvalidInput(e))?;
+  let is_artifact = store::resolve_artifact_id(config, target_id, true).is_ok()
+    && store::resolve_task_id(config, target_id, true).is_err();
+  action::link::link::<Task>(config, task_id_str, target_id, &rel, is_artifact)?;
+  Ok(())
 }
 
 #[cfg(test)]
@@ -149,8 +275,9 @@ mod tests {
       let ctx = make_test_context(dir.path());
 
       let cmd = Command {
-        title: "Full Task".to_string(),
+        title: Some("Full Task".to_string()),
         assigned_to: Some("agent-1".to_string()),
+        batch: false,
         description: Some("A description".to_string()),
         iteration: None,
         json: false,
@@ -188,8 +315,9 @@ mod tests {
       let ctx = make_test_context(dir.path());
 
       let cmd = Command {
-        title: "My Task".to_string(),
+        title: Some("My Task".to_string()),
         assigned_to: None,
+        batch: false,
         description: None,
         iteration: None,
         json: false,
@@ -219,8 +347,9 @@ mod tests {
       let ctx = make_test_context(dir.path());
 
       let cmd = Command {
-        title: "Cancelled Task".to_string(),
+        title: Some("Cancelled Task".to_string()),
         assigned_to: None,
+        batch: false,
         description: Some("Cancelled".to_string()),
         iteration: None,
         json: false,
@@ -255,8 +384,9 @@ mod tests {
       let ctx = make_test_context(dir.path());
 
       let cmd = Command {
-        title: "Done Task".to_string(),
+        title: Some("Done Task".to_string()),
         assigned_to: None,
+        batch: false,
         description: Some("Already done".to_string()),
         iteration: None,
         json: false,

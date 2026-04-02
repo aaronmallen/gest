@@ -1,3 +1,4 @@
+mod when_batch_creating;
 mod when_blocking;
 mod when_cancelling;
 mod when_completing;

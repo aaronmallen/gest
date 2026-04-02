@@ -6,6 +6,7 @@ mod fs;
 mod helpers;
 mod iteration;
 pub mod meta;
+pub(crate) mod meta_value;
 pub mod note;
 mod orchestration;
 mod search;

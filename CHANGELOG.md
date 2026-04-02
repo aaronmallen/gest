@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [v0.4.1] - 2026-04-01
+
+### Added
+
+- Search queries now support structured filters: `is:`, `tag:`, `status:`, and `type:` prefixes with negation via `-`
+  prefix, OR-combination within the same filter type, and AND-combination across different types
+
+### Changed
+
+- Unified metadata handling across tasks and artifacts via a shared trait, reducing code duplication in the store layer
+
+### Fixed
+
+- Entity file moves are now atomic (write-to-temp then rename), eliminating partial-read and TOCTOU race conditions
+- Unrecognized event types in the database now produce a user-visible error instead of panicking
+- Web view tables no longer overflow the container on narrow viewports
+- HTML error responses in the web server are sanitized to prevent XSS
+- Dashboard handler now logs errors instead of silently swallowing them
+- Task link updates are now atomic via a dedicated `links` patch field
+- Metadata values set via the CLI are parsed as typed TOML values (integers, booleans, floats) instead of always strings
+- Native TOML datetime values are handled correctly during deserialization
+- Project directory resolution no longer contains an unreachable code branch
+- Integer casts in iteration orchestration replaced with correct `usize` types
+- UI text truncation no longer panics on certain inputs
+
 ## [v0.4.0] - 2026-04-01
 
 ### Added
@@ -202,7 +227,7 @@ Initial release
 [#23]: https://github.com/aaronmallen/gest/issues/23
 [#24]: https://github.com/aaronmallen/gest/issues/24
 
-[Unreleased]: https://github.com/aaronmallen/gest/compare/0.4.0...main
+[Unreleased]: https://github.com/aaronmallen/gest/compare/0.4.1...main
 [v0.2.0]: https://github.com/aaronmallen/gest/compare/0.1.0...0.2.0
 [v0.2.1]: https://github.com/aaronmallen/gest/compare/0.2.0...0.2.1
 [v0.2.2]: https://github.com/aaronmallen/gest/compare/0.2.1...0.2.2
@@ -214,3 +239,4 @@ Initial release
 [v0.3.4]: https://github.com/aaronmallen/gest/compare/0.3.3...0.3.4
 [v0.3.5]: https://github.com/aaronmallen/gest/compare/0.3.4...0.3.5
 [v0.4.0]: https://github.com/aaronmallen/gest/compare/0.3.5...0.4.0
+[v0.4.1]: https://github.com/aaronmallen/gest/compare/0.4.0...0.4.1

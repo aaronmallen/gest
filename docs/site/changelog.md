@@ -2,6 +2,31 @@
 
 What's new in gest — told version by version.
 
+## v0.4.1
+
+<span style="opacity: 0.5">2026-04-01</span>
+
+### Search Filters
+
+`gest search` now understands structured queries. Use `is:`, `tag:`, `status:`, and `type:` prefixes to narrow results —
+negate any filter with a `-` prefix (e.g. `-status:done`). Filters of the same type OR-combine, and different filter
+types AND-combine, giving you precise control without complex syntax.
+
+### Reliability and Safety
+
+A batch of fixes hardens the store and web server:
+
+- Entity file moves are now atomic (write-to-temp then rename), closing a TOCTOU race that could leave partial files on
+  disk
+- Unrecognized event types produce a clear error instead of panicking
+- HTML error responses are sanitized to prevent reflected XSS
+- Dashboard errors are logged instead of silently swallowed
+- Task link mutations use a dedicated patch field for atomicity
+- CLI metadata values are parsed as typed TOML (numbers, booleans) rather than always strings
+- Native TOML datetimes are deserialized correctly
+- Integer casts in orchestration replaced with correct types
+- UI text truncation no longer panics on edge-case inputs
+
 ## v0.4.0
 
 <span style="opacity: 0.5">2026-04-01</span>

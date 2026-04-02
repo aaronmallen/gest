@@ -11,7 +11,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct AdvanceSummary {
   /// Number of tasks now active in the new phase.
-  pub active_tasks: u16,
+  pub active_tasks: usize,
   /// Whether the advance was forced (skipping non-terminal tasks).
   pub forced: bool,
   /// The phase that was just completed.
@@ -25,25 +25,25 @@ pub struct AdvanceSummary {
 pub struct IterationProgress {
   pub active_phase: Option<u16>,
   pub assignees: Vec<String>,
-  pub blocked: u16,
-  pub in_progress: u16,
+  pub blocked: usize,
+  pub in_progress: usize,
   pub overall_progress: OverallProgress,
   pub phase_progress: PhaseProgress,
-  pub total_phases: u16,
+  pub total_phases: usize,
 }
 
 /// Overall progress counts.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct OverallProgress {
-  pub done: u16,
-  pub total: u16,
+  pub done: usize,
+  pub total: usize,
 }
 
 /// Progress information for a single phase.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct PhaseProgress {
-  pub done: u16,
-  pub total: u16,
+  pub done: usize,
+  pub total: usize,
 }
 
 /// Validate and return a summary of what advancing the phase would do.
@@ -63,7 +63,7 @@ pub fn advance_phase(config: &Settings, id: &Id, force: bool) -> super::Result<A
   let remaining = tasks
     .iter()
     .filter(|t| t.phase.unwrap_or(0) == from_phase && !t.status.is_terminal())
-    .count() as u16;
+    .count();
 
   if remaining > 0 && !force {
     return Err(super::Error::generic(format!(
@@ -86,7 +86,7 @@ pub fn advance_phase(config: &Settings, id: &Id, force: bool) -> super::Result<A
     Some(p) => tasks
       .iter()
       .filter(|t| t.phase.unwrap_or(0) == p && !t.status.is_terminal())
-      .count() as u16,
+      .count(),
     None => 0,
   };
 
@@ -119,7 +119,7 @@ pub fn iteration_status(config: &Settings, id: &Id) -> super::Result<IterationPr
     for t in &tasks {
       phases.insert(t.phase.unwrap_or(0));
     }
-    phases.len() as u16
+    phases.len()
   };
 
   let blocking = super::resolve_blocking_batch(config, &tasks);
@@ -135,15 +135,15 @@ pub fn iteration_status(config: &Settings, id: &Id) -> super::Result<IterationPr
     .filter(|t| active.is_some_and(|p| t.phase.unwrap_or(0) == p))
     .collect();
 
-  let phase_done = phase_tasks.iter().filter(|t| t.status.is_terminal()).count() as u16;
-  let phase_total = phase_tasks.len() as u16;
+  let phase_done = phase_tasks.iter().filter(|t| t.status.is_terminal()).count();
+  let phase_total = phase_tasks.len();
 
-  let blocked_count = phase_tasks.iter().filter(|t| blocked_ids.contains(&t.id)).count() as u16;
+  let blocked_count = phase_tasks.iter().filter(|t| blocked_ids.contains(&t.id)).count();
 
   let in_progress_count = phase_tasks
     .iter()
     .filter(|t| t.status == TaskStatus::InProgress)
-    .count() as u16;
+    .count();
 
   let mut assignees: Vec<String> = tasks
     .iter()
@@ -154,8 +154,8 @@ pub fn iteration_status(config: &Settings, id: &Id) -> super::Result<IterationPr
     .collect();
   assignees.sort();
 
-  let overall_done = tasks.iter().filter(|t| t.status.is_terminal()).count() as u16;
-  let overall_total = tasks.len() as u16;
+  let overall_done = tasks.iter().filter(|t| t.status.is_terminal()).count();
+  let overall_total = tasks.len();
 
   Ok(IterationProgress {
     active_phase: active,

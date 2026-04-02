@@ -1,6 +1,7 @@
 use clap::Args;
 
 use crate::{
+  action,
   cli::{self, AppContext},
   model::NotePatch,
   store,
@@ -26,18 +27,8 @@ impl Command {
     let theme = &ctx.theme;
     let task_id = store::resolve_task_id(config, &self.task_id, true)?;
 
-    // Resolve note ID by prefix match
-    let notes = store::note::list_notes(config, &task_id)?;
-    let note = notes
-      .iter()
-      .find(|n| n.id.to_string().starts_with(&self.note_id))
-      .ok_or_else(|| {
-        cli::Error::NotFound(format!(
-          "Note matching '{}' not found on task {}",
-          self.note_id, task_id
-        ))
-      })?;
-    let note_id = note.id.clone();
+    let note = action::resolve_note_prefix(config, &task_id, &self.note_id)?;
+    let note_id = note.id;
 
     let body = if let Some(body) = &self.body {
       body.clone()

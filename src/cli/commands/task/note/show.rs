@@ -1,6 +1,7 @@
 use clap::Args;
 
 use crate::{
+  action,
   cli::{self, AppContext},
   store,
   ui::views::note::NoteDetailView,
@@ -24,26 +25,16 @@ impl Command {
     let config = &ctx.settings;
     let theme = &ctx.theme;
     let task_id = store::resolve_task_id(config, &self.task_id, true)?;
-    let notes = store::note::list_notes(config, &task_id)?;
-
-    let note = notes
-      .iter()
-      .find(|n| n.id.to_string().starts_with(&self.note_id))
-      .ok_or_else(|| {
-        cli::Error::NotFound(format!(
-          "Note matching '{}' not found on task {}",
-          self.note_id, task_id
-        ))
-      })?;
+    let note = action::resolve_note_prefix(config, &task_id, &self.note_id)?;
 
     if self.json {
-      let json = serde_json::to_string_pretty(note)?;
+      let json = serde_json::to_string_pretty(&note)?;
       println!("{json}");
       return Ok(());
     }
 
     let view = NoteDetailView {
-      note,
+      note: &note,
       theme,
     };
     println!("{view}");

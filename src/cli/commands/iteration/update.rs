@@ -1,8 +1,9 @@
 use clap::Args;
 
 use crate::{
+  action,
   cli::{self, AppContext},
-  model::{IterationPatch, event::AuthorInfo, iteration::Status, note::AuthorType},
+  model::{IterationPatch, iteration::Status},
   store,
   ui::composites::success_message::SuccessMessage,
 };
@@ -58,18 +59,7 @@ impl Command {
       title: self.title.clone(),
     };
 
-    let author = match crate::cli::git::resolve_author() {
-      Some(a) => AuthorInfo {
-        author: a.name,
-        author_email: a.email,
-        author_type: AuthorType::Human,
-      },
-      None => AuthorInfo {
-        author: "unknown".to_string(),
-        author_email: None,
-        author_type: AuthorType::Human,
-      },
-    };
+    let author = action::resolve_author(false)?;
     let iteration = store::update_iteration(config, &id, patch, Some(&author))?;
 
     let msg = format!("Updated iteration {}", iteration.id);

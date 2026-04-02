@@ -1,8 +1,9 @@
 use clap::Args;
 
 use crate::{
+  action,
   cli::{self, AppContext},
-  model::{TaskPatch, event::AuthorInfo, note::AuthorType, task::Status},
+  model::{TaskPatch, task::Status},
   store,
   ui::views::task::TaskUpdateView,
 };
@@ -73,18 +74,7 @@ impl Command {
       title: self.title.clone(),
     };
 
-    let author = match crate::cli::git::resolve_author() {
-      Some(a) => AuthorInfo {
-        author: a.name,
-        author_email: a.email,
-        author_type: AuthorType::Human,
-      },
-      None => AuthorInfo {
-        author: "unknown".to_string(),
-        author_email: None,
-        author_type: AuthorType::Human,
-      },
-    };
+    let author = action::resolve_author(false)?;
     let task = store::update_task(config, &id, patch, Some(&author))?;
     let id_str = task.id.to_string();
 

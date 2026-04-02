@@ -3,7 +3,7 @@ use clap::Args;
 use crate::{
   action,
   cli::{self, AppContext},
-  model::{Task, event::AuthorInfo, note::AuthorType, task::Status},
+  model::{Task, task::Status},
   store,
   ui::views::task::TaskUpdateView,
 };
@@ -22,18 +22,7 @@ impl Command {
     let theme = &ctx.theme;
     let id = store::resolve_task_id(config, &self.id, true)?;
 
-    let author = match crate::cli::git::resolve_author() {
-      Some(a) => AuthorInfo {
-        author: a.name,
-        author_email: a.email,
-        author_type: AuthorType::Human,
-      },
-      None => AuthorInfo {
-        author: "unknown".to_string(),
-        author_email: None,
-        author_type: AuthorType::Human,
-      },
-    };
+    let author = action::resolve_author(false)?;
     let task = action::set_status::<Task>(config, &id, Status::Done, Some(&author))?;
     let id_str = task.id.to_string();
 

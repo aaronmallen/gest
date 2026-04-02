@@ -158,6 +158,40 @@ mod tests {
       }
 
       #[test]
+      fn it_deserializes_native_toml_datetime_for_completed_at() {
+        let toml_str = r#"
+          completed_at = 2026-04-01T18:30:00Z
+          created_at = "2026-04-01T12:00:00Z"
+          description = "An iteration"
+          id = "zyxwvutsrqponmlkzyxwvutsrqponmlk"
+          status = "completed"
+          title = "Test"
+          updated_at = "2026-04-01T12:00:00Z"
+        "#;
+
+        let iteration: Iteration = toml::from_str(toml_str).unwrap();
+        assert!(iteration.completed_at.is_some());
+      }
+
+      #[test]
+      fn it_roundtrips_native_toml_datetime() {
+        let toml_str = r#"
+          completed_at = 2026-04-01T18:30:00Z
+          created_at = "2026-04-01T12:00:00Z"
+          description = "An iteration"
+          id = "zyxwvutsrqponmlkzyxwvutsrqponmlk"
+          status = "completed"
+          title = "Test"
+          updated_at = "2026-04-01T12:00:00Z"
+        "#;
+
+        let iteration: Iteration = toml::from_str(toml_str).unwrap();
+        let serialized = toml::to_string(&iteration).unwrap();
+        let roundtripped: Iteration = toml::from_str(&serialized).unwrap();
+        assert_eq!(iteration, roundtripped);
+      }
+
+      #[test]
       fn it_omits_completed_at_when_none() {
         let now = Utc::now();
         let iteration = Iteration {

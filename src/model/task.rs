@@ -230,6 +230,40 @@ mod tests {
       }
 
       #[test]
+      fn it_deserializes_native_toml_datetime_for_resolved_at() {
+        let toml_str = r#"
+          created_at = "2026-04-01T12:00:00Z"
+          description = "A task"
+          id = "zyxwvutsrqponmlkzyxwvutsrqponmlk"
+          resolved_at = 2026-04-01T18:30:00Z
+          status = "done"
+          title = "Test"
+          updated_at = "2026-04-01T12:00:00Z"
+        "#;
+
+        let task: Task = toml::from_str(toml_str).unwrap();
+        assert!(task.resolved_at.is_some());
+      }
+
+      #[test]
+      fn it_roundtrips_native_toml_datetime() {
+        let toml_str = r#"
+          created_at = "2026-04-01T12:00:00Z"
+          description = "A task"
+          id = "zyxwvutsrqponmlkzyxwvutsrqponmlk"
+          resolved_at = 2026-04-01T18:30:00Z
+          status = "done"
+          title = "Test"
+          updated_at = "2026-04-01T12:00:00Z"
+        "#;
+
+        let task: Task = toml::from_str(toml_str).unwrap();
+        let serialized = toml::to_string(&task).unwrap();
+        let roundtripped: Task = toml::from_str(&serialized).unwrap();
+        assert_eq!(task, roundtripped);
+      }
+
+      #[test]
       fn it_roundtrips_through_toml() {
         let now = Utc::now();
         let task = Task {

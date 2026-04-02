@@ -2,6 +2,11 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::id::Id;
+use crate::{
+  action::{Resolvable, Storable, Taggable},
+  config::Settings,
+  store,
+};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Artifact {
@@ -44,6 +49,36 @@ pub struct NewArtifact {
   pub metadata: yaml_serde::Mapping,
   pub tags: Vec<String>,
   pub title: String,
+}
+
+impl Resolvable for Artifact {
+  fn entity_prefix() -> &'static str {
+    "artifacts"
+  }
+
+  fn resolve_id(config: &Settings, prefix: &str) -> store::Result<Id> {
+    store::resolve_artifact_id(config, prefix, false)
+  }
+}
+
+impl Storable for Artifact {
+  fn read(config: &Settings, id: &Id) -> store::Result<Self> {
+    store::read_artifact(config, id)
+  }
+
+  fn write(config: &Settings, entity: &Self) -> store::Result<()> {
+    store::write_artifact(config, entity)
+  }
+}
+
+impl Taggable for Artifact {
+  fn tags_mut(&mut self) -> &mut Vec<String> {
+    &mut self.tags
+  }
+
+  fn set_updated_at(&mut self, time: DateTime<Utc>) {
+    self.updated_at = time;
+  }
 }
 
 #[cfg(test)]

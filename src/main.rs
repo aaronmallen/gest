@@ -1,3 +1,4 @@
+mod action;
 mod cli;
 mod config;
 mod event_store;

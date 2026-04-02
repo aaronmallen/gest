@@ -7,6 +7,11 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::{event::Event, id::Id, link::Link};
+use crate::{
+  action::{HasStatus, Linkable, Resolvable, Storable, Taggable},
+  config::Settings,
+  store,
+};
 
 /// A time-boxed planning container that groups related tasks.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -112,6 +117,50 @@ impl FromStr for Status {
       other => Err(format!("unknown status: {other}")),
     }
   }
+}
+
+impl Resolvable for Iteration {
+  fn entity_prefix() -> &'static str {
+    "iterations"
+  }
+
+  fn resolve_id(config: &Settings, prefix: &str) -> store::Result<Id> {
+    store::resolve_iteration_id(config, prefix, false)
+  }
+}
+
+impl Storable for Iteration {
+  fn read(config: &Settings, id: &Id) -> store::Result<Self> {
+    store::read_iteration(config, id)
+  }
+
+  fn write(config: &Settings, entity: &Self) -> store::Result<()> {
+    store::write_iteration(config, entity)
+  }
+}
+
+impl Taggable for Iteration {
+  fn tags_mut(&mut self) -> &mut Vec<String> {
+    &mut self.tags
+  }
+
+  fn set_updated_at(&mut self, time: DateTime<Utc>) {
+    self.updated_at = time;
+  }
+}
+
+impl Linkable for Iteration {
+  fn links_mut(&mut self) -> &mut Vec<Link> {
+    &mut self.links
+  }
+
+  fn set_updated_at(&mut self, time: DateTime<Utc>) {
+    self.updated_at = time;
+  }
+}
+
+impl HasStatus for Iteration {
+  type Status = Status;
 }
 
 #[cfg(test)]

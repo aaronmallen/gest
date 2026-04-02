@@ -7,6 +7,11 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::{event::Event, id::Id, link::Link, note::Note};
+use crate::{
+  action::{HasStatus, Linkable, Resolvable, Storable, Taggable},
+  config::Settings,
+  store,
+};
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct NewTask {
@@ -123,6 +128,50 @@ pub struct TaskPatch {
   pub status: Option<Status>,
   pub tags: Option<Vec<String>>,
   pub title: Option<String>,
+}
+
+impl Resolvable for Task {
+  fn entity_prefix() -> &'static str {
+    "tasks"
+  }
+
+  fn resolve_id(config: &Settings, prefix: &str) -> store::Result<Id> {
+    store::resolve_task_id(config, prefix, false)
+  }
+}
+
+impl Storable for Task {
+  fn read(config: &Settings, id: &Id) -> store::Result<Self> {
+    store::read_task(config, id)
+  }
+
+  fn write(config: &Settings, entity: &Self) -> store::Result<()> {
+    store::write_task(config, entity)
+  }
+}
+
+impl Taggable for Task {
+  fn tags_mut(&mut self) -> &mut Vec<String> {
+    &mut self.tags
+  }
+
+  fn set_updated_at(&mut self, time: DateTime<Utc>) {
+    self.updated_at = time;
+  }
+}
+
+impl Linkable for Task {
+  fn links_mut(&mut self) -> &mut Vec<Link> {
+    &mut self.links
+  }
+
+  fn set_updated_at(&mut self, time: DateTime<Utc>) {
+    self.updated_at = time;
+  }
+}
+
+impl HasStatus for Task {
+  type Status = Status;
 }
 
 #[cfg(test)]

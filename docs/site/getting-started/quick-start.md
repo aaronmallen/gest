@@ -35,14 +35,14 @@ gest task create "Add rate limiting" \
   -d "Implement token-bucket rate limiting on API endpoints" \
   -p 1 \
   -s open \
-  --tags "api,security" \
+  --tag "api,security" \
   --phase 2
 ```
 
 - `-d` sets the description (omit it to open your `$EDITOR`)
 - `-p` sets priority (`0` is highest, `4` is lowest)
 - `-s` sets the initial status (`open`, `in-progress`, `done`, or `cancelled`)
-- `--tags` attaches comma-separated tags
+- `--tag` attaches tags (repeatable, or comma-separated)
 - `--phase` assigns an execution phase for parallel grouping
 
 List your tasks to see what you have:
@@ -56,7 +56,7 @@ gest task list
 Artifacts store documents like specs, ADRs, RFCs, and notes. You can create one from a file:
 
 ```sh
-gest artifact create --source auth-spec.md --type spec --tags "auth"
+gest artifact create --source auth-spec.md --type spec --tag "auth"
 ```
 
 Or write the body inline:
@@ -66,7 +66,7 @@ gest artifact create \
   -t "Rate Limiting Design" \
   -b "Token-bucket algorithm with per-user quotas." \
   -k adr \
-  --tags "api,design"
+  --tag "api,design"
 ```
 
 - `-t` sets the title (auto-extracted from the first `#` heading if omitted)

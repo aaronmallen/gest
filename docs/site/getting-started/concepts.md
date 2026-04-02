@@ -143,7 +143,7 @@ gest task link <source-id> relates-to <artifact-id> --artifact
 
 ### Tags
 
-Tags are freeform string labels. Add them at creation time with `--tags` or after the fact:
+Tags are freeform string labels. Add them at creation time with `--tag` or after the fact:
 
 ```sh
 gest task tag <id> "api,security"
@@ -163,8 +163,8 @@ Metadata stores arbitrary key-value pairs on any entity. Set values with the `-m
 creation time or through the `meta` subcommand:
 
 ```sh
-gest task meta <id> set complexity high
-gest task meta <id> get complexity
+gest task meta set <id> complexity high
+gest task meta get <id> complexity
 ```
 
 Task and iteration metadata is stored as TOML. Artifact metadata is stored as YAML in the

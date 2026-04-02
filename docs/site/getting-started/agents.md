@@ -27,7 +27,15 @@ Update a task's status as work progresses:
 ```sh
 gest task update <id> --status in-progress
 # ... do the work ...
-gest task update <id> --status done
+gest task complete <id>
+```
+
+Task shortcuts provide concise alternatives to `task update --status`:
+
+```sh
+gest task complete <id>   # shortcut for task update <id> --status done
+gest task cancel <id>     # shortcut for task update <id> --status cancelled
+gest task block <id> <other-id>  # shortcut for task link <id> blocks <other-id>
 ```
 
 Assign a task to the current agent so other agents know it's taken:
@@ -46,13 +54,13 @@ gest artifact create \
   -t "Auth Middleware Design" \
   -b "Token-bucket rate limiting with per-user quotas." \
   -k spec \
-  --tags "auth,design"
+  --tag "auth,design"
 ```
 
 Or import from a file:
 
 ```sh
-gest artifact create --source design.md --type adr --tags "architecture"
+gest artifact create --source design.md --type adr --tag "architecture"
 ```
 
 Link a task to its source artifact:
@@ -115,17 +123,46 @@ fi
 See the [Agent Orchestration guide](./agent-orchestration.md) for a complete
 walkthrough.
 
-## Use JSON Output
+## Use JSON and Quiet Output
 
-Most listing and show commands support `--json` for structured output. This is useful for
-agents that need to parse results programmatically:
+Most commands support `--json` for structured output. Mutation commands also support
+`-q`/`--quiet` to print only the entity ID:
 
 ```sh
 gest task show <id> --json
 gest task list --json
 gest artifact list --json
-gest iteration graph <id> --json
 gest search "auth" --json
+
+# Get just the ID for scripting
+task_id=$(gest task create "My task" -q)
+gest task complete "$task_id" -q
+```
+
+### Stdin Piping
+
+When `--description` (tasks) or `--body` (artifacts/notes) is omitted and stdin is a pipe,
+the piped content is used automatically:
+
+```sh
+echo "Detailed description" | gest task create "My task"
+cat spec.md | gest artifact create -k spec
+```
+
+### Batch Creation
+
+Use `--batch` to create multiple entities from NDJSON (one JSON object per line):
+
+```sh
+cat tasks.ndjson | gest task create --batch
+```
+
+### Iteration and Link Flags
+
+Create tasks pre-linked and assigned to an iteration in a single command:
+
+```sh
+gest task create "Add auth" -i <iteration-id> -l child-of:<spec-id>
 ```
 
 ## Search Before Creating

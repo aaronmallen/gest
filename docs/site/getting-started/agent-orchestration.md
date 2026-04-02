@@ -189,6 +189,51 @@ while true; do
 
   # ... do the work ...
 
-  gest task update "$task_id" --status done
+  gest task complete "$task_id" -q
 done
+```
+
+## Scripting Tips
+
+### Machine-Readable Output
+
+All mutation commands (`create`, `update`, `complete`, `cancel`, `block`, `link`, `tag`,
+`untag`, `note add`, `note update`, `meta set`) support `--json` for structured output and
+`-q`/`--quiet` for printing only the entity ID:
+
+```sh
+# Get the new task's full JSON after creation
+gest task create "Implement parser" --json
+
+# Get just the ID for scripting
+task_id=$(gest task create "Implement parser" -q)
+```
+
+### Stdin Piping
+
+When `--description` (tasks) or `--body` (artifacts/notes) is omitted and stdin is a pipe,
+the piped content is used automatically:
+
+```sh
+echo "Design notes here" | gest task create "Design task"
+cat spec.md | gest artifact create -k spec
+```
+
+### Batch Creation
+
+Use `--batch` to create multiple entities from NDJSON (one JSON object per line):
+
+```sh
+cat tasks.ndjson | gest task create --batch
+cat artifacts.ndjson | gest artifact create --batch
+```
+
+### Iteration and Link Flags
+
+Create tasks that are pre-linked and assigned to an iteration in a single command:
+
+```sh
+gest task create "Add auth" \
+  -i <iteration-id> \
+  -l child-of:<spec-artifact-id>
 ```

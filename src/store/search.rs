@@ -3,6 +3,7 @@ use rayon::prelude::*;
 use crate::{
   config::Settings,
   model::{Artifact, ArtifactFilter, Iteration, IterationFilter, Task, TaskFilter},
+  store::search_query::{Filter, ParsedQuery},
 };
 
 /// Collected search results across entity types.
@@ -12,85 +13,306 @@ pub struct SearchResults {
   pub tasks: Vec<Task>,
 }
 
-/// Perform a case-insensitive full-text search across tasks and artifacts.
+/// Perform a case-insensitive full-text search across tasks, artifacts, and iterations.
 ///
-/// Supports the `tag:<name>` prefix to filter by exact tag match.
+/// Supports expressive query syntax via [`super::search_query::parse`]:
+/// - `is:<type>` to scope by entity type
+/// - `tag:<name>` for exact tag match
+/// - `status:<status>` for status match
+/// - `type:<kind>` for artifact kind match
+/// - `-<filter>` to negate any filter
 pub fn search(config: &Settings, query: &str, show_all: bool) -> super::Result<SearchResults> {
-  let query_lower = query.to_lowercase();
+  let parsed = super::search_query::parse(query);
+  let text_lower = parsed.text.to_lowercase();
 
-  // Check for tag: prefix filter.
-  let tag_filter = query_lower.strip_prefix("tag:").map(|t| t.to_owned());
+  let want_tasks = wants_entity_type(&parsed, "task");
+  let want_artifacts = wants_entity_type(&parsed, "artifact");
+  let want_iterations = wants_entity_type(&parsed, "iteration");
 
-  let task_filter = TaskFilter {
-    all: show_all,
-    ..Default::default()
+  let tasks = if want_tasks {
+    let filter = TaskFilter {
+      all: show_all,
+      ..Default::default()
+    };
+    super::list_tasks(config, &filter)?
+      .into_par_iter()
+      .filter(|task| {
+        if !matches_tag_filters(&parsed, &task.tags) {
+          return false;
+        }
+        if !matches_status_filters(&parsed, &task.status.to_string()) {
+          return false;
+        }
+        // Tasks have no kind — exclude if a type: include filter is present.
+        if has_include_of_kind(&parsed, FilterKind::Type) {
+          return false;
+        }
+        if has_exclude_of_kind(&parsed, FilterKind::Type) && !matches_type_exclude(&parsed) {
+          return false;
+        }
+        matches_text(task, &text_lower)
+      })
+      .collect()
+  } else {
+    Vec::new()
   };
-  let all_tasks = super::list_tasks(config, &task_filter)?;
 
-  let artifact_filter = ArtifactFilter {
-    all: show_all,
-    ..Default::default()
+  let artifacts = if want_artifacts {
+    let filter = ArtifactFilter {
+      all: show_all,
+      ..Default::default()
+    };
+    super::list_artifacts(config, &filter)?
+      .into_par_iter()
+      .filter(|artifact| {
+        if !matches_tag_filters(&parsed, &artifact.tags) {
+          return false;
+        }
+        // Artifacts have no status — exclude if a status: include filter is present.
+        if has_include_of_kind(&parsed, FilterKind::Status) {
+          return false;
+        }
+        if !matches_type_filters(&parsed, artifact.kind.as_deref().unwrap_or("")) {
+          return false;
+        }
+        matches_text_artifact(artifact, &text_lower)
+      })
+      .collect()
+  } else {
+    Vec::new()
   };
-  let all_artifacts = super::list_artifacts(config, &artifact_filter)?;
 
-  let iteration_filter = IterationFilter {
-    all: show_all,
-    ..Default::default()
+  let iterations = if want_iterations {
+    let filter = IterationFilter {
+      all: show_all,
+      ..Default::default()
+    };
+    super::list_iterations(config, &filter)?
+      .into_par_iter()
+      .filter(|iteration| {
+        if !matches_tag_filters(&parsed, &iteration.tags) {
+          return false;
+        }
+        if !matches_status_filters(&parsed, &iteration.status.to_string()) {
+          return false;
+        }
+        // Iterations have no kind — exclude if a type: include filter is present.
+        if has_include_of_kind(&parsed, FilterKind::Type) {
+          return false;
+        }
+        if has_exclude_of_kind(&parsed, FilterKind::Type) && !matches_type_exclude(&parsed) {
+          return false;
+        }
+        matches_text_iteration(iteration, &text_lower)
+      })
+      .collect()
+  } else {
+    Vec::new()
   };
-  let all_iterations = super::list_iterations(config, &iteration_filter)?;
-
-  let tasks: Vec<Task> = all_tasks
-    .into_par_iter()
-    .filter(|task| {
-      if let Some(ref tag) = tag_filter {
-        return task.tags.iter().any(|t| t.to_lowercase() == *tag);
-      }
-      contains_ignore_case(&task.title, &query_lower)
-        || contains_ignore_case(&task.description, &query_lower)
-        || task.tags.iter().any(|t| contains_ignore_case(t, &query_lower))
-        || contains_ignore_case(&task.status.to_string(), &query_lower)
-        || (!task.metadata.is_empty()
-          && contains_ignore_case(&toml::to_string(&task.metadata).unwrap_or_default(), &query_lower))
-    })
-    .collect();
-
-  let artifacts: Vec<Artifact> = all_artifacts
-    .into_par_iter()
-    .filter(|artifact| {
-      if let Some(ref tag) = tag_filter {
-        return artifact.tags.iter().any(|t| t.to_lowercase() == *tag);
-      }
-      contains_ignore_case(&artifact.title, &query_lower)
-        || contains_ignore_case(&artifact.body, &query_lower)
-        || artifact.tags.iter().any(|t| contains_ignore_case(t, &query_lower))
-        || contains_ignore_case(artifact.kind.as_deref().unwrap_or(""), &query_lower)
-        || (!artifact.metadata.is_empty()
-          && contains_ignore_case(
-            &yaml_serde::to_string(&artifact.metadata).unwrap_or_default(),
-            &query_lower,
-          ))
-    })
-    .collect();
-
-  let iterations: Vec<Iteration> = all_iterations
-    .into_par_iter()
-    .filter(|iteration| {
-      if let Some(ref tag) = tag_filter {
-        return iteration.tags.iter().any(|t| t.to_lowercase() == *tag);
-      }
-      contains_ignore_case(&iteration.title, &query_lower)
-        || contains_ignore_case(&iteration.description, &query_lower)
-        || iteration.tags.iter().any(|t| contains_ignore_case(t, &query_lower))
-        || (!iteration.metadata.is_empty()
-          && contains_ignore_case(&toml::to_string(&iteration.metadata).unwrap_or_default(), &query_lower))
-    })
-    .collect();
 
   Ok(SearchResults {
     artifacts,
     iterations,
     tasks,
   })
+}
+
+// ---------------------------------------------------------------------------
+// Filter helpers
+// ---------------------------------------------------------------------------
+
+/// Discriminant for filter kinds (used to check presence without matching values).
+enum FilterKind {
+  Status,
+  Type,
+}
+
+/// Determine whether a given entity type should be included based on `is:` filters.
+///
+/// - No `is:` include filters → include all types (unless excluded).
+/// - `is:` include filters present → only include listed types.
+/// - `is:` exclude filters → exclude listed types.
+fn wants_entity_type(parsed: &ParsedQuery, entity: &str) -> bool {
+  let has_is_include = parsed.include.iter().any(|f| matches!(f, Filter::Is(_)));
+
+  if has_is_include {
+    // Must be in the include list.
+    if !parsed.include.iter().any(|f| matches!(f, Filter::Is(v) if v == entity)) {
+      return false;
+    }
+  }
+
+  // Must not be in the exclude list.
+  !parsed.exclude.iter().any(|f| matches!(f, Filter::Is(v) if v == entity))
+}
+
+/// Check tag filters (include OR-combines, exclude rejects any match).
+fn matches_tag_filters(parsed: &ParsedQuery, tags: &[String]) -> bool {
+  let tag_includes: Vec<&str> = parsed
+    .include
+    .iter()
+    .filter_map(|f| match f {
+      Filter::Tag(v) => Some(v.as_str()),
+      _ => None,
+    })
+    .collect();
+
+  if !tag_includes.is_empty()
+    && !tag_includes
+      .iter()
+      .any(|tv| tags.iter().any(|t| t.to_lowercase() == *tv))
+  {
+    return false;
+  }
+
+  let tag_excludes: Vec<&str> = parsed
+    .exclude
+    .iter()
+    .filter_map(|f| match f {
+      Filter::Tag(v) => Some(v.as_str()),
+      _ => None,
+    })
+    .collect();
+
+  if tag_excludes
+    .iter()
+    .any(|tv| tags.iter().any(|t| t.to_lowercase() == *tv))
+  {
+    return false;
+  }
+
+  true
+}
+
+/// Check status filters (include OR-combines, exclude rejects any match).
+fn matches_status_filters(parsed: &ParsedQuery, status: &str) -> bool {
+  let status_lower = status.to_lowercase();
+
+  let status_includes: Vec<&str> = parsed
+    .include
+    .iter()
+    .filter_map(|f| match f {
+      Filter::Status(v) => Some(v.as_str()),
+      _ => None,
+    })
+    .collect();
+
+  if !status_includes.is_empty() && !status_includes.iter().any(|sv| *sv == status_lower) {
+    return false;
+  }
+
+  let status_excludes: Vec<&str> = parsed
+    .exclude
+    .iter()
+    .filter_map(|f| match f {
+      Filter::Status(v) => Some(v.as_str()),
+      _ => None,
+    })
+    .collect();
+
+  if status_excludes.iter().any(|sv| *sv == status_lower) {
+    return false;
+  }
+
+  true
+}
+
+/// Check type (artifact kind) filters.
+fn matches_type_filters(parsed: &ParsedQuery, kind: &str) -> bool {
+  let kind_lower = kind.to_lowercase();
+
+  let type_includes: Vec<&str> = parsed
+    .include
+    .iter()
+    .filter_map(|f| match f {
+      Filter::Type(v) => Some(v.as_str()),
+      _ => None,
+    })
+    .collect();
+
+  if !type_includes.is_empty() && !type_includes.iter().any(|tv| *tv == kind_lower) {
+    return false;
+  }
+
+  let type_excludes: Vec<&str> = parsed
+    .exclude
+    .iter()
+    .filter_map(|f| match f {
+      Filter::Type(v) => Some(v.as_str()),
+      _ => None,
+    })
+    .collect();
+
+  if type_excludes.iter().any(|tv| *tv == kind_lower) {
+    return false;
+  }
+
+  true
+}
+
+/// Whether any include filter of the given kind exists.
+fn has_include_of_kind(parsed: &ParsedQuery, kind: FilterKind) -> bool {
+  parsed.include.iter().any(|f| match kind {
+    FilterKind::Status => matches!(f, Filter::Status(_)),
+    FilterKind::Type => matches!(f, Filter::Type(_)),
+  })
+}
+
+/// Whether any exclude filter of the given kind exists.
+fn has_exclude_of_kind(parsed: &ParsedQuery, kind: FilterKind) -> bool {
+  parsed.exclude.iter().any(|f| match kind {
+    FilterKind::Status => matches!(f, Filter::Status(_)),
+    FilterKind::Type => matches!(f, Filter::Type(_)),
+  })
+}
+
+/// For entities without a kind field: if only exclude type filters exist, they
+/// pass (because they can't match the excluded kind).
+fn matches_type_exclude(_parsed: &ParsedQuery) -> bool {
+  // Entities without a kind can never match -type:X, so they always pass.
+  true
+}
+
+// ---------------------------------------------------------------------------
+// Free-text matching helpers
+// ---------------------------------------------------------------------------
+
+fn matches_text(task: &Task, text_lower: &str) -> bool {
+  if text_lower.is_empty() {
+    return true;
+  }
+  contains_ignore_case(&task.title, text_lower)
+    || contains_ignore_case(&task.description, text_lower)
+    || task.tags.iter().any(|t| contains_ignore_case(t, text_lower))
+    || contains_ignore_case(&task.status.to_string(), text_lower)
+    || (!task.metadata.is_empty()
+      && contains_ignore_case(&toml::to_string(&task.metadata).unwrap_or_default(), text_lower))
+}
+
+fn matches_text_artifact(artifact: &Artifact, text_lower: &str) -> bool {
+  if text_lower.is_empty() {
+    return true;
+  }
+  contains_ignore_case(&artifact.title, text_lower)
+    || contains_ignore_case(&artifact.body, text_lower)
+    || artifact.tags.iter().any(|t| contains_ignore_case(t, text_lower))
+    || contains_ignore_case(artifact.kind.as_deref().unwrap_or(""), text_lower)
+    || (!artifact.metadata.is_empty()
+      && contains_ignore_case(
+        &yaml_serde::to_string(&artifact.metadata).unwrap_or_default(),
+        text_lower,
+      ))
+}
+
+fn matches_text_iteration(iteration: &Iteration, text_lower: &str) -> bool {
+  if text_lower.is_empty() {
+    return true;
+  }
+  contains_ignore_case(&iteration.title, text_lower)
+    || contains_ignore_case(&iteration.description, text_lower)
+    || iteration.tags.iter().any(|t| contains_ignore_case(t, text_lower))
+    || (!iteration.metadata.is_empty()
+      && contains_ignore_case(&toml::to_string(&iteration.metadata).unwrap_or_default(), text_lower))
 }
 
 /// Check whether `haystack` contains `needle` case-insensitively, without
@@ -304,6 +526,164 @@ mod tests {
       assert_eq!(results.tasks.len(), 0);
       assert_eq!(results.artifacts.len(), 0);
       assert_eq!(results.iterations.len(), 0);
+    }
+
+    #[test]
+    fn it_excludes_entities_with_negated_is_filter() {
+      let dir = tempfile::tempdir().unwrap();
+      let cfg = crate::test_helpers::make_test_config(dir.path().to_path_buf());
+      let task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "My Task");
+      crate::store::write_task(&cfg, &task).unwrap();
+      let artifact = make_test_artifact("llllllllllllllllllllllllllllllll", "My Artifact", "body");
+      crate::store::write_artifact(&cfg, &artifact).unwrap();
+
+      let results = super::super::search(&cfg, "-is:artifact My", false).unwrap();
+
+      assert_eq!(results.tasks.len(), 1);
+      assert_eq!(results.artifacts.len(), 0);
+    }
+
+    #[test]
+    fn it_excludes_entities_with_negated_tag_filter() {
+      let dir = tempfile::tempdir().unwrap();
+      let cfg = crate::test_helpers::make_test_config(dir.path().to_path_buf());
+      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "Tagged Task");
+      task.tags = vec!["wip".to_string()];
+      crate::store::write_task(&cfg, &task).unwrap();
+      let task2 = make_test_task("nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn", "Other Task");
+      crate::store::write_task(&cfg, &task2).unwrap();
+
+      let results = super::super::search(&cfg, "-tag:wip Task", false).unwrap();
+
+      assert_eq!(results.tasks.len(), 1);
+      assert_eq!(results.tasks[0].title, "Other Task");
+    }
+
+    #[test]
+    fn it_filters_artifacts_by_type() {
+      let dir = tempfile::tempdir().unwrap();
+      let cfg = crate::test_helpers::make_test_config(dir.path().to_path_buf());
+      let mut artifact = make_test_artifact("llllllllllllllllllllllllllllllll", "My Spec", "body");
+      artifact.kind = Some("spec".to_string());
+      crate::store::write_artifact(&cfg, &artifact).unwrap();
+      let mut artifact2 = make_test_artifact("nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn", "My RFC", "body");
+      artifact2.kind = Some("rfc".to_string());
+      crate::store::write_artifact(&cfg, &artifact2).unwrap();
+
+      let results = super::super::search(&cfg, "type:spec", false).unwrap();
+
+      assert_eq!(results.artifacts.len(), 1);
+      assert_eq!(results.artifacts[0].title, "My Spec");
+    }
+
+    #[test]
+    fn it_filters_by_status() {
+      let dir = tempfile::tempdir().unwrap();
+      let cfg = crate::test_helpers::make_test_config(dir.path().to_path_buf());
+      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "Open Task");
+      task.status = crate::model::task::Status::Open;
+      crate::store::write_task(&cfg, &task).unwrap();
+      let mut task2 = make_test_task("nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn", "Done Task");
+      task2.status = crate::model::task::Status::Done;
+      crate::store::write_task(&cfg, &task2).unwrap();
+
+      let results = super::super::search(&cfg, "status:open", false).unwrap();
+
+      assert_eq!(results.tasks.len(), 1);
+      assert_eq!(results.tasks[0].title, "Open Task");
+      // Artifacts have no status — should be excluded when status: filter is present.
+      assert_eq!(results.artifacts.len(), 0);
+    }
+
+    #[test]
+    fn it_filters_tasks_only_with_is_task() {
+      let dir = tempfile::tempdir().unwrap();
+      let cfg = crate::test_helpers::make_test_config(dir.path().to_path_buf());
+      let task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "My Task");
+      crate::store::write_task(&cfg, &task).unwrap();
+      let artifact = make_test_artifact("llllllllllllllllllllllllllllllll", "My Artifact", "body");
+      crate::store::write_artifact(&cfg, &artifact).unwrap();
+
+      let results = super::super::search(&cfg, "is:task My", false).unwrap();
+
+      assert_eq!(results.tasks.len(), 1);
+      assert_eq!(results.artifacts.len(), 0);
+      assert_eq!(results.iterations.len(), 0);
+    }
+
+    #[test]
+    fn it_or_combines_multiple_is_filters() {
+      let dir = tempfile::tempdir().unwrap();
+      let cfg = crate::test_helpers::make_test_config(dir.path().to_path_buf());
+      let task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "My Task");
+      crate::store::write_task(&cfg, &task).unwrap();
+      let artifact = make_test_artifact("llllllllllllllllllllllllllllllll", "My Artifact", "body");
+      crate::store::write_artifact(&cfg, &artifact).unwrap();
+      let mut iteration = make_test_iteration("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm", "My Iteration");
+      iteration.description = "body".to_string();
+      crate::store::write_iteration(&cfg, &iteration).unwrap();
+
+      let results = super::super::search(&cfg, "is:task is:artifact My", false).unwrap();
+
+      assert_eq!(results.tasks.len(), 1);
+      assert_eq!(results.artifacts.len(), 1);
+      assert_eq!(results.iterations.len(), 0);
+    }
+
+    #[test]
+    fn it_or_combines_multiple_tag_filters() {
+      let dir = tempfile::tempdir().unwrap();
+      let cfg = crate::test_helpers::make_test_config(dir.path().to_path_buf());
+      let mut task1 = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "Task A");
+      task1.tags = vec!["alpha".to_string()];
+      crate::store::write_task(&cfg, &task1).unwrap();
+      let mut task2 = make_test_task("nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn", "Task B");
+      task2.tags = vec!["beta".to_string()];
+      crate::store::write_task(&cfg, &task2).unwrap();
+      let task3 = make_test_task("pppppppppppppppppppppppppppppppp", "Task C");
+      crate::store::write_task(&cfg, &task3).unwrap();
+
+      let results = super::super::search(&cfg, "tag:alpha tag:beta", false).unwrap();
+
+      assert_eq!(results.tasks.len(), 2);
+    }
+
+    #[test]
+    fn it_and_combines_different_filter_types() {
+      let dir = tempfile::tempdir().unwrap();
+      let cfg = crate::test_helpers::make_test_config(dir.path().to_path_buf());
+      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "Tagged Open");
+      task.tags = vec!["urgent".to_string()];
+      task.status = crate::model::task::Status::Open;
+      crate::store::write_task(&cfg, &task).unwrap();
+      let mut task2 = make_test_task("nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn", "Tagged Done");
+      task2.tags = vec!["urgent".to_string()];
+      task2.status = crate::model::task::Status::Done;
+      crate::store::write_task(&cfg, &task2).unwrap();
+
+      let results = super::super::search(&cfg, "is:task tag:urgent status:open", false).unwrap();
+
+      assert_eq!(results.tasks.len(), 1);
+      assert_eq!(results.tasks[0].title, "Tagged Open");
+    }
+
+    #[test]
+    fn it_returns_all_types_with_no_filters() {
+      let dir = tempfile::tempdir().unwrap();
+      let cfg = crate::test_helpers::make_test_config(dir.path().to_path_buf());
+      let task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "Shared Word");
+      crate::store::write_task(&cfg, &task).unwrap();
+      let artifact = make_test_artifact("llllllllllllllllllllllllllllllll", "Shared Word", "body");
+      crate::store::write_artifact(&cfg, &artifact).unwrap();
+      let mut iteration = make_test_iteration("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm", "Shared Word");
+      iteration.description = "".to_string();
+      crate::store::write_iteration(&cfg, &iteration).unwrap();
+
+      let results = super::super::search(&cfg, "Shared", false).unwrap();
+
+      assert_eq!(results.tasks.len(), 1);
+      assert_eq!(results.artifacts.len(), 1);
+      assert_eq!(results.iterations.len(), 1);
     }
   }
 }

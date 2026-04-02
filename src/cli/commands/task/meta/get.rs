@@ -4,6 +4,7 @@ use crate::{
   action,
   cli::{self, AppContext},
   model::task::Task,
+  ui::views::meta::MetaValueView,
 };
 
 /// Get a metadata value from a task by dot-delimited key path.
@@ -11,14 +12,32 @@ use crate::{
 pub struct Command {
   /// Task ID or unique prefix.
   pub id: String,
+  /// Output as a JSON object.
+  #[arg(long, conflicts_with = "raw")]
+  pub json: bool,
   /// Dot-delimited key path (e.g. `outer.inner`).
   pub path: String,
+  /// Output the bare value with no styling.
+  #[arg(long, conflicts_with = "json")]
+  pub raw: bool,
 }
 
 impl Command {
   /// Resolve the task, look up the metadata key, and print the value.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    action::meta::meta_get::<Task>(ctx, &self.id, &self.path, ctx.theme.task_detail_value)
+    let formatted = action::meta::meta_get::<Task>(ctx, &self.id, &self.path)?;
+    let value = formatted.trim_end_matches('\n');
+
+    if self.json {
+      let obj = serde_json::json!({ &self.path: value });
+      println!("{}", serde_json::to_string_pretty(&obj).unwrap());
+    } else if self.raw {
+      println!("{value}");
+    } else {
+      println!("{}", MetaValueView::new(formatted, ctx.theme.task_detail_value));
+    }
+
+    Ok(())
   }
 }
 
@@ -39,7 +58,9 @@ mod tests {
 
     let cmd = Command {
       id: "zyxw".to_string(),
+      json: false,
       path: "nonexistent".to_string(),
+      raw: false,
     };
     let result = cmd.call(&ctx);
 
@@ -58,7 +79,9 @@ mod tests {
 
     let cmd = Command {
       id: "zyxw".to_string(),
+      json: false,
       path: "priority".to_string(),
+      raw: false,
     };
     cmd.call(&ctx).unwrap();
   }

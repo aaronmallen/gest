@@ -1,17 +1,16 @@
 //! Generic meta get/set actions for TOML-backed entities.
 
 use chrono::Utc;
-use yansi::Style;
 
 use super::{HasMetadata, Resolvable, Storable};
 use crate::{
   cli::{self, AppContext},
   store,
-  ui::{composites::success_message::SuccessMessage, views::meta::MetaValueView},
+  ui::composites::success_message::SuccessMessage,
 };
 
-/// Look up a metadata value by dot-delimited path and print it.
-pub fn meta_get<E>(ctx: &AppContext, prefix: &str, path: &str, value_style: Style) -> cli::Result<()>
+/// Look up a metadata value by dot-delimited path and return the formatted string.
+pub fn meta_get<E>(ctx: &AppContext, prefix: &str, path: &str) -> cli::Result<String>
 where
   E: HasMetadata + Resolvable + Storable,
 {
@@ -23,9 +22,7 @@ where
   let value = store::meta::resolve_dot_path(&root, path)
     .ok_or_else(|| cli::Error::NotFound(format!("Metadata key not found: '{path}'")))?;
 
-  let formatted = store::meta::format_toml_value(value);
-  println!("{}", MetaValueView::new(formatted, value_style));
-  Ok(())
+  Ok(store::meta::format_toml_value(value))
 }
 
 /// Set a metadata value at a dot-delimited path and persist the entity.

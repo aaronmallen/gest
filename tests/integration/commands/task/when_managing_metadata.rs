@@ -34,6 +34,32 @@ fn it_gets_metadata() {
 }
 
 #[test]
+fn it_gets_metadata_raw() {
+  let env = GestCmd::new();
+  let id = create_task_and_get_id(&env, "Meta get raw task");
+
+  env.run(&["task", "meta", "set", &id, "foo", "bar"]).success();
+
+  env
+    .run(&["task", "meta", "get", &id, "foo", "--raw"])
+    .success()
+    .stdout(predicate::eq("bar\n"));
+}
+
+#[test]
+fn it_gets_metadata_json() {
+  let env = GestCmd::new();
+  let id = create_task_and_get_id(&env, "Meta get json task");
+
+  env.run(&["task", "meta", "set", &id, "foo", "bar"]).success();
+
+  env
+    .run(&["task", "meta", "get", &id, "foo", "--json"])
+    .success()
+    .stdout(predicate::str::contains(r#""foo": "bar""#));
+}
+
+#[test]
 fn it_sets_metadata() {
   let env = GestCmd::new();
   let id = create_task_and_get_id(&env, "Meta task");

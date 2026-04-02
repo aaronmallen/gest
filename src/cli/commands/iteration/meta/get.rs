@@ -4,6 +4,7 @@ use crate::{
   action,
   cli::{self, AppContext},
   model::iteration::Iteration,
+  ui::views::meta::MetaValueView,
 };
 
 /// Retrieve a single metadata value from an iteration.
@@ -11,14 +12,32 @@ use crate::{
 pub struct Command {
   /// Iteration ID or unique prefix.
   pub id: String,
+  /// Output as a JSON object.
+  #[arg(long, conflicts_with = "raw")]
+  pub json: bool,
   /// Dot-delimited key path (e.g. `outer.inner`).
   pub path: String,
+  /// Output the bare value with no styling.
+  #[arg(long, conflicts_with = "json")]
+  pub raw: bool,
 }
 
 impl Command {
   /// Resolve the iteration, walk the metadata table by dot-path, and print the value.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    action::meta::meta_get::<Iteration>(ctx, &self.id, &self.path, ctx.theme.iteration_detail_value)
+    let formatted = action::meta::meta_get::<Iteration>(ctx, &self.id, &self.path)?;
+    let value = formatted.trim_end_matches('\n');
+
+    if self.json {
+      let obj = serde_json::json!({ &self.path: value });
+      println!("{}", serde_json::to_string_pretty(&obj).unwrap());
+    } else if self.raw {
+      println!("{value}");
+    } else {
+      println!("{}", MetaValueView::new(formatted, ctx.theme.iteration_detail_value));
+    }
+
+    Ok(())
   }
 }
 
@@ -39,7 +58,9 @@ mod tests {
 
     let cmd = Command {
       id: "zyxw".to_string(),
+      json: false,
       path: "nonexistent".to_string(),
+      raw: false,
     };
     let result = cmd.call(&ctx);
     assert!(result.is_err());
@@ -57,7 +78,9 @@ mod tests {
 
     let cmd = Command {
       id: "zyxw".to_string(),
+      json: false,
       path: "priority".to_string(),
+      raw: false,
     };
     cmd.call(&ctx).unwrap();
   }

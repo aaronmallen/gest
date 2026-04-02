@@ -46,11 +46,6 @@ where
     .transpose()
 }
 
-/// Split a comma-separated string into trimmed, non-empty tag strings.
-pub fn parse_tags(s: &str) -> Vec<String> {
-  crate::model::parse_tags(s)
-}
-
 /// Open `$EDITOR` with a temporary file and return the content, or fall back to an empty string.
 ///
 /// If `explicit` is `Some`, that value is returned immediately (no editor opened).
@@ -95,44 +90,6 @@ pub fn split_key_value_pairs(pairs: &[String]) -> crate::cli::Result<Vec<(String
 #[cfg(test)]
 mod tests {
   use super::*;
-
-  mod parse_tags {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_filters_empty_strings() {
-      assert_eq!(parse_tags("rust,,cli,,,test"), vec!["rust", "cli", "test"]);
-    }
-
-    #[test]
-    fn it_handles_single_tag() {
-      assert_eq!(parse_tags("rust"), vec!["rust"]);
-    }
-
-    #[test]
-    fn it_returns_empty_vec_for_empty_string() {
-      let result: Vec<String> = parse_tags("");
-      assert!(result.is_empty());
-    }
-
-    #[test]
-    fn it_returns_empty_vec_for_only_commas() {
-      let result: Vec<String> = parse_tags(",,,");
-      assert!(result.is_empty());
-    }
-
-    #[test]
-    fn it_splits_comma_separated_tags() {
-      assert_eq!(parse_tags("rust,cli,test"), vec!["rust", "cli", "test"]);
-    }
-
-    #[test]
-    fn it_trims_whitespace() {
-      assert_eq!(parse_tags(" rust , cli , test "), vec!["rust", "cli", "test"]);
-    }
-  }
 
   mod split_key_value_pairs {
     use pretty_assertions::assert_eq;

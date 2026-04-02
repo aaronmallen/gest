@@ -30,9 +30,10 @@ pub struct Command {
   /// New status (done/cancelled auto-resolves; open/in-progress un-resolves).
   #[arg(short, long)]
   pub status: Option<String>,
-  /// Replace all tags with this comma-separated list.
-  #[arg(long)]
-  pub tags: Option<String>,
+  /// Replace all tags (repeatable, or comma-separated).
+  // TODO: deprecate --tags in favor of --tag
+  #[arg(long = "tag", value_delimiter = ',', alias = "tags")]
+  pub tag: Vec<String>,
   /// New title.
   #[arg(short, long)]
   pub title: Option<String>,
@@ -54,7 +55,11 @@ impl Command {
       crate::cli::helpers::merge_toml_metadata(&self.metadata, existing)?
     };
 
-    let tags = self.tags.as_deref().map(crate::cli::helpers::parse_tags);
+    let tags = if self.tag.is_empty() {
+      None
+    } else {
+      Some(self.tag.clone())
+    };
 
     let patch = TaskPatch {
       assigned_to: self.assigned_to.as_ref().map(|v| Some(v.clone())),
@@ -133,7 +138,7 @@ mod tests {
         phase: None,
         priority: None,
         status: None,
-        tags: None,
+        tag: vec![],
         metadata: vec!["team=backend".to_string()],
       };
 
@@ -160,7 +165,7 @@ mod tests {
         phase: None,
         priority: None,
         status: None,
-        tags: None,
+        tag: vec![],
         metadata: vec![],
       };
 
@@ -188,7 +193,7 @@ mod tests {
         phase: None,
         priority: None,
         status: None,
-        tags: None,
+        tag: vec![],
         metadata: vec![],
       };
 

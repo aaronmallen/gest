@@ -18,9 +18,10 @@ pub struct Command {
   /// Artifact type (e.g. spec, adr, rfc, note).
   #[arg(short = 'k', long = "type")]
   pub kind: Option<String>,
-  /// Replace all tags with this comma-separated list.
-  #[arg(long)]
-  pub tags: Option<String>,
+  /// Replace all tags (repeatable, or comma-separated).
+  // TODO: deprecate --tags in favor of --tag
+  #[arg(long = "tag", value_delimiter = ',', alias = "tags")]
+  pub tag: Vec<String>,
   /// New title.
   #[arg(short, long)]
   pub title: Option<String>,
@@ -33,7 +34,11 @@ impl Command {
     let theme = &ctx.theme;
     let id = store::resolve_artifact_id(config, &self.id, true)?;
 
-    let tags = self.tags.as_deref().map(crate::cli::helpers::parse_tags);
+    let tags = if self.tag.is_empty() {
+      None
+    } else {
+      Some(self.tag.clone())
+    };
 
     let patch = ArtifactPatch {
       body: self.body.clone(),
@@ -83,7 +88,7 @@ mod tests {
         id: "zyxw".to_string(),
         body: Some("New body".to_string()),
         kind: None,
-        tags: None,
+        tag: vec![],
         title: None,
       };
 
@@ -106,7 +111,7 @@ mod tests {
         id: "zyxw".to_string(),
         body: None,
         kind: None,
-        tags: Some("new,tags".to_string()),
+        tag: vec!["new".to_string(), "tags".to_string()],
         title: None,
       };
 
@@ -130,7 +135,7 @@ mod tests {
         id: "zyxw".to_string(),
         body: None,
         kind: None,
-        tags: None,
+        tag: vec![],
         title: Some("New Title".to_string()),
       };
 

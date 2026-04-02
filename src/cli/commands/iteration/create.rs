@@ -21,9 +21,10 @@ pub struct Command {
   /// Initial status: active, completed, or failed (default: active).
   #[arg(short, long)]
   pub status: Option<String>,
-  /// Comma-separated list of tags.
-  #[arg(long)]
-  pub tags: Option<String>,
+  /// Tag (repeatable, or comma-separated).
+  // TODO: deprecate --tags in favor of --tag
+  #[arg(long = "tag", value_delimiter = ',', alias = "tags")]
+  pub tag: Vec<String>,
 }
 
 impl Command {
@@ -38,11 +39,7 @@ impl Command {
 
     let metadata = crate::cli::helpers::build_toml_metadata(&self.metadata)?;
 
-    let tags = self
-      .tags
-      .as_deref()
-      .map(crate::cli::helpers::parse_tags)
-      .unwrap_or_default();
+    let tags = self.tag.clone();
 
     let new = NewIteration {
       description: self.description.clone().unwrap_or_default(),
@@ -82,7 +79,7 @@ mod tests {
         description: Some("A description".to_string()),
         metadata: vec!["team=backend".to_string()],
         status: Some("active".to_string()),
-        tags: Some("sprint,q1".to_string()),
+        tag: vec!["sprint".to_string(), "q1".to_string()],
       };
 
       cmd.call(&ctx).unwrap();
@@ -106,7 +103,7 @@ mod tests {
         description: None,
         metadata: vec![],
         status: None,
-        tags: None,
+        tag: vec![],
       };
 
       cmd.call(&ctx).unwrap();
@@ -128,7 +125,7 @@ mod tests {
         description: None,
         metadata: vec![],
         status: Some("completed".to_string()),
-        tags: None,
+        tag: vec![],
       };
 
       cmd.call(&ctx).unwrap();

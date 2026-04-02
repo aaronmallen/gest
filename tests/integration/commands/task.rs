@@ -1,4 +1,5 @@
 mod when_creating;
+mod when_creating_with_tag_flag;
 mod when_linking;
 mod when_listing;
 mod when_listing_resolved;

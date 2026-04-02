@@ -22,9 +22,10 @@ pub struct Command {
   /// Read body content from a file path.
   #[arg(short, long)]
   pub source: Option<String>,
-  /// Comma-separated list of tags.
-  #[arg(long)]
-  pub tags: Option<String>,
+  /// Tag (repeatable, or comma-separated).
+  // TODO: deprecate --tags in favor of --tag
+  #[arg(long = "tag", value_delimiter = ',', alias = "tags")]
+  pub tag: Vec<String>,
   /// Artifact title (auto-extracted from first # heading if omitted).
   #[arg(short, long)]
   pub title: Option<String>,
@@ -37,11 +38,7 @@ impl Command {
     let theme = &ctx.theme;
     let metadata = crate::cli::helpers::build_yaml_metadata(&self.metadata)?;
 
-    let tags = self
-      .tags
-      .as_deref()
-      .map(crate::cli::helpers::parse_tags)
-      .unwrap_or_default();
+    let tags = self.tag.clone();
 
     let body = if let Some(ref src) = self.source {
       std::fs::read_to_string(src).map_err(cli::Error::from)?
@@ -111,7 +108,7 @@ mod tests {
         kind: None,
         metadata: vec![],
         source: Some(source_path.to_string_lossy().to_string()),
-        tags: None,
+        tag: vec![],
         title: Some("Sourced Artifact".to_string()),
       };
 
@@ -133,7 +130,7 @@ mod tests {
         kind: Some("spec".to_string()),
         metadata: vec!["version=1".to_string()],
         source: None,
-        tags: Some("rust,cli".to_string()),
+        tag: vec!["rust".to_string(), "cli".to_string()],
         title: Some("Full Artifact".to_string()),
       };
 
@@ -160,7 +157,7 @@ mod tests {
         kind: None,
         metadata: vec![],
         source: None,
-        tags: None,
+        tag: vec![],
         title: Some("My Artifact".to_string()),
       };
 
@@ -182,7 +179,7 @@ mod tests {
         kind: None,
         metadata: vec![],
         source: None,
-        tags: None,
+        tag: vec![],
         title: None,
       };
 
@@ -202,7 +199,7 @@ mod tests {
         kind: None,
         metadata: vec![],
         source: None,
-        tags: None,
+        tag: vec![],
         title: None,
       };
 

@@ -30,9 +30,10 @@ pub struct Command {
   /// Initial status: open, in-progress, done, or cancelled (default: open).
   #[arg(short, long)]
   pub status: Option<String>,
-  /// Comma-separated list of tags.
-  #[arg(long)]
-  pub tags: Option<String>,
+  /// Tag (repeatable, or comma-separated).
+  // TODO: deprecate --tags in favor of --tag
+  #[arg(long = "tag", value_delimiter = ',', alias = "tags")]
+  pub tag: Vec<String>,
 }
 
 impl Command {
@@ -47,11 +48,7 @@ impl Command {
 
     let metadata = crate::cli::helpers::build_toml_metadata(&self.metadata)?;
 
-    let tags = self
-      .tags
-      .as_deref()
-      .map(crate::cli::helpers::parse_tags)
-      .unwrap_or_default();
+    let tags = self.tag.clone();
 
     let description =
       crate::cli::helpers::read_from_editor(self.description.as_deref(), ".md", "Aborting: empty description")?;
@@ -107,7 +104,7 @@ mod tests {
         phase: Some(1),
         priority: Some(2),
         status: Some("in-progress".to_string()),
-        tags: Some("rust,cli".to_string()),
+        tag: vec!["rust".to_string(), "cli".to_string()],
       };
 
       cmd.call(&ctx).unwrap();
@@ -142,7 +139,7 @@ mod tests {
         phase: None,
         priority: None,
         status: None,
-        tags: None,
+        tag: vec![],
       };
 
       cmd.call(&ctx).unwrap();
@@ -169,7 +166,7 @@ mod tests {
         phase: None,
         priority: None,
         status: Some("cancelled".to_string()),
-        tags: None,
+        tag: vec![],
       };
 
       cmd.call(&ctx).unwrap();
@@ -201,7 +198,7 @@ mod tests {
         phase: None,
         priority: None,
         status: Some("done".to_string()),
-        tags: None,
+        tag: vec![],
       };
 
       cmd.call(&ctx).unwrap();

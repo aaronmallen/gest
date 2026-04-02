@@ -1,7 +1,5 @@
 //! Persistence layer for reading, writing, and querying entities on disk.
 
-#![allow(unused_imports)]
-
 mod artifact;
 pub mod artifact_meta;
 mod fs;
@@ -56,17 +54,21 @@ pub use artifact::{
   archive_artifact, create_artifact, list_artifacts, read_artifact, resolve_artifact_id, update_artifact,
   write_artifact,
 };
+#[allow(unused_imports)] // used in tests via crate::store::ensure_dirs
 pub use fs::ensure_dirs;
+#[allow(unused_imports)] // is_iteration_resolved, resolve_iteration used in tests
 pub use iteration::{
   add_task as add_iteration_task, create_iteration, is_iteration_resolved, list_iterations, read_iteration,
   read_iteration_tasks, remove_task as remove_iteration_task, resolve_iteration, resolve_iteration_id,
   update_iteration, write_iteration,
 };
+#[allow(unused_imports)] // AdvanceSummary, OverallProgress, PhaseProgress used in tests
 pub use orchestration::{
   AdvanceSummary, IterationProgress, OverallProgress, PhaseProgress, advance_phase, claim_task, iteration_status,
   next_available_task,
 };
 pub use search::{SearchResults, search};
+#[allow(unused_imports)] // is_task_resolved, resolve_task used in tests
 pub use task::{
   ResolvedBlocking, create_task, is_task_resolved, list_tasks, read_task, resolve_blocking, resolve_blocking_batch,
   resolve_task, resolve_task_id, update_task, write_task,

@@ -11,6 +11,7 @@ pub mod note;
 mod orchestration;
 mod search;
 pub mod search_query;
+mod tag;
 mod task;
 
 use std::io;
@@ -73,6 +74,8 @@ pub use orchestration::{
   next_available_task,
 };
 pub use search::{SearchResults, search};
+#[allow(unused_imports)] // TagResult used by callers of tag_entity/untag_entity
+pub use tag::{TagParams, TagResult, tag_entity, untag_entity};
 #[allow(unused_imports)] // is_task_resolved, resolve_task used in tests
 pub use task::{
   ResolvedBlocking, create_task, is_task_resolved, list_tasks, read_task, resolve_blocking, resolve_blocking_batch,

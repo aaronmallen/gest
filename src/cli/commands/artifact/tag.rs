@@ -2,7 +2,9 @@ use clap::Args;
 
 use crate::{
   cli::{self, AppContext},
+  model::EntityType,
   store,
+  ui::composites::success_message::SuccessMessage,
 };
 
 /// Add tags to an artifact.
@@ -18,17 +20,15 @@ pub struct Command {
 impl Command {
   /// Merge the given tags into the artifact's tag list, deduplicate, and persist.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    crate::cli::commands::tags::tag_entity(
-      ctx,
-      &self.id,
-      &self.tags,
-      "artifact",
-      store::resolve_artifact_id,
-      store::read_artifact,
-      |a| &mut a.tags,
-      |a, t| a.updated_at = t,
-      store::write_artifact,
-    )
+    let params = store::TagParams {
+      entity_type: EntityType::Artifact,
+      id_prefix: &self.id,
+      tags: &self.tags,
+    };
+    let result = store::tag_entity(&ctx.settings, &params)?;
+    let msg = format!("Tagged artifact {} with {}", result.id, self.tags.join(", "));
+    println!("{}", SuccessMessage::new(&msg, &ctx.theme));
+    Ok(())
   }
 }
 

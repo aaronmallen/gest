@@ -2,7 +2,9 @@ use clap::Args;
 
 use crate::{
   cli::{self, AppContext},
+  model::EntityType,
   store,
+  ui::composites::success_message::SuccessMessage,
 };
 
 /// Remove tags from an iteration.
@@ -18,17 +20,15 @@ pub struct Command {
 impl Command {
   /// Remove the specified tags from the iteration's tag set.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    crate::cli::commands::tags::untag_entity(
-      ctx,
-      &self.id,
-      &self.tags,
-      "iteration",
-      store::resolve_iteration_id,
-      store::read_iteration,
-      |i| &mut i.tags,
-      |i, t| i.updated_at = t,
-      store::write_iteration,
-    )
+    let params = store::TagParams {
+      entity_type: EntityType::Iteration,
+      id_prefix: &self.id,
+      tags: &self.tags,
+    };
+    let result = store::untag_entity(&ctx.settings, &params)?;
+    let msg = format!("Untagged iteration {} from {}", result.id, self.tags.join(", "));
+    println!("{}", SuccessMessage::new(&msg, &ctx.theme));
+    Ok(())
   }
 }
 

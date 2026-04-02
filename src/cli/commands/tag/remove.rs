@@ -2,8 +2,8 @@ use clap::Args;
 
 use crate::{
   cli::{self, AppContext},
-  model::EntityType,
   store,
+  ui::composites::success_message::SuccessMessage,
 };
 
 /// Remove tags from any entity (task, artifact, or iteration) by ID prefix.
@@ -19,42 +19,16 @@ pub struct Command {
 impl Command {
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
     let resolved = store::resolve_any_id(&ctx.settings, &self.id)?;
-
-    match resolved.entity_type {
-      EntityType::Task => crate::cli::commands::tags::untag_entity(
-        ctx,
-        &self.id,
-        &self.tags,
-        "task",
-        store::resolve_task_id,
-        store::read_task,
-        |t| &mut t.tags,
-        |t, ts| t.updated_at = ts,
-        store::write_task,
-      ),
-      EntityType::Artifact => crate::cli::commands::tags::untag_entity(
-        ctx,
-        &self.id,
-        &self.tags,
-        "artifact",
-        store::resolve_artifact_id,
-        store::read_artifact,
-        |a| &mut a.tags,
-        |a, ts| a.updated_at = ts,
-        store::write_artifact,
-      ),
-      EntityType::Iteration => crate::cli::commands::tags::untag_entity(
-        ctx,
-        &self.id,
-        &self.tags,
-        "iteration",
-        store::resolve_iteration_id,
-        store::read_iteration,
-        |i| &mut i.tags,
-        |i, ts| i.updated_at = ts,
-        store::write_iteration,
-      ),
-    }
+    let params = store::TagParams {
+      entity_type: resolved.entity_type,
+      id_prefix: &self.id,
+      tags: &self.tags,
+    };
+    let result = store::untag_entity(&ctx.settings, &params)?;
+    let noun = resolved.entity_type;
+    let msg = format!("Untagged {noun} {} from {}", result.id, self.tags.join(", "));
+    println!("{}", SuccessMessage::new(&msg, &ctx.theme));
+    Ok(())
   }
 }
 

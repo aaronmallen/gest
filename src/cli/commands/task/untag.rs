@@ -2,7 +2,9 @@ use clap::Args;
 
 use crate::{
   cli::{self, AppContext},
+  model::EntityType,
   store,
+  ui::composites::success_message::SuccessMessage,
 };
 
 /// Remove tags from a task.
@@ -18,17 +20,15 @@ pub struct Command {
 impl Command {
   /// Remove the specified tags from the task and persist.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    crate::cli::commands::tags::untag_entity(
-      ctx,
-      &self.id,
-      &self.tags,
-      "task",
-      store::resolve_task_id,
-      store::read_task,
-      |t| &mut t.tags,
-      |t, ts| t.updated_at = ts,
-      store::write_task,
-    )
+    let params = store::TagParams {
+      entity_type: EntityType::Task,
+      id_prefix: &self.id,
+      tags: &self.tags,
+    };
+    let result = store::untag_entity(&ctx.settings, &params)?;
+    let msg = format!("Untagged task {} from {}", result.id, self.tags.join(", "));
+    println!("{}", SuccessMessage::new(&msg, &ctx.theme));
+    Ok(())
   }
 }
 

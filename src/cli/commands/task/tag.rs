@@ -2,7 +2,9 @@ use clap::Args;
 
 use crate::{
   cli::{self, AppContext},
+  model::EntityType,
   store,
+  ui::composites::success_message::SuccessMessage,
 };
 
 /// Add tags to a task, deduplicating with any existing tags.
@@ -18,17 +20,15 @@ pub struct Command {
 impl Command {
   /// Merge the given tags into the task and persist.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    crate::cli::commands::tags::tag_entity(
-      ctx,
-      &self.id,
-      &self.tags,
-      "task",
-      store::resolve_task_id,
-      store::read_task,
-      |t| &mut t.tags,
-      |t, ts| t.updated_at = ts,
-      store::write_task,
-    )
+    let params = store::TagParams {
+      entity_type: EntityType::Task,
+      id_prefix: &self.id,
+      tags: &self.tags,
+    };
+    let result = store::tag_entity(&ctx.settings, &params)?;
+    let msg = format!("Tagged task {} with {}", result.id, self.tags.join(", "));
+    println!("{}", SuccessMessage::new(&msg, &ctx.theme));
+    Ok(())
   }
 }
 

@@ -2,7 +2,9 @@ use clap::Args;
 
 use crate::{
   cli::{self, AppContext},
+  model::EntityType,
   store,
+  ui::composites::success_message::SuccessMessage,
 };
 
 /// Add tags to an iteration.
@@ -18,17 +20,15 @@ pub struct Command {
 impl Command {
   /// Merge the provided tags into the iteration's existing tag set, deduplicating.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    crate::cli::commands::tags::tag_entity(
-      ctx,
-      &self.id,
-      &self.tags,
-      "iteration",
-      store::resolve_iteration_id,
-      store::read_iteration,
-      |i| &mut i.tags,
-      |i, t| i.updated_at = t,
-      store::write_iteration,
-    )
+    let params = store::TagParams {
+      entity_type: EntityType::Iteration,
+      id_prefix: &self.id,
+      tags: &self.tags,
+    };
+    let result = store::tag_entity(&ctx.settings, &params)?;
+    let msg = format!("Tagged iteration {} with {}", result.id, self.tags.join(", "));
+    println!("{}", SuccessMessage::new(&msg, &ctx.theme));
+    Ok(())
   }
 }
 

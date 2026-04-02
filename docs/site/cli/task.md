@@ -11,20 +11,20 @@ gest task <COMMAND> [OPTIONS]
 
 ## Subcommands
 
-| Command                      | Description                                                         |
-|------------------------------|---------------------------------------------------------------------|
-| [`block`](#task-block)       | Shortcut for `task link <id> blocks <target>`                       |
-| [`cancel`](#task-cancel)     | Cancel a task (shortcut for `task update <id> --status cancelled`)  |
-| [`complete`](#task-complete) | Mark a task as done (shortcut for `task update <id> --status done`) |
-| [`create`](#task-create)     | Create a new task                                                   |
-| [`list`](#task-list)         | List tasks with optional filters                                    |
-| [`show`](#task-show)         | Display a task's full details                                       |
-| [`update`](#task-update)     | Update a task's fields                                              |
-| [`tag`](#task-tag)           | Add tags to a task                                                  |
-| [`untag`](#task-untag)       | Remove tags from a task                                             |
-| [`link`](#task-link)         | Create a relationship between entities                              |
-| [`meta`](#task-meta)         | Read or write metadata fields                                       |
-| [`note`](#task-note)         | Manage notes on a task                                              |
+| Command                      | Aliases | Description                                                         |
+|------------------------------|---------|---------------------------------------------------------------------|
+| [`block`](#task-block)       |         | Shortcut for `task link <id> blocks <target>`                       |
+| [`cancel`](#task-cancel)     |         | Cancel a task (shortcut for `task update <id> --status cancelled`)  |
+| [`complete`](#task-complete) |         | Mark a task as done (shortcut for `task update <id> --status done`) |
+| [`create`](#task-create)     | `new`   | Create a new task                                                   |
+| [`list`](#task-list)         | `ls`    | List tasks with optional filters                                    |
+| [`show`](#task-show)         | `view`  | Display a task's full details                                       |
+| [`update`](#task-update)     | `edit`  | Update a task's fields                                              |
+| [`tag`](#task-tag)           |         | Add tags to a task                                                  |
+| [`untag`](#task-untag)       |         | Remove tags from a task                                             |
+| [`link`](#task-link)         |         | Create a relationship between entities                              |
+| [`meta`](#task-meta)         |         | Read or write metadata fields                                       |
+| [`note`](#task-note)         |         | Manage notes on a task                                              |
 
 ---
 
@@ -46,9 +46,11 @@ gest task block [OPTIONS] <ID> <BLOCKING_ID>
 
 ### Options
 
-| Flag         | Description                                                             |
-|--------------|-------------------------------------------------------------------------|
-| `--artifact` | Target is an artifact instead of a task (no reciprocal link is created) |
+| Flag           | Description                                                             |
+|----------------|-------------------------------------------------------------------------|
+| `--artifact`   | Target is an artifact instead of a task (no reciprocal link is created) |
+| `-j, --json`   | Output the task as JSON after linking                                   |
+| `-q, --quiet`  | Output only the task ID                                                 |
 
 ### Examples
 
@@ -67,7 +69,7 @@ gest task block abc123 art789 --artifact
 Cancel a task. Shortcut for `task update <id> --status cancelled`.
 
 ```text
-gest task cancel <ID>
+gest task cancel [OPTIONS] <ID>
 ```
 
 ### Arguments
@@ -75,6 +77,13 @@ gest task cancel <ID>
 | Argument | Description              |
 |----------|--------------------------|
 | `<ID>`   | Task ID or unique prefix |
+
+### Options
+
+| Flag          | Description            |
+|---------------|------------------------|
+| `-j, --json`  | Output as JSON         |
+| `-q, --quiet` | Print only the task ID |
 
 ### Examples
 
@@ -89,7 +98,7 @@ gest task cancel abc123
 Mark a task as done. Shortcut for `task update <id> --status done`.
 
 ```text
-gest task complete <ID>
+gest task complete [OPTIONS] <ID>
 ```
 
 ### Arguments
@@ -97,6 +106,13 @@ gest task complete <ID>
 | Argument | Description              |
 |----------|--------------------------|
 | `<ID>`   | Task ID or unique prefix |
+
+### Options
+
+| Flag          | Description            |
+|---------------|------------------------|
+| `-j, --json`  | Output as JSON         |
+| `-q, --quiet` | Print only the task ID |
 
 ### Examples
 
@@ -110,27 +126,35 @@ gest task complete abc123
 
 Create a new task with optional metadata, tags, and status.
 
+When `--description` is omitted and stdin is a terminal, `$EDITOR` opens for interactive
+editing. When stdin is a pipe, the piped content is used as the description body.
+
 ```text
-gest task create [OPTIONS] <TITLE>
+gest task create [OPTIONS] [TITLE]
 ```
 
 ### Arguments
 
 | Argument  | Description |
 |-----------|-------------|
-| `<TITLE>` | Task title  |
+| `[TITLE]` | Task title  |
 
 ### Options
 
 | Flag                              | Description                                                                     |
 |-----------------------------------|---------------------------------------------------------------------------------|
 | `--assigned-to <ASSIGNED_TO>`     | Actor assigned to this task                                                     |
+| `--batch`                         | Read NDJSON from stdin (one task per line)                                      |
 | `-d, --description <DESCRIPTION>` | Description text (opens `$EDITOR` if omitted and stdin is a terminal)           |
+| `-i, --iteration <ITERATION>`     | Add the task to an iteration (ID or prefix)                                     |
+| `-j, --json`                      | Output the created task as JSON                                                 |
+| `-l, --link <LINK>`               | Create a link on the new task (repeatable, format: `<rel>:<target_id>`)         |
 | `-m, --metadata <METADATA>`       | Key=value metadata pair (repeatable, e.g. `-m key=value`)                       |
 | `--phase <PHASE>`                 | Execution phase for parallel grouping                                           |
 | `-p, --priority <PRIORITY>`       | Priority level (0-4, where 0 is highest)                                        |
+| `-q, --quiet`                     | Print only the task ID                                                          |
 | `-s, --status <STATUS>`           | Initial status: `open`, `in-progress`, `done`, or `cancelled` (default: `open`) |
-| `--tags <TAGS>`                   | Comma-separated list of tags                                                    |
+| `--tag <TAG>`                     | Tag (repeatable, or comma-separated)                                            |
 
 ### Examples
 
@@ -139,10 +163,23 @@ gest task create [OPTIONS] <TITLE>
 gest task create "Implement login page"
 
 # Create a task with description and tags
-gest task create "Fix memory leak" -d "OOM after 24h uptime" --tags "bug,critical"
+gest task create "Fix memory leak" -d "OOM after 24h uptime" --tag "bug,critical"
 
 # Create a high-priority task assigned to an agent
 gest task create "Write migration" -p 0 --assigned-to agent --phase 1
+
+# Create a task and add it to an iteration with a link
+gest task create "Add auth" -i iter123 -l child-of:spec456
+
+# Pipe description from stdin
+echo "Detailed description here" | gest task create "My task"
+
+# Batch-create tasks from NDJSON
+cat tasks.ndjson | gest task create --batch
+
+# Machine-readable output
+gest task create "Quick task" --json
+gest task create "Quick task" -q
 ```
 
 ---
@@ -157,12 +194,13 @@ gest task list [OPTIONS]
 
 ### Options
 
-| Flag                    | Description                                                     |
-|-------------------------|-----------------------------------------------------------------|
-| `-a, --all`             | Include resolved (done/cancelled) tasks                         |
-| `-j, --json`            | Output task list as JSON                                        |
-| `-s, --status <STATUS>` | Filter by status: `open`, `in-progress`, `done`, or `cancelled` |
-| `--tag <TAG>`           | Filter by tag                                                   |
+| Flag                             | Description                                                     |
+|----------------------------------|-----------------------------------------------------------------|
+| `-a, --all`                      | Include resolved (done/cancelled) tasks                         |
+| `--assigned-to <ASSIGNED_TO>`    | Filter by assigned-to name                                      |
+| `-j, --json`                     | Output task list as JSON                                        |
+| `-s, --status <STATUS>`          | Filter by status: `open`, `in-progress`, `done`, or `cancelled` |
+| `--tag <TAG>`                    | Filter by tag                                                   |
 
 ### Examples
 
@@ -175,6 +213,9 @@ gest task list --all
 
 # Filter by status
 gest task list -s in-progress
+
+# Filter by assignee
+gest task list --assigned-to agent
 
 # JSON output for scripting
 gest task list --json
@@ -237,11 +278,13 @@ gest task update [OPTIONS] <ID>
 |-----------------------------------|-------------------------------------------------------------------------|
 | `--assigned-to <ASSIGNED_TO>`     | Actor assigned to this task                                             |
 | `-d, --description <DESCRIPTION>` | New description text                                                    |
+| `-j, --json`                      | Output as JSON                                                          |
 | `-m, --metadata <METADATA>`       | Key=value metadata pair, merged with existing (repeatable)              |
 | `--phase <PHASE>`                 | Execution phase for parallel grouping                                   |
 | `-p, --priority <PRIORITY>`       | Priority level (0-4, where 0 is highest)                                |
+| `-q, --quiet`                     | Print only the task ID                                                  |
 | `-s, --status <STATUS>`           | New status (done/cancelled auto-resolves; open/in-progress un-resolves) |
-| `--tags <TAGS>`                   | Replace all tags with this comma-separated list                         |
+| `--tag <TAG>`                     | Replace all tags (repeatable, or comma-separated)                       |
 | `-t, --title <TITLE>`             | New title                                                               |
 
 ### Examples
@@ -255,6 +298,9 @@ gest task update abc123 -t "New title" -d "Updated description"
 
 # Add metadata
 gest task update abc123 -m estimate=3h -m complexity=high
+
+# Machine-readable output
+gest task update abc123 -s done --json
 ```
 
 ---
@@ -264,20 +310,28 @@ gest task update abc123 -m estimate=3h -m complexity=high
 Add tags to a task, deduplicating with any existing tags.
 
 ```text
-gest task tag <ID> [TAGS]...
+gest task tag [OPTIONS] <ID> [TAGS]...
 ```
 
 ### Arguments
 
-| Argument    | Description                   |
-|-------------|-------------------------------|
-| `<ID>`      | Task ID or unique prefix      |
-| `[TAGS]...` | Tags to add (space-separated) |
+| Argument    | Description                              |
+|-------------|------------------------------------------|
+| `<ID>`      | Task ID or unique prefix                 |
+| `[TAGS]...` | Tags to add (space or comma-separated)   |
+
+### Options
+
+| Flag          | Description                           |
+|---------------|---------------------------------------|
+| `-j, --json`  | Output the task as JSON after tagging |
+| `-q, --quiet` | Output only the task ID               |
 
 ### Examples
 
 ```sh
 gest task tag abc123 bug critical
+gest task tag abc123 bug,critical
 ```
 
 ---
@@ -287,15 +341,22 @@ gest task tag abc123 bug critical
 Remove tags from a task.
 
 ```text
-gest task untag <ID> [TAGS]...
+gest task untag [OPTIONS] <ID> [TAGS]...
 ```
 
 ### Arguments
 
-| Argument    | Description                      |
-|-------------|----------------------------------|
-| `<ID>`      | Task ID or unique prefix         |
-| `[TAGS]...` | Tags to remove (space-separated) |
+| Argument    | Description                                |
+|-------------|--------------------------------------------|
+| `<ID>`      | Task ID or unique prefix                   |
+| `[TAGS]...` | Tags to remove (space or comma-separated)  |
+
+### Options
+
+| Flag          | Description                             |
+|---------------|-----------------------------------------|
+| `-j, --json`  | Output the task as JSON after untagging |
+| `-q, --quiet` | Output only the task ID                 |
 
 ### Examples
 
@@ -323,9 +384,11 @@ gest task link [OPTIONS] <ID> <REL> <TARGET_ID>
 
 ### Options
 
-| Flag         | Description                                                             |
-|--------------|-------------------------------------------------------------------------|
-| `--artifact` | Target is an artifact instead of a task (no reciprocal link is created) |
+| Flag          | Description                                                             |
+|---------------|-------------------------------------------------------------------------|
+| `--artifact`  | Target is an artifact instead of a task (no reciprocal link is created) |
+| `-j, --json`  | Output the task as JSON after linking                                   |
+| `-q, --quiet` | Output only the task ID                                                 |
 
 ### Examples
 
@@ -352,7 +415,7 @@ gest task meta <COMMAND>
 Retrieve a single metadata value.
 
 ```text
-gest task meta get <ID> <PATH>
+gest task meta get [OPTIONS] <ID> <PATH>
 ```
 
 | Argument | Description                                 |
@@ -360,12 +423,17 @@ gest task meta get <ID> <PATH>
 | `<ID>`   | Task ID or unique prefix                    |
 | `<PATH>` | Dot-delimited key path (e.g. `outer.inner`) |
 
+| Flag     | Description                           |
+|----------|---------------------------------------|
+| `--json` | Output as a JSON object               |
+| `--raw`  | Output the bare value with no styling |
+
 ### meta set
 
 Set a metadata value. Strings, numbers, and booleans are auto-detected.
 
 ```text
-gest task meta set <ID> <PATH> <VALUE>
+gest task meta set [OPTIONS] <ID> <PATH> <VALUE>
 ```
 
 | Argument  | Description                                 |
@@ -373,6 +441,11 @@ gest task meta set <ID> <PATH> <VALUE>
 | `<ID>`    | Task ID or unique prefix                    |
 | `<PATH>`  | Dot-delimited key path (e.g. `outer.inner`) |
 | `<VALUE>` | Value to set                                |
+
+| Flag          | Description              |
+|---------------|--------------------------|
+| `-j, --json`  | Output as JSON           |
+| `-q, --quiet` | Print only the entity ID |
 
 ### Examples
 
@@ -382,6 +455,12 @@ gest task meta set abc123 estimate "3 hours"
 
 # Read it back
 gest task meta get abc123 estimate
+
+# JSON output
+gest task meta get abc123 estimate --json
+
+# Raw value (no styling)
+gest task meta get abc123 estimate --raw
 ```
 
 ---
@@ -395,9 +474,20 @@ progress updates, and observations — analogous to comments on a GitHub issue.
 gest task note <COMMAND>
 ```
 
+| Command                         | Aliases | Description              |
+|---------------------------------|---------|--------------------------|
+| [`add`](#note-add)              |         | Add a note to a task     |
+| [`list`](#note-list)            | `ls`    | List all notes on a task |
+| [`show`](#note-show)            | `view`  | Show a single note       |
+| [`update`](#note-update)        |         | Update a note's body     |
+| [`delete`](#note-delete)        |         | Delete a note            |
+
 ### note add
 
 Add a note to a task. Author defaults to `git config user.name` / `user.email`.
+
+When `--body` is omitted and stdin is a terminal, `$EDITOR` opens for interactive editing.
+When stdin is a pipe, the piped content is used as the note body.
 
 ```text
 gest task note add [OPTIONS] <ID>
@@ -409,8 +499,10 @@ gest task note add [OPTIONS] <ID>
 
 | Flag                | Description                                                                 |
 |---------------------|-----------------------------------------------------------------------------|
+| `--agent <AGENT>`   | Agent name for attribution (mutually exclusive with git-derived authorship) |
 | `-b, --body <BODY>` | Note body text (opens `$EDITOR` if omitted and stdin is a terminal)         |
-| `--agent <NAME>`    | Agent name for attribution (mutually exclusive with git-derived authorship) |
+| `-j, --json`        | Output as JSON                                                              |
+| `-q, --quiet`       | Print only the note ID                                                      |
 
 ### note list
 
@@ -424,9 +516,9 @@ gest task note list [OPTIONS] <ID>
 |----------|--------------------------|
 | `<ID>`   | Task ID or unique prefix |
 
-| Flag     | Description    |
-|----------|----------------|
-| `--json` | Output as JSON |
+| Flag         | Description    |
+|--------------|----------------|
+| `-j, --json` | Output as JSON |
 
 ### note show
 
@@ -441,9 +533,9 @@ gest task note show [OPTIONS] <TASK_ID> <NOTE_ID>
 | `<TASK_ID>` | Task ID or unique prefix |
 | `<NOTE_ID>` | Note ID or unique prefix |
 
-| Flag     | Description    |
-|----------|----------------|
-| `--json` | Output as JSON |
+| Flag         | Description    |
+|--------------|----------------|
+| `-j, --json` | Output as JSON |
 
 ### note update
 
@@ -461,6 +553,8 @@ gest task note update [OPTIONS] <TASK_ID> <NOTE_ID>
 | Flag                | Description                                                                   |
 |---------------------|-------------------------------------------------------------------------------|
 | `-b, --body <BODY>` | New body text (opens `$EDITOR` pre-filled if omitted and stdin is a terminal) |
+| `-j, --json`        | Output as JSON                                                                |
+| `-q, --quiet`       | Print only the note ID                                                        |
 
 ### note delete
 
@@ -483,6 +577,9 @@ gest task note add abc123 --body "Found the root cause in the parser"
 
 # Add an agent note
 gest task note add abc123 --agent claude --body "Completed code review, no issues found"
+
+# Pipe note body from stdin
+echo "Investigation notes" | gest task note add abc123
 
 # List notes
 gest task note list abc123

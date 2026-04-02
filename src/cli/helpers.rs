@@ -5,7 +5,7 @@ pub fn build_toml_metadata(pairs: &[String]) -> crate::cli::Result<toml::Table> 
   let kvs = split_key_value_pairs(pairs)?;
   let mut table = toml::Table::new();
   for (key, value) in kvs {
-    table.insert(key, toml::Value::String(value));
+    table.insert(key, crate::store::meta::parse_toml_value(&value));
   }
   Ok(table)
 }
@@ -27,7 +27,7 @@ pub fn merge_toml_metadata(pairs: &[String], mut existing: toml::Table) -> crate
   }
   let kvs = split_key_value_pairs(pairs)?;
   for (key, value) in kvs {
-    existing.insert(key, toml::Value::String(value));
+    existing.insert(key, crate::store::meta::parse_toml_value(&value));
   }
   Ok(Some(existing))
 }

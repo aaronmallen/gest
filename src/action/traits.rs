@@ -38,6 +38,15 @@ pub trait Linkable {
   fn set_updated_at(&mut self, time: DateTime<Utc>);
 }
 
+/// Access to an entity's TOML metadata table for mutation.
+pub trait HasMetadata {
+  fn metadata(&self) -> &toml::Table;
+
+  fn metadata_mut(&mut self) -> &mut toml::Table;
+
+  fn set_updated_at(&mut self, time: DateTime<Utc>);
+}
+
 /// Marker for entity types that carry a status field.
 ///
 /// Only implemented on entity types that have a status (Task, Iteration).

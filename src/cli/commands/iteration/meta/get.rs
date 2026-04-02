@@ -1,9 +1,9 @@
 use clap::Args;
 
 use crate::{
+  action,
   cli::{self, AppContext},
-  store,
-  ui::views::meta::MetaValueView,
+  model::iteration::Iteration,
 };
 
 /// Retrieve a single metadata value from an iteration.
@@ -18,58 +18,47 @@ pub struct Command {
 impl Command {
   /// Resolve the iteration, walk the metadata table by dot-path, and print the value.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let id = store::resolve_iteration_id(config, &self.id, false)?;
-    let iteration = store::read_iteration(config, &id)?;
-
-    let root = toml::Value::Table(iteration.metadata);
-    let value = store::meta::resolve_dot_path(&root, &self.path)
-      .ok_or_else(|| cli::Error::NotFound(format!("Metadata key not found: '{}'", self.path)))?;
-
-    let formatted = store::meta::format_toml_value(value);
-    println!("{}", MetaValueView::new(formatted, ctx.theme.iteration_detail_value));
-    Ok(())
+    action::meta::meta_get::<Iteration>(ctx, &self.id, &self.path, ctx.theme.iteration_detail_value)
   }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::{
+    store,
+    test_helpers::{make_test_context, make_test_iteration},
+  };
 
-  mod call {
-    use super::*;
-    use crate::test_helpers::{make_test_context, make_test_iteration};
+  #[test]
+  fn it_errors_on_missing_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = make_test_context(dir.path());
+    let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+    store::write_iteration(&ctx.settings, &iteration).unwrap();
 
-    #[test]
-    fn it_errors_on_missing_path() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
+    let cmd = Command {
+      id: "zyxw".to_string(),
+      path: "nonexistent".to_string(),
+    };
+    let result = cmd.call(&ctx);
+    assert!(result.is_err());
+  }
 
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        path: "nonexistent".to_string(),
-      };
-      let result = cmd.call(&ctx);
-      assert!(result.is_err());
-    }
+  #[test]
+  fn it_reads_metadata_value() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = make_test_context(dir.path());
+    let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+    iteration
+      .metadata
+      .insert("priority".to_string(), toml::Value::String("high".to_string()));
+    store::write_iteration(&ctx.settings, &iteration).unwrap();
 
-    #[test]
-    fn it_reads_metadata_value() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration
-        .metadata
-        .insert("priority".to_string(), toml::Value::String("high".to_string()));
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        path: "priority".to_string(),
-      };
-      cmd.call(&ctx).unwrap();
-    }
+    let cmd = Command {
+      id: "zyxw".to_string(),
+      path: "priority".to_string(),
+    };
+    cmd.call(&ctx).unwrap();
   }
 }

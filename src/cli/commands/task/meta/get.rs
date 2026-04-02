@@ -1,9 +1,9 @@
 use clap::Args;
 
 use crate::{
+  action,
   cli::{self, AppContext},
-  store,
-  ui::views::meta::MetaValueView,
+  model::task::Task,
 };
 
 /// Get a metadata value from a task by dot-delimited key path.
@@ -18,59 +18,48 @@ pub struct Command {
 impl Command {
   /// Resolve the task, look up the metadata key, and print the value.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let id = store::resolve_task_id(config, &self.id, false)?;
-    let task = store::read_task(config, &id)?;
-
-    let root = toml::Value::Table(task.metadata);
-    let value = store::meta::resolve_dot_path(&root, &self.path)
-      .ok_or_else(|| cli::Error::NotFound(format!("Metadata key not found: '{}'", self.path)))?;
-
-    let formatted = store::meta::format_toml_value(value);
-    println!("{}", MetaValueView::new(formatted, ctx.theme.task_detail_value));
-    Ok(())
+    action::meta::meta_get::<Task>(ctx, &self.id, &self.path, ctx.theme.task_detail_value)
   }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::{
+    store,
+    test_helpers::{make_test_context, make_test_task},
+  };
 
-  mod call {
-    use super::*;
-    use crate::test_helpers::{make_test_context, make_test_task};
+  #[test]
+  fn it_errors_on_missing_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = make_test_context(dir.path());
+    let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+    store::write_task(&ctx.settings, &task).unwrap();
 
-    #[test]
-    fn it_errors_on_missing_path() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
+    let cmd = Command {
+      id: "zyxw".to_string(),
+      path: "nonexistent".to_string(),
+    };
+    let result = cmd.call(&ctx);
 
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        path: "nonexistent".to_string(),
-      };
-      let result = cmd.call(&ctx);
+    assert!(result.is_err());
+  }
 
-      assert!(result.is_err());
-    }
+  #[test]
+  fn it_reads_metadata_value() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = make_test_context(dir.path());
+    let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+    task
+      .metadata
+      .insert("priority".to_string(), toml::Value::String("high".to_string()));
+    store::write_task(&ctx.settings, &task).unwrap();
 
-    #[test]
-    fn it_reads_metadata_value() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      task
-        .metadata
-        .insert("priority".to_string(), toml::Value::String("high".to_string()));
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        path: "priority".to_string(),
-      };
-      cmd.call(&ctx).unwrap();
-    }
+    let cmd = Command {
+      id: "zyxw".to_string(),
+      path: "priority".to_string(),
+    };
+    cmd.call(&ctx).unwrap();
   }
 }

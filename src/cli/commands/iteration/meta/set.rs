@@ -1,10 +1,9 @@
-use chrono::Utc;
 use clap::Args;
 
 use crate::{
+  action,
   cli::{self, AppContext},
-  store,
-  ui::composites::success_message::SuccessMessage,
+  model::iteration::Iteration,
 };
 
 /// Set a metadata value on an iteration.
@@ -21,70 +20,55 @@ pub struct Command {
 impl Command {
   /// Write a metadata key-value pair into the iteration, creating nested tables as needed.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let id = store::resolve_iteration_id(config, &self.id, false)?;
-    let mut iteration = store::read_iteration(config, &id)?;
-
-    store::meta::set_dot_path(&mut iteration.metadata, &self.path, &self.value)?;
-
-    iteration.updated_at = Utc::now();
-    store::write_iteration(config, &iteration)?;
-
-    let msg = format!("Set {}.{} = {}", id, self.path, self.value);
-    println!("{}", SuccessMessage::new(&msg, theme));
-    Ok(())
+    action::meta::meta_set::<Iteration>(ctx, &self.id, &self.path, &self.value)
   }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::{
+    store,
+    test_helpers::{make_test_context, make_test_iteration},
+  };
 
-  mod call {
-    use pretty_assertions::assert_eq;
+  #[test]
+  fn it_sets_metadata_value() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = make_test_context(dir.path());
+    let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+    store::write_iteration(&ctx.settings, &iteration).unwrap();
 
-    use super::*;
-    use crate::test_helpers::{make_test_context, make_test_iteration};
+    let cmd = Command {
+      id: "zyxw".to_string(),
+      path: "priority".to_string(),
+      value: "high".to_string(),
+    };
+    cmd.call(&ctx).unwrap();
 
-    #[test]
-    fn it_sets_metadata_value() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
+    let loaded = store::read_iteration(&ctx.settings, &iteration.id).unwrap();
+    assert_eq!(
+      loaded.metadata.get("priority"),
+      Some(&toml::Value::String("high".to_string()))
+    );
+  }
 
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        path: "priority".to_string(),
-        value: "high".to_string(),
-      };
-      cmd.call(&ctx).unwrap();
+  #[test]
+  fn it_sets_nested_metadata_value() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = make_test_context(dir.path());
+    let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+    store::write_iteration(&ctx.settings, &iteration).unwrap();
 
-      let loaded = store::read_iteration(&ctx.settings, &iteration.id).unwrap();
-      assert_eq!(
-        loaded.metadata.get("priority"),
-        Some(&toml::Value::String("high".to_string()))
-      );
-    }
+    let cmd = Command {
+      id: "zyxw".to_string(),
+      path: "config.timeout".to_string(),
+      value: "30".to_string(),
+    };
+    cmd.call(&ctx).unwrap();
 
-    #[test]
-    fn it_sets_nested_metadata_value() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        path: "config.timeout".to_string(),
-        value: "30".to_string(),
-      };
-      cmd.call(&ctx).unwrap();
-
-      let loaded = store::read_iteration(&ctx.settings, &iteration.id).unwrap();
-      let config = loaded.metadata.get("config").unwrap().as_table().unwrap();
-      assert_eq!(config.get("timeout"), Some(&toml::Value::Integer(30)));
-    }
+    let loaded = store::read_iteration(&ctx.settings, &iteration.id).unwrap();
+    let config = loaded.metadata.get("config").unwrap().as_table().unwrap();
+    assert_eq!(config.get("timeout"), Some(&toml::Value::Integer(30)));
   }
 }

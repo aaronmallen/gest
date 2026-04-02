@@ -12,7 +12,7 @@ use super::{
   link::Link,
 };
 use crate::{
-  action::{HasStatus, Linkable, Resolvable, Storable, Taggable},
+  action::{HasMetadata, HasStatus, Linkable, Resolvable, Storable, Taggable},
   config::Settings,
   store,
 };
@@ -156,6 +156,20 @@ impl Taggable for Iteration {
 impl Linkable for Iteration {
   fn links_mut(&mut self) -> &mut Vec<Link> {
     &mut self.links
+  }
+
+  fn set_updated_at(&mut self, time: DateTime<Utc>) {
+    self.updated_at = time;
+  }
+}
+
+impl HasMetadata for Iteration {
+  fn metadata(&self) -> &toml::Table {
+    &self.metadata
+  }
+
+  fn metadata_mut(&mut self) -> &mut toml::Table {
+    &mut self.metadata
   }
 
   fn set_updated_at(&mut self, time: DateTime<Utc>) {

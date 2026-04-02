@@ -1,10 +1,9 @@
-use chrono::Utc;
 use clap::Args;
 
 use crate::{
+  action,
   cli::{self, AppContext},
-  store,
-  ui::composites::success_message::SuccessMessage,
+  model::task::Task,
 };
 
 /// Set a metadata value on a task using a dot-delimited key path.
@@ -21,70 +20,55 @@ pub struct Command {
 impl Command {
   /// Write the value into the task's metadata table and persist.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let id = store::resolve_task_id(config, &self.id, false)?;
-    let mut task = store::read_task(config, &id)?;
-
-    store::meta::set_dot_path(&mut task.metadata, &self.path, &self.value)?;
-
-    task.updated_at = Utc::now();
-    store::write_task(config, &task)?;
-
-    let msg = format!("Set {}.{} = {}", id, self.path, self.value);
-    println!("{}", SuccessMessage::new(&msg, theme));
-    Ok(())
+    action::meta::meta_set::<Task>(ctx, &self.id, &self.path, &self.value)
   }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::{
+    store,
+    test_helpers::{make_test_context, make_test_task},
+  };
 
-  mod call {
-    use pretty_assertions::assert_eq;
+  #[test]
+  fn it_sets_metadata_value() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = make_test_context(dir.path());
+    let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+    store::write_task(&ctx.settings, &task).unwrap();
 
-    use super::*;
-    use crate::test_helpers::{make_test_context, make_test_task};
+    let cmd = Command {
+      id: "zyxw".to_string(),
+      path: "priority".to_string(),
+      value: "high".to_string(),
+    };
+    cmd.call(&ctx).unwrap();
 
-    #[test]
-    fn it_sets_metadata_value() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
+    let loaded = store::read_task(&ctx.settings, &task.id).unwrap();
+    assert_eq!(
+      loaded.metadata.get("priority"),
+      Some(&toml::Value::String("high".to_string()))
+    );
+  }
 
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        path: "priority".to_string(),
-        value: "high".to_string(),
-      };
-      cmd.call(&ctx).unwrap();
+  #[test]
+  fn it_sets_nested_metadata_value() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = make_test_context(dir.path());
+    let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
+    store::write_task(&ctx.settings, &task).unwrap();
 
-      let loaded = store::read_task(&ctx.settings, &task.id).unwrap();
-      assert_eq!(
-        loaded.metadata.get("priority"),
-        Some(&toml::Value::String("high".to_string()))
-      );
-    }
+    let cmd = Command {
+      id: "zyxw".to_string(),
+      path: "config.timeout".to_string(),
+      value: "30".to_string(),
+    };
+    cmd.call(&ctx).unwrap();
 
-    #[test]
-    fn it_sets_nested_metadata_value() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        path: "config.timeout".to_string(),
-        value: "30".to_string(),
-      };
-      cmd.call(&ctx).unwrap();
-
-      let loaded = store::read_task(&ctx.settings, &task.id).unwrap();
-      let config = loaded.metadata.get("config").unwrap().as_table().unwrap();
-      assert_eq!(config.get("timeout"), Some(&toml::Value::Integer(30)));
-    }
+    let loaded = store::read_task(&ctx.settings, &task.id).unwrap();
+    let config = loaded.metadata.get("config").unwrap().as_table().unwrap();
+    assert_eq!(config.get("timeout"), Some(&toml::Value::Integer(30)));
   }
 }

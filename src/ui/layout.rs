@@ -101,7 +101,9 @@ fn truncate_visible(f: &mut Formatter<'_>, s: &str, budget: usize) -> fmt::Resul
     if c == '\x1b' {
       write!(f, "{c}")?;
       if chars.peek() == Some(&'[') {
-        write!(f, "{}", chars.next().unwrap())?;
+        if let Some(bracket) = chars.next() {
+          write!(f, "{bracket}")?;
+        }
         for inner in chars.by_ref() {
           write!(f, "{inner}")?;
           if inner.is_ascii_alphabetic() {

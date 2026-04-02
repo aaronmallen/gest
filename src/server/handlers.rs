@@ -490,14 +490,23 @@ pub async fn dashboard(State(state): State<ServerState>) -> Response {
       ..Default::default()
     },
   )
-  .unwrap_or_default();
+  .unwrap_or_else(|e| {
+    log::warn!("dashboard: failed to list tasks: {e}");
+    Vec::new()
+  });
 
   let artifact_count = store::list_artifacts(&state.settings, &ArtifactFilter::default())
-    .unwrap_or_default()
+    .unwrap_or_else(|e| {
+      log::warn!("dashboard: failed to list artifacts: {e}");
+      Vec::new()
+    })
     .len();
 
   let iteration_count = store::list_iterations(&state.settings, &IterationFilter::default())
-    .unwrap_or_default()
+    .unwrap_or_else(|e| {
+      log::warn!("dashboard: failed to list iterations: {e}");
+      Vec::new()
+    })
     .len();
 
   let open_count = tasks.iter().filter(|t| t.status == Status::Open).count();

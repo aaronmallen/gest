@@ -15,9 +15,15 @@ pub struct Command {
   /// Description text.
   #[arg(short, long)]
   pub description: Option<String>,
+  /// Output the created iteration as JSON.
+  #[arg(short, long, conflicts_with = "quiet")]
+  pub json: bool,
   /// Key=value metadata pair (repeatable, e.g. `-m key=value`).
   #[arg(short, long)]
   pub metadata: Vec<String>,
+  /// Print only the iteration ID.
+  #[arg(short, long, conflicts_with = "json")]
+  pub quiet: bool,
   /// Initial status: active, completed, or failed (default: active).
   #[arg(short, long)]
   pub status: Option<String>,
@@ -53,6 +59,17 @@ impl Command {
 
     let iteration = store::create_iteration(config, new)?;
 
+    if self.json {
+      let json = serde_json::to_string_pretty(&iteration)?;
+      println!("{json}");
+      return Ok(());
+    }
+
+    if self.quiet {
+      println!("{}", iteration.id);
+      return Ok(());
+    }
+
     let msg = format!("Created iteration {}", iteration.id);
     println!("{}", SuccessMessage::new(&msg, theme));
     Ok(())
@@ -77,7 +94,9 @@ mod tests {
       let cmd = Command {
         title: "Full Iteration".to_string(),
         description: Some("A description".to_string()),
+        json: false,
         metadata: vec!["team=backend".to_string()],
+        quiet: false,
         status: Some("active".to_string()),
         tag: vec!["sprint".to_string(), "q1".to_string()],
       };
@@ -101,7 +120,9 @@ mod tests {
       let cmd = Command {
         title: "Sprint 1".to_string(),
         description: None,
+        json: false,
         metadata: vec![],
+        quiet: false,
         status: None,
         tag: vec![],
       };
@@ -123,7 +144,9 @@ mod tests {
       let cmd = Command {
         title: "Done Iteration".to_string(),
         description: None,
+        json: false,
         metadata: vec![],
+        quiet: false,
         status: Some("completed".to_string()),
         tag: vec![],
       };

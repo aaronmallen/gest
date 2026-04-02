@@ -18,6 +18,9 @@ pub struct Command {
   /// Description text (opens `$EDITOR` if omitted and stdin is a terminal).
   #[arg(short, long)]
   pub description: Option<String>,
+  /// Output the created task as JSON.
+  #[arg(short, long, conflicts_with = "quiet")]
+  pub json: bool,
   /// Key=value metadata pair (repeatable, e.g. `-m key=value`).
   #[arg(short, long)]
   pub metadata: Vec<String>,
@@ -27,6 +30,9 @@ pub struct Command {
   /// Priority level (0-4, where 0 is highest).
   #[arg(short, long)]
   pub priority: Option<u8>,
+  /// Print only the task ID.
+  #[arg(short, long, conflicts_with = "json")]
+  pub quiet: bool,
   /// Initial status: open, in-progress, done, or cancelled (default: open).
   #[arg(short, long)]
   pub status: Option<String>,
@@ -67,6 +73,17 @@ impl Command {
 
     let task = store::create_task(config, new)?;
 
+    if self.json {
+      let json = serde_json::to_string_pretty(&task)?;
+      println!("{json}");
+      return Ok(());
+    }
+
+    if self.quiet {
+      println!("{}", task.id);
+      return Ok(());
+    }
+
     let status_str = task.status.as_str();
     let fields = vec![("title", task.title.clone())];
 
@@ -100,9 +117,11 @@ mod tests {
         title: "Full Task".to_string(),
         assigned_to: Some("agent-1".to_string()),
         description: Some("A description".to_string()),
+        json: false,
         metadata: vec!["custom=high".to_string()],
         phase: Some(1),
         priority: Some(2),
+        quiet: false,
         status: Some("in-progress".to_string()),
         tag: vec!["rust".to_string(), "cli".to_string()],
       };
@@ -135,9 +154,11 @@ mod tests {
         title: "My Task".to_string(),
         assigned_to: None,
         description: None,
+        json: false,
         metadata: vec![],
         phase: None,
         priority: None,
+        quiet: false,
         status: None,
         tag: vec![],
       };
@@ -162,9 +183,11 @@ mod tests {
         title: "Cancelled Task".to_string(),
         assigned_to: None,
         description: Some("Cancelled".to_string()),
+        json: false,
         metadata: vec![],
         phase: None,
         priority: None,
+        quiet: false,
         status: Some("cancelled".to_string()),
         tag: vec![],
       };
@@ -194,9 +217,11 @@ mod tests {
         title: "Done Task".to_string(),
         assigned_to: None,
         description: Some("Already done".to_string()),
+        json: false,
         metadata: vec![],
         phase: None,
         priority: None,
+        quiet: false,
         status: Some("done".to_string()),
         tag: vec![],
       };

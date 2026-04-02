@@ -13,12 +13,18 @@ pub struct Command {
   /// Body content as an inline string (skips editor and stdin).
   #[arg(short, long)]
   pub body: Option<String>,
+  /// Output the created artifact as JSON.
+  #[arg(short, long, conflicts_with = "quiet")]
+  pub json: bool,
   /// Artifact type (e.g. spec, adr, rfc, note).
   #[arg(short = 'k', long = "type")]
   pub kind: Option<String>,
   /// Key=value metadata pairs (repeatable).
   #[arg(short, long)]
   pub metadata: Vec<String>,
+  /// Print only the artifact ID.
+  #[arg(short, long, conflicts_with = "json")]
+  pub quiet: bool,
   /// Read body content from a file path.
   #[arg(short, long)]
   pub source: Option<String>,
@@ -64,6 +70,17 @@ impl Command {
 
     let artifact = store::create_artifact(config, new)?;
 
+    if self.json {
+      let json = serde_json::to_string_pretty(&artifact)?;
+      println!("{json}");
+      return Ok(());
+    }
+
+    if self.quiet {
+      println!("{}", artifact.id);
+      return Ok(());
+    }
+
     let id_str = artifact.id.to_string();
     let mut view = ArtifactCreateView::new(&id_str, &artifact.title, theme);
     if let Some(ref src) = self.source {
@@ -106,8 +123,10 @@ mod tests {
 
       let cmd = Command {
         body: None,
+        json: false,
         kind: None,
         metadata: vec![],
+        quiet: false,
         source: Some(source_path.to_string_lossy().to_string()),
         tag: vec![],
         title: Some("Sourced Artifact".to_string()),
@@ -128,8 +147,10 @@ mod tests {
 
       let cmd = Command {
         body: Some("# Content\n\nSome body text.".to_string()),
+        json: false,
         kind: Some("spec".to_string()),
         metadata: vec!["version=1".to_string()],
+        quiet: false,
         source: None,
         tag: vec!["rust".to_string(), "cli".to_string()],
         title: Some("Full Artifact".to_string()),
@@ -155,8 +176,10 @@ mod tests {
 
       let cmd = Command {
         body: None,
+        json: false,
         kind: None,
         metadata: vec![],
+        quiet: false,
         source: None,
         tag: vec![],
         title: Some("My Artifact".to_string()),
@@ -177,8 +200,10 @@ mod tests {
 
       let cmd = Command {
         body: Some("No heading here".to_string()),
+        json: false,
         kind: None,
         metadata: vec![],
+        quiet: false,
         source: None,
         tag: vec![],
         title: None,
@@ -197,8 +222,10 @@ mod tests {
 
       let cmd = Command {
         body: Some("# Auto Title\n\nBody text.".to_string()),
+        json: false,
         kind: None,
         metadata: vec![],
+        quiet: false,
         source: None,
         tag: vec![],
         title: None,

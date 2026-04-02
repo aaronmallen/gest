@@ -6,7 +6,6 @@ use super::{HasMetadata, Resolvable, Storable};
 use crate::{
   cli::{self, AppContext},
   store,
-  ui::composites::success_message::SuccessMessage,
 };
 
 /// Look up a metadata value by dot-delimited path and return the formatted string.
@@ -26,12 +25,13 @@ where
 }
 
 /// Set a metadata value at a dot-delimited path and persist the entity.
-pub fn meta_set<E>(ctx: &AppContext, prefix: &str, path: &str, value: &str) -> cli::Result<()>
+///
+/// Returns the updated entity so the caller can format output (JSON, quiet, styled).
+pub fn meta_set<E>(ctx: &AppContext, prefix: &str, path: &str, value: &str) -> cli::Result<E>
 where
   E: HasMetadata + Resolvable + Storable,
 {
   let config = &ctx.settings;
-  let theme = &ctx.theme;
   let id = E::resolve_id(config, prefix)?;
   let mut entity = E::read(config, &id)?;
 
@@ -40,7 +40,5 @@ where
   entity.set_updated_at(Utc::now());
   E::write(config, &entity)?;
 
-  let msg = format!("Set {id}.{path} = {value}");
-  println!("{}", SuccessMessage::new(&msg, theme));
-  Ok(())
+  Ok(entity)
 }

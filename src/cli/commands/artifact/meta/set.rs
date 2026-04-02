@@ -12,8 +12,14 @@ use crate::{
 pub struct Command {
   /// Artifact ID or unique prefix.
   pub id: String,
+  /// Output as JSON.
+  #[arg(short, long, conflicts_with = "quiet")]
+  pub json: bool,
   /// Dot-delimited key path (e.g. `config.timeout`).
   pub path: String,
+  /// Print only the entity ID.
+  #[arg(short, long, conflicts_with = "json")]
+  pub quiet: bool,
   /// Value to set (strings, numbers, booleans, and null are auto-detected).
   pub value: String,
 }
@@ -22,7 +28,6 @@ impl Command {
   /// Resolve the artifact, set the metadata key to the given value, and persist.
   pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
     let config = &ctx.settings;
-    let theme = &ctx.theme;
     let id = store::resolve_artifact_id(config, &self.id, false)?;
     let mut artifact = store::read_artifact(config, &id)?;
 
@@ -31,8 +36,15 @@ impl Command {
     artifact.updated_at = Utc::now();
     store::write_artifact(config, &artifact)?;
 
-    let msg = format!("Set {}.{} = {}", id, self.path, self.value);
-    println!("{}", SuccessMessage::new(&msg, theme));
+    if self.json {
+      println!("{}", serde_json::to_string_pretty(&artifact)?);
+    } else if self.quiet {
+      println!("{}", artifact.id);
+    } else {
+      let msg = format!("Set {}.{} = {}", id, self.path, self.value);
+      println!("{}", SuccessMessage::new(&msg, &ctx.theme));
+    }
+
     Ok(())
   }
 }
@@ -56,7 +68,9 @@ mod tests {
 
       let cmd = Command {
         id: "zyxw".to_string(),
+        json: false,
         path: "priority".to_string(),
+        quiet: false,
         value: "high".to_string(),
       };
       cmd.call(&ctx).unwrap();
@@ -78,7 +92,9 @@ mod tests {
 
       let cmd = Command {
         id: "zyxw".to_string(),
+        json: false,
         path: "config.timeout".to_string(),
+        quiet: false,
         value: "30".to_string(),
       };
       cmd.call(&ctx).unwrap();

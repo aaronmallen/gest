@@ -18,6 +18,12 @@ pub struct Command {
   /// New body text (opens `$EDITOR` pre-filled if omitted and stdin is a terminal).
   #[arg(short, long)]
   pub body: Option<String>,
+  /// Output as JSON.
+  #[arg(short, long, conflicts_with = "quiet")]
+  pub json: bool,
+  /// Print only the note ID.
+  #[arg(short, long, conflicts_with = "json")]
+  pub quiet: bool,
 }
 
 impl Command {
@@ -44,10 +50,17 @@ impl Command {
       body: Some(body),
     };
 
-    store::note::update_note(config, &task_id, &note_id, patch)?;
+    let updated_note = store::note::update_note(config, &task_id, &note_id, patch)?;
 
-    let msg = format!("updated note {} on task {}", note_id.short(), task_id.short());
-    println!("{}", SuccessMessage::new(&msg, theme));
+    if self.json {
+      println!("{}", serde_json::to_string_pretty(&updated_note)?);
+    } else if self.quiet {
+      println!("{}", updated_note.id);
+    } else {
+      let msg = format!("updated note {} on task {}", note_id.short(), task_id.short());
+      println!("{}", SuccessMessage::new(&msg, theme));
+    }
+
     Ok(())
   }
 }
@@ -84,6 +97,8 @@ mod tests {
         task_id: "zyxw".to_string(),
         note_id: note.id.short(),
         body: Some("Updated body".to_string()),
+        json: false,
+        quiet: false,
       };
       cmd.call(&ctx).unwrap();
 

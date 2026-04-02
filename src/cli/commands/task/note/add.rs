@@ -18,6 +18,12 @@ pub struct Command {
   /// Note body text (opens `$EDITOR` if omitted and stdin is a terminal).
   #[arg(short, long)]
   pub body: Option<String>,
+  /// Output as JSON.
+  #[arg(short, long, conflicts_with = "quiet")]
+  pub json: bool,
+  /// Print only the note ID.
+  #[arg(short, long, conflicts_with = "json")]
+  pub quiet: bool,
 }
 
 impl Command {
@@ -50,8 +56,15 @@ impl Command {
 
     let note = store::note::add_note(config, &task_id, new)?;
 
-    let msg = format!("added note {} to task {}", note.id.short(), task_id.short());
-    println!("{}", SuccessMessage::new(&msg, theme));
+    if self.json {
+      println!("{}", serde_json::to_string_pretty(&note)?);
+    } else if self.quiet {
+      println!("{}", note.id);
+    } else {
+      let msg = format!("added note {} to task {}", note.id.short(), task_id.short());
+      println!("{}", SuccessMessage::new(&msg, theme));
+    }
+
     Ok(())
   }
 }
@@ -75,6 +88,8 @@ mod tests {
         id: "zyxw".to_string(),
         agent: Some("claude".to_string()),
         body: Some("Found the root cause".to_string()),
+        json: false,
+        quiet: false,
       };
       cmd.call(&ctx).unwrap();
 
@@ -96,6 +111,8 @@ mod tests {
         id: "zyxw".to_string(),
         agent: Some("claude".to_string()),
         body: Some("".to_string()),
+        json: false,
+        quiet: false,
       };
       assert!(cmd.call(&ctx).is_err());
     }

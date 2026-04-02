@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use clap::{Args, Command as ClapCommand, CommandFactory};
 
-use crate::cli;
+use crate::{cli, ui::composites::success_message::SuccessMessage};
 
 /// Write roff man page files for all commands to a directory.
 #[derive(Args, Debug)]
@@ -15,17 +15,20 @@ pub struct Command {
 
 impl Command {
   /// Create the output directory and generate all man pages.
-  pub fn call(&self) -> cli::Result<()> {
+  pub fn call(&self, ctx: &cli::AppContext) -> cli::Result<()> {
     std::fs::create_dir_all(&self.output_dir)?;
 
     let cmd = crate::cli::Cli::command();
-    generate_man_pages(&cmd, &self.output_dir, "gest")?;
+    let count = generate_man_pages(&cmd, &self.output_dir, "gest")?;
+    let msg = format!("Generated {count} man pages to {}", self.output_dir.display());
+    println!("{}", SuccessMessage::new(&msg, &ctx.theme));
     Ok(())
   }
 }
 
 /// Recursively render a `.1` man page for `cmd` and each visible subcommand.
-fn generate_man_pages(cmd: &ClapCommand, dir: &Path, prefix: &str) -> cli::Result<()> {
+/// Returns the total number of man pages generated.
+fn generate_man_pages(cmd: &ClapCommand, dir: &Path, prefix: &str) -> cli::Result<usize> {
   let man = clap_mangen::Man::new(cmd.clone());
   let filename = format!("{prefix}.1");
   let path = dir.join(&filename);
@@ -33,15 +36,16 @@ fn generate_man_pages(cmd: &ClapCommand, dir: &Path, prefix: &str) -> cli::Resul
   man.render(&mut buf)?;
   std::fs::write(&path, buf)?;
 
+  let mut count = 1;
   for subcmd in cmd.get_subcommands() {
     if subcmd.is_hide_set() {
       continue;
     }
     let sub_prefix = format!("{prefix}-{}", subcmd.get_name());
-    generate_man_pages(subcmd, dir, &sub_prefix)?;
+    count += generate_man_pages(subcmd, dir, &sub_prefix)?;
   }
 
-  Ok(())
+  Ok(count)
 }
 
 #[cfg(test)]

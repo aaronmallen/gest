@@ -60,7 +60,7 @@ impl Command {
       store::write_task(config, &target_task)?;
     }
 
-    let msg = format!("Linked {} --{}--\u{003e} {}", id, self.rel, target_id);
+    let msg = format!("Linked {} --{}--\u{003e} {}", id.short(), self.rel, target_id.short());
     println!("{}", SuccessMessage::new(&msg, theme));
     Ok(())
   }

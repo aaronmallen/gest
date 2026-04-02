@@ -22,10 +22,10 @@ enum GenerateCommand {
 
 impl Command {
   /// Dispatch to the appropriate generate subcommand.
-  pub fn call(&self, _ctx: &AppContext) -> cli::Result<()> {
+  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
     match &self.command {
       GenerateCommand::Completions(cmd) => cmd.call(),
-      GenerateCommand::ManPages(cmd) => cmd.call(),
+      GenerateCommand::ManPages(cmd) => cmd.call(ctx),
     }
   }
 }

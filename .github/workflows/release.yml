@@ -95,5 +95,5 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           curl -H "Content-Type: application/json" \
-            -d "{\"content\": \"**gest ${{ github.ref_name }}** has been released! https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}\"}" \
+            -d "{\"content\": \"**gest v${{ github.ref_name }}** has been released! https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}\"}" \
             "$DISCORD_WEBHOOK_URL"

@@ -32,7 +32,9 @@ impl Command {
 enum NoteCommand {
   Add(add::Command),
   Delete(delete::Command),
+  #[command(visible_alias = "ls")]
   List(list::Command),
+  #[command(visible_alias = "view")]
   Show(show::Command),
   Update(update::Command),
 }

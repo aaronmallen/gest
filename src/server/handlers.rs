@@ -564,26 +564,47 @@ pub async fn dashboard(State(state): State<ServerState>) -> Response {
       })
       .len();
 
-    let iteration_count = store::list_iterations(&state.settings, &IterationFilter::default())
-      .unwrap_or_else(|e| {
-        log::warn!("dashboard: failed to list iterations: {e}");
-        Vec::new()
-      })
-      .len();
+    let iterations = store::list_iterations(
+      &state.settings,
+      &IterationFilter {
+        all: true,
+        ..Default::default()
+      },
+    )
+    .unwrap_or_else(|e| {
+      log::warn!("dashboard: failed to list iterations: {e}");
+      Vec::new()
+    });
 
     let open_count = tasks.iter().filter(|t| t.status == Status::Open).count();
     let in_progress_count = tasks.iter().filter(|t| t.status == Status::InProgress).count();
     let done_count = tasks.iter().filter(|t| t.status == Status::Done).count();
     let cancelled_count = tasks.iter().filter(|t| t.status == Status::Cancelled).count();
 
+    let active_iteration_count = iterations
+      .iter()
+      .filter(|i| i.status == IterationStatus::Active)
+      .count();
+    let completed_iteration_count = iterations
+      .iter()
+      .filter(|i| i.status == IterationStatus::Completed)
+      .count();
+    let failed_iteration_count = iterations
+      .iter()
+      .filter(|i| i.status == IterationStatus::Failed)
+      .count();
+
     DashboardTemplate {
-      task_count: tasks.len(),
+      active_iteration_count,
       artifact_count,
-      iteration_count,
-      open_count,
-      in_progress_count,
-      done_count,
       cancelled_count,
+      completed_iteration_count,
+      done_count,
+      failed_iteration_count,
+      in_progress_count,
+      iteration_count: active_iteration_count,
+      open_count,
+      task_count: open_count + in_progress_count,
     }
     .into_response()
   })
@@ -1317,26 +1338,47 @@ pub async fn dashboard_fragment(State(state): State<ServerState>) -> Response {
       })
       .len();
 
-    let iteration_count = store::list_iterations(&state.settings, &IterationFilter::default())
-      .unwrap_or_else(|e| {
-        log::warn!("dashboard: failed to list iterations: {e}");
-        Vec::new()
-      })
-      .len();
+    let iterations = store::list_iterations(
+      &state.settings,
+      &IterationFilter {
+        all: true,
+        ..Default::default()
+      },
+    )
+    .unwrap_or_else(|e| {
+      log::warn!("dashboard: failed to list iterations: {e}");
+      Vec::new()
+    });
 
     let open_count = tasks.iter().filter(|t| t.status == Status::Open).count();
     let in_progress_count = tasks.iter().filter(|t| t.status == Status::InProgress).count();
     let done_count = tasks.iter().filter(|t| t.status == Status::Done).count();
     let cancelled_count = tasks.iter().filter(|t| t.status == Status::Cancelled).count();
 
+    let active_iteration_count = iterations
+      .iter()
+      .filter(|i| i.status == IterationStatus::Active)
+      .count();
+    let completed_iteration_count = iterations
+      .iter()
+      .filter(|i| i.status == IterationStatus::Completed)
+      .count();
+    let failed_iteration_count = iterations
+      .iter()
+      .filter(|i| i.status == IterationStatus::Failed)
+      .count();
+
     templates::render(&DashboardFragmentTemplate {
-      task_count: tasks.len(),
+      active_iteration_count,
       artifact_count,
-      iteration_count,
-      open_count,
-      in_progress_count,
-      done_count,
       cancelled_count,
+      completed_iteration_count,
+      done_count,
+      failed_iteration_count,
+      in_progress_count,
+      iteration_count: active_iteration_count,
+      open_count,
+      task_count: open_count + in_progress_count,
     })
   })
   .await

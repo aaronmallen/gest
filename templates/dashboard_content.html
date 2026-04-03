@@ -33,3 +33,20 @@
     <div class="dash-card-label">cancelled</div>
   </a>
 </div>
+
+<h2 class="section-heading">iterations by status</h2>
+<div class="dash-grid">
+  <a href="/iterations" class="dash-card" aria-label="{{ active_iteration_count }} active iterations">
+    <div class="dash-card-count status-open">{{ active_iteration_count }}</div>
+    <div class="dash-card-label">active</div>
+  </a>
+  <a href="/iterations?status=completed" class="dash-card"
+    aria-label="{{ completed_iteration_count }} completed iterations">
+    <div class="dash-card-count status-done">{{ completed_iteration_count }}</div>
+    <div class="dash-card-label">completed</div>
+  </a>
+  <a href="/iterations?status=failed" class="dash-card" aria-label="{{ failed_iteration_count }} failed iterations">
+    <div class="dash-card-count status-cancelled">{{ failed_iteration_count }}</div>
+    <div class="dash-card-label">failed</div>
+  </a>
+</div>

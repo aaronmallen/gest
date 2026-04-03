@@ -80,9 +80,12 @@ impl IntoResponse for ArtifactListTemplate {
 #[derive(Template)]
 #[template(path = "dashboard.html")]
 pub struct DashboardTemplate {
+  pub active_iteration_count: usize,
   pub artifact_count: usize,
   pub cancelled_count: usize,
+  pub completed_iteration_count: usize,
   pub done_count: usize,
+  pub failed_iteration_count: usize,
   pub in_progress_count: usize,
   pub iteration_count: usize,
   pub open_count: usize,
@@ -291,9 +294,12 @@ pub struct ArtifactListFragmentTemplate {
 #[derive(Template)]
 #[template(path = "dashboard_content.html")]
 pub struct DashboardFragmentTemplate {
+  pub active_iteration_count: usize,
   pub artifact_count: usize,
   pub cancelled_count: usize,
+  pub completed_iteration_count: usize,
   pub done_count: usize,
+  pub failed_iteration_count: usize,
   pub in_progress_count: usize,
   pub iteration_count: usize,
   pub open_count: usize,

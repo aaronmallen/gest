@@ -9,9 +9,10 @@ use super::{
 use crate::{
   config::Settings,
   model::{
-    Id, Iteration, IterationFilter, IterationPatch, NewIteration, Task,
+    Id, Iteration, IterationFilter, IterationPatch, NewIteration, Task, TaskPatch,
     event::{AuthorInfo, Event, EventKind},
     iteration::Status,
+    task::Status as TaskStatus,
   },
 };
 
@@ -162,6 +163,12 @@ pub fn resolve_iteration_id(config: &Settings, prefix: &str, include_resolved: b
 /// Apply a partial update to an existing iteration, moving it between active/resolved as needed.
 ///
 /// When `author` is provided, events are appended for detected status changes.
+///
+/// **Cascade behavior:**
+/// - When the iteration transitions to `Cancelled` or `Failed`, all non-terminal tasks
+///   (`open` and `in-progress`) are automatically cancelled.
+/// - When the iteration transitions from a terminal status back to `Active`, all
+///   `cancelled` tasks in the iteration are restored to `open`.
 pub fn update_iteration(
   config: &Settings,
   id: &Id,
@@ -170,6 +177,7 @@ pub fn update_iteration(
 ) -> super::Result<Iteration> {
   let mut iteration = read_iteration(config, id)?;
   let was_resolved = is_iteration_resolved(config, id);
+  let old_status = iteration.status.clone();
 
   if let Some(author) = author
     && let Some(ref new_status) = patch.status
@@ -220,7 +228,47 @@ pub fn update_iteration(
     || write_iteration(config, &iteration),
   )?;
 
+  // Cascade: cancel non-terminal tasks when iteration is cancelled/failed
+  let is_cancellation = matches!(iteration.status, Status::Cancelled | Status::Failed) && !old_status.is_terminal();
+  if is_cancellation {
+    cascade_cancel_tasks(config, &iteration, author)?;
+  }
+
+  // Cascade: reopen cancelled tasks when iteration is reopened
+  let is_reopen = iteration.status == Status::Active && old_status.is_terminal();
+  if is_reopen {
+    cascade_reopen_tasks(config, &iteration, author)?;
+  }
+
   Ok(iteration)
+}
+
+/// Cancel all non-terminal tasks in an iteration.
+fn cascade_cancel_tasks(config: &Settings, iteration: &Iteration, author: Option<&AuthorInfo>) -> super::Result<()> {
+  for task in read_iteration_tasks(config, iteration) {
+    if !task.status.is_terminal() {
+      let patch = TaskPatch {
+        status: Some(TaskStatus::Cancelled),
+        ..Default::default()
+      };
+      super::update_task(config, &task.id, patch, author)?;
+    }
+  }
+  Ok(())
+}
+
+/// Restore all cancelled tasks in an iteration to open.
+fn cascade_reopen_tasks(config: &Settings, iteration: &Iteration, author: Option<&AuthorInfo>) -> super::Result<()> {
+  for task in read_iteration_tasks(config, iteration) {
+    if task.status == TaskStatus::Cancelled {
+      let patch = TaskPatch {
+        status: Some(TaskStatus::Open),
+        ..Default::default()
+      };
+      super::update_task(config, &task.id, patch, author)?;
+    }
+  }
+  Ok(())
 }
 
 /// Serialize and write an iteration, respecting its current location on disk.
@@ -690,6 +738,170 @@ mod tests {
           .join("iterations/resolved/zyxwvutsrqponmlkzyxwvutsrqponmlk.toml")
           .exists()
       );
+    }
+  }
+
+  mod cascade_cancel {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::model::{IterationPatch, task::Status as TaskStatus};
+
+    #[test]
+    fn it_cancels_non_terminal_tasks_on_iteration_cancel() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_config(dir.path());
+
+      let mut task1 = crate::test_helpers::make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      task1.status = TaskStatus::Open;
+      crate::store::write_task(&config, &task1).unwrap();
+
+      let mut task2 = crate::test_helpers::make_test_task("llllllllllllllllllllllllllllllll");
+      task2.status = TaskStatus::InProgress;
+      crate::store::write_task(&config, &task2).unwrap();
+
+      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Test");
+      iteration.tasks = vec![format!("tasks/{}", task1.id), format!("tasks/{}", task2.id)];
+      crate::store::write_iteration(&config, &iteration).unwrap();
+
+      let patch = IterationPatch {
+        status: Some(Status::Cancelled),
+        ..Default::default()
+      };
+      crate::store::update_iteration(&config, &iteration.id, patch, None).unwrap();
+
+      let t1 = crate::store::read_task(&config, &task1.id).unwrap();
+      let t2 = crate::store::read_task(&config, &task2.id).unwrap();
+      assert_eq!(t1.status, TaskStatus::Cancelled);
+      assert_eq!(t2.status, TaskStatus::Cancelled);
+    }
+
+    #[test]
+    fn it_leaves_done_tasks_unchanged_on_cancel() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_config(dir.path());
+
+      let mut task = crate::test_helpers::make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      task.status = TaskStatus::Done;
+      task.resolved_at = Some(chrono::Utc::now());
+      crate::store::write_task(&config, &task).unwrap();
+
+      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Test");
+      iteration.tasks = vec![format!("tasks/{}", task.id)];
+      crate::store::write_iteration(&config, &iteration).unwrap();
+
+      let patch = IterationPatch {
+        status: Some(Status::Cancelled),
+        ..Default::default()
+      };
+      crate::store::update_iteration(&config, &iteration.id, patch, None).unwrap();
+
+      let t = crate::store::read_task(&config, &task.id).unwrap();
+      assert_eq!(t.status, TaskStatus::Done);
+    }
+
+    #[test]
+    fn it_cascades_on_deprecated_failed_status() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_config(dir.path());
+
+      let mut task = crate::test_helpers::make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      task.status = TaskStatus::Open;
+      crate::store::write_task(&config, &task).unwrap();
+
+      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Test");
+      iteration.tasks = vec![format!("tasks/{}", task.id)];
+      crate::store::write_iteration(&config, &iteration).unwrap();
+
+      let patch = IterationPatch {
+        status: Some(Status::Failed),
+        ..Default::default()
+      };
+      crate::store::update_iteration(&config, &iteration.id, patch, None).unwrap();
+
+      let t = crate::store::read_task(&config, &task.id).unwrap();
+      assert_eq!(t.status, TaskStatus::Cancelled);
+    }
+  }
+
+  mod cascade_reopen {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::model::{IterationPatch, task::Status as TaskStatus};
+
+    #[test]
+    fn it_reopens_cancelled_tasks_on_iteration_reopen() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_config(dir.path());
+
+      let mut task1 = crate::test_helpers::make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      task1.status = TaskStatus::Open;
+      crate::store::write_task(&config, &task1).unwrap();
+
+      let mut task2 = crate::test_helpers::make_test_task("llllllllllllllllllllllllllllllll");
+      task2.status = TaskStatus::InProgress;
+      crate::store::write_task(&config, &task2).unwrap();
+
+      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Test");
+      iteration.tasks = vec![format!("tasks/{}", task1.id), format!("tasks/{}", task2.id)];
+      crate::store::write_iteration(&config, &iteration).unwrap();
+
+      // Cancel the iteration (cascades to tasks)
+      let patch = IterationPatch {
+        status: Some(Status::Cancelled),
+        ..Default::default()
+      };
+      crate::store::update_iteration(&config, &iteration.id, patch, None).unwrap();
+
+      // Reopen the iteration
+      let patch = IterationPatch {
+        status: Some(Status::Active),
+        ..Default::default()
+      };
+      crate::store::update_iteration(&config, &iteration.id, patch, None).unwrap();
+
+      let t1 = crate::store::read_task(&config, &task1.id).unwrap();
+      let t2 = crate::store::read_task(&config, &task2.id).unwrap();
+      assert_eq!(t1.status, TaskStatus::Open);
+      assert_eq!(t2.status, TaskStatus::Open);
+    }
+
+    #[test]
+    fn it_leaves_done_tasks_unchanged_on_reopen() {
+      let dir = tempfile::tempdir().unwrap();
+      let config = make_config(dir.path());
+
+      let mut task_open = crate::test_helpers::make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
+      task_open.status = TaskStatus::Open;
+      crate::store::write_task(&config, &task_open).unwrap();
+
+      let mut task_done = crate::test_helpers::make_test_task("llllllllllllllllllllllllllllllll");
+      task_done.status = TaskStatus::Done;
+      task_done.resolved_at = Some(chrono::Utc::now());
+      crate::store::write_task(&config, &task_done).unwrap();
+
+      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Test");
+      iteration.tasks = vec![format!("tasks/{}", task_open.id), format!("tasks/{}", task_done.id)];
+      crate::store::write_iteration(&config, &iteration).unwrap();
+
+      // Cancel then reopen
+      let patch = IterationPatch {
+        status: Some(Status::Cancelled),
+        ..Default::default()
+      };
+      crate::store::update_iteration(&config, &iteration.id, patch, None).unwrap();
+
+      let patch = IterationPatch {
+        status: Some(Status::Active),
+        ..Default::default()
+      };
+      crate::store::update_iteration(&config, &iteration.id, patch, None).unwrap();
+
+      let t_open = crate::store::read_task(&config, &task_open.id).unwrap();
+      let t_done = crate::store::read_task(&config, &task_done.id).unwrap();
+      assert_eq!(t_open.status, TaskStatus::Open);
+      assert_eq!(t_done.status, TaskStatus::Done);
     }
   }
 }

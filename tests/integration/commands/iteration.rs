@@ -1,5 +1,6 @@
 mod when_adding;
 mod when_advancing;
+mod when_cancelling_cascades;
 mod when_creating;
 mod when_graphing;
 mod when_linking;

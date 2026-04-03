@@ -128,6 +128,9 @@ paths.
 
 ## Configuration settings
 
+For a dedicated guide to terminal UI color customization, see
+[Theming](/configuration/theming).
+
 ### `[storage]`
 
 | Key             | Type                   | Default                    | Description                                                             |

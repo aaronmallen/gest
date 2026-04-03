@@ -45,6 +45,7 @@ export default defineConfig({
         text: 'Configuration',
         items: [
           { text: 'Config Reference', link: '/configuration/' },
+          { text: 'Theming', link: '/configuration/theming' },
         ],
       },
       {

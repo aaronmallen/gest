@@ -758,6 +758,13 @@
           })
           .catch(function() { fetching = false; });
       });
+
+      // Close the SSE connection on navigation to free the browser's
+      // per-domain connection slot immediately rather than waiting for
+      // the server to notice the dropped TCP connection.
+      window.addEventListener('beforeunload', function() {
+        source.close();
+      });
     })();
   </script>
 </body>

@@ -744,14 +744,19 @@
       var search = window.location.search;
       if (search) fragmentUrl += search;
 
+      var fetching = false;
       var source = new EventSource('/events');
       source.addEventListener('ping', function() {
+        if (fetching) return;
+        fetching = true;
         fetch(fragmentUrl)
           .then(function(res) { return res.text(); })
           .then(function(html) {
             var main = document.getElementById('main-content');
             if (main) main.innerHTML = html;
-          });
+            fetching = false;
+          })
+          .catch(function() { fetching = false; });
       });
     })();
   </script>

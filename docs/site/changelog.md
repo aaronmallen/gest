@@ -2,6 +2,39 @@
 
 What's new in gest — told version by version.
 
+## v0.4.3
+
+<span style="opacity: 0.5">2026-04-03</span>
+
+### Iteration Cancel and Reopen
+
+Iterations can now be cancelled and reopened with dedicated commands. `gest iteration cancel <id>`
+marks the iteration as cancelled and automatically cascades to all non-terminal tasks — open and
+in-progress tasks become cancelled, while done tasks are left untouched. `gest iteration reopen <id>`
+reverses the operation, restoring the iteration and its cancelled tasks. The old `failed` status
+remains as a deprecated alias for backward compatibility.
+
+### Live Reload
+
+The web UI now updates in real time. When you change project files on disk, pages connected to the
+web server receive updates via server-sent events and swap in fresh content without a full reload.
+The file watcher debounce defaults to 2000ms and is configurable via `serve.debounce_ms`.
+
+### Request Logging
+
+Every HTTP request to the web server is now logged with method, path, response status, and elapsed
+time. Control the verbosity with the `serve.log_level` setting (default: info).
+
+### Web Dashboard
+
+The dashboard task card now shows only actionable work (open + in-progress) rather than all tasks.
+A new iteration status breakdown row shows active, completed, and cancelled counts with links to
+filtered views.
+
+### Bug Fixes
+
+- `read_from_editor` no longer drops content due to a missing return statement
+
 ## v0.4.2
 
 <span style="opacity: 0.5">2026-04-02</span>

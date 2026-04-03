@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [v0.4.3] - 2026-04-03
+
+### Added
+
+- `iteration cancel` and `iteration reopen` shortcut commands for iteration lifecycle management,
+  with automatic cascade — cancelling an iteration cancels all non-terminal tasks, reopening restores
+  them
+- `Cancelled` iteration status with `failed` retained as a deprecated alias for backward
+  compatibility
+- Live reload in the web UI via server-sent events — pages update automatically when project files
+  change on disk, with configurable debounce (`serve.debounce_ms`, default 2000ms)
+- Per-request HTTP logging with method, path, status, and elapsed time (`serve.log_level`, default
+  info)
+
+### Changed
+
+- Dashboard now shows open + in-progress task counts instead of all tasks, with a new iteration
+  status breakdown row
+- Web server handler I/O is now offloaded to blocking threads, preventing file reads from starving
+  async connection handling
+
+### Fixed
+
+- Editor content is no longer silently discarded when using `read_from_editor`
+
 ## [v0.4.2] - 2026-04-02
 
 ### Added
@@ -257,7 +282,7 @@ Initial release
 [#23]: https://github.com/aaronmallen/gest/issues/23
 [#24]: https://github.com/aaronmallen/gest/issues/24
 
-[Unreleased]: https://github.com/aaronmallen/gest/compare/0.4.2...main
+[Unreleased]: https://github.com/aaronmallen/gest/compare/0.4.3...main
 [v0.2.0]: https://github.com/aaronmallen/gest/compare/0.1.0...0.2.0
 [v0.2.1]: https://github.com/aaronmallen/gest/compare/0.2.0...0.2.1
 [v0.2.2]: https://github.com/aaronmallen/gest/compare/0.2.1...0.2.2
@@ -271,3 +296,4 @@ Initial release
 [v0.4.0]: https://github.com/aaronmallen/gest/compare/0.3.5...0.4.0
 [v0.4.1]: https://github.com/aaronmallen/gest/compare/0.4.0...0.4.1
 [v0.4.2]: https://github.com/aaronmallen/gest/compare/0.4.1...0.4.2
+[v0.4.3]: https://github.com/aaronmallen/gest/compare/0.4.2...0.4.3

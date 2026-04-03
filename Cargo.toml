@@ -7,7 +7,7 @@ keywords = ["cli", "agent", "artifact", "task"]
 license = "MIT"
 name = "gest"
 repository = "https://github.com/aaronmallen/gest"
-version = "0.4.2"
+version = "0.4.3"
 
 [package.metadata.binstall]
 bin-dir = "{bin}{binary-ext}"
@@ -24,7 +24,7 @@ clap_mangen = "0.3"
 dir_spec = "0.5"
 form_urlencoded = "1.2.2"
 log = "0.4"
-notify = "7"
+notify = "8"
 pulldown-cmark = "0.13"
 rand = "0.10"
 rayon = "1"
@@ -38,12 +38,6 @@ shell-words = "1"
 tempfile = "3"
 terminal_size = "0.4"
 thiserror = "2"
-tokio = { features = [
-  "macros",
-  "rt-multi-thread",
-  "net",
-  "sync",
-], version = "1" }
 tokio-stream = { features = ["sync"], version = "0.1" }
 toml = "1"
 tracing = "0.1"
@@ -56,6 +50,10 @@ yansi = { features = ["detect-env", "detect-tty", "hyperlink"], version = "1" }
 default-features = false
 features = ["archive-tar", "compression-flate2", "reqwest", "rustls"]
 version = "0.43"
+
+[dependencies.tokio]
+features = ["macros", "rt-multi-thread", "net", "sync"]
+version = "1"
 
 [dev-dependencies]
 assert_cmd = "2"

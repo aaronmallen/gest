@@ -29,9 +29,7 @@ impl Command {
     let port = self.port.unwrap_or_else(|| serve_config.port());
     let open = !self.no_open && serve_config.open();
 
-    let state = crate::server::ServerState {
-      settings: ctx.settings.clone(),
-    };
+    let state = crate::server::ServerState::new(ctx.settings.clone());
 
     let rt = tokio::runtime::Runtime::new().map_err(|e| cli::Error::Runtime(e.to_string()))?;
     rt.block_on(async {

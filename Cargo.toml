@@ -37,7 +37,7 @@ shell-words = "1"
 tempfile = "3"
 terminal_size = "0.4"
 thiserror = "2"
-tokio = { features = ["macros", "rt-multi-thread", "net"], version = "1" }
+tokio = { features = ["macros", "rt-multi-thread", "net", "sync"], version = "1" }
 toml = "1"
 typed-env = "0.3"
 unicode-width = "0.2"

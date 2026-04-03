@@ -85,6 +85,7 @@ pub fn read_from_editor(
     if content.trim().is_empty() {
       return Err(crate::cli::Error::InvalidInput(abort_message.into()));
     }
+    return Ok(content);
   }
 
   Ok(String::new())

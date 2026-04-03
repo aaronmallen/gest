@@ -1,40 +1,7 @@
 {% extends "base.html" %}
 {% block title %}gest — dashboard{% endblock %}
 {% block nav_dashboard %}class="active"{% endblock %}
+{% block body_attrs %}data-live-reload{% endblock %}
 {% block content %}
-<h1 class="section-heading">Dashboard</h1>
-<div class="dash-grid">
-  <a href="/tasks" class="dash-card" aria-label="{{ task_count }} tasks">
-    <div class="dash-card-count">{{ task_count }}</div>
-    <div class="dash-card-label">tasks</div>
-  </a>
-  <a href="/artifacts" class="dash-card" aria-label="{{ artifact_count }} artifacts">
-    <div class="dash-card-count">{{ artifact_count }}</div>
-    <div class="dash-card-label">artifacts</div>
-  </a>
-  <a href="/iterations" class="dash-card" aria-label="{{ iteration_count }} iterations">
-    <div class="dash-card-count">{{ iteration_count }}</div>
-    <div class="dash-card-label">iterations</div>
-  </a>
-</div>
-
-<h2 class="section-heading">tasks by status</h2>
-<div class="dash-grid">
-  <a href="/tasks" class="dash-card" aria-label="{{ open_count }} open tasks">
-    <div class="dash-card-count status-open">{{ open_count }}</div>
-    <div class="dash-card-label">open</div>
-  </a>
-  <a href="/tasks?status=in_progress" class="dash-card" aria-label="{{ in_progress_count }} in progress tasks">
-    <div class="dash-card-count status-in-progress">{{ in_progress_count }}</div>
-    <div class="dash-card-label">in progress</div>
-  </a>
-  <a href="/tasks?status=done" class="dash-card" aria-label="{{ done_count }} done tasks">
-    <div class="dash-card-count status-done">{{ done_count }}</div>
-    <div class="dash-card-label">done</div>
-  </a>
-  <a href="/tasks?status=cancelled" class="dash-card" aria-label="{{ cancelled_count }} cancelled tasks">
-    <div class="dash-card-count status-cancelled">{{ cancelled_count }}</div>
-    <div class="dash-card-label">cancelled</div>
-  </a>
-</div>
+{% include "dashboard_content.html" %}
 {% endblock %}

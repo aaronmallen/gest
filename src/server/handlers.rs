@@ -18,10 +18,12 @@ use tokio_stream::{Stream, StreamExt, wrappers::BroadcastStream};
 use super::{
   state::ServerState,
   templates::{
-    ArtifactCreateTemplate, ArtifactDetailTemplate, ArtifactEditTemplate, ArtifactListTemplate, DashboardTemplate,
-    DisplayEvent, DisplayLink, DisplayNote, IterationBoardTemplate, IterationDetailTemplate, IterationListTemplate,
-    PhaseGroup, SearchTemplate, TaskCreateTemplate, TaskDetailTemplate, TaskEditTemplate, TaskListTemplate, TaskRow,
-    TimelineEntry,
+    self, ArtifactCreateTemplate, ArtifactDetailFragmentTemplate, ArtifactDetailTemplate, ArtifactEditTemplate,
+    ArtifactListFragmentTemplate, ArtifactListTemplate, DashboardFragmentTemplate, DashboardTemplate, DisplayEvent,
+    DisplayLink, DisplayNote, IterationBoardFragmentTemplate, IterationBoardTemplate, IterationDetailFragmentTemplate,
+    IterationDetailTemplate, IterationListFragmentTemplate, IterationListTemplate, PhaseGroup, SearchTemplate,
+    TaskCreateTemplate, TaskDetailFragmentTemplate, TaskDetailTemplate, TaskEditTemplate, TaskListFragmentTemplate,
+    TaskListTemplate, TaskRow, TimelineEntry,
   },
 };
 use crate::{
@@ -1067,4 +1069,426 @@ pub async fn task_update(State(state): State<ServerState>, Path(id_str): Path<St
       (StatusCode::INTERNAL_SERVER_ERROR, error_html(&e)).into_response()
     }
   }
+}
+
+// ── Fragment handlers (content only, no base layout) ─────────────────────────
+
+/// GET /artifacts/{id}/_detail — artifact detail fragment.
+pub async fn artifact_detail_fragment(State(state): State<ServerState>, Path(id): Path<String>) -> Response {
+  let resolved = match store::resolve_artifact_id(&state.settings, &id, true) {
+    Ok(id) => id,
+    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>artifact not found</p>")).into_response(),
+  };
+
+  match store::read_artifact(&state.settings, &resolved) {
+    Ok(artifact) => {
+      let body_html = render_markdown(&artifact.body);
+      templates::render(&ArtifactDetailFragmentTemplate {
+        artifact,
+        body_html,
+      })
+    }
+    Err(e) => {
+      log::error!("failed to read artifact {resolved}: {e}");
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Html("<p>failed to load artifact</p>"),
+      )
+        .into_response()
+    }
+  }
+}
+
+/// GET /artifacts/_list — artifact list fragment.
+pub async fn artifact_list_fragment(
+  State(state): State<ServerState>,
+  Query(params): Query<ArtifactListParams>,
+) -> Response {
+  let filter = ArtifactFilter {
+    all: true,
+    ..Default::default()
+  };
+
+  let all_artifacts = match store::list_artifacts(&state.settings, &filter) {
+    Ok(a) => a,
+    Err(e) => {
+      log::error!("failed to list artifacts: {e}");
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Html("<p>failed to load artifacts</p>"),
+      )
+        .into_response();
+    }
+  };
+
+  let open_count = all_artifacts.iter().filter(|a| a.archived_at.is_none()).count();
+  let archived_count = all_artifacts.iter().filter(|a| a.archived_at.is_some()).count();
+  let current_status = params.status.unwrap_or_else(|| "open".to_string());
+
+  let artifacts: Vec<_> = all_artifacts
+    .into_iter()
+    .filter(|a| match current_status.as_str() {
+      "archived" => a.archived_at.is_some(),
+      _ => a.archived_at.is_none(),
+    })
+    .collect();
+
+  templates::render(&ArtifactListFragmentTemplate {
+    artifacts,
+    open_count,
+    archived_count,
+    current_status,
+  })
+}
+
+/// GET /_dashboard — dashboard fragment.
+pub async fn dashboard_fragment(State(state): State<ServerState>) -> Response {
+  let tasks = store::list_tasks(
+    &state.settings,
+    &TaskFilter {
+      all: true,
+      ..Default::default()
+    },
+  )
+  .unwrap_or_else(|e| {
+    log::warn!("dashboard: failed to list tasks: {e}");
+    Vec::new()
+  });
+
+  let artifact_count = store::list_artifacts(&state.settings, &ArtifactFilter::default())
+    .unwrap_or_else(|e| {
+      log::warn!("dashboard: failed to list artifacts: {e}");
+      Vec::new()
+    })
+    .len();
+
+  let iteration_count = store::list_iterations(&state.settings, &IterationFilter::default())
+    .unwrap_or_else(|e| {
+      log::warn!("dashboard: failed to list iterations: {e}");
+      Vec::new()
+    })
+    .len();
+
+  let open_count = tasks.iter().filter(|t| t.status == Status::Open).count();
+  let in_progress_count = tasks.iter().filter(|t| t.status == Status::InProgress).count();
+  let done_count = tasks.iter().filter(|t| t.status == Status::Done).count();
+  let cancelled_count = tasks.iter().filter(|t| t.status == Status::Cancelled).count();
+
+  templates::render(&DashboardFragmentTemplate {
+    task_count: tasks.len(),
+    artifact_count,
+    iteration_count,
+    open_count,
+    in_progress_count,
+    done_count,
+    cancelled_count,
+  })
+}
+
+/// GET /iterations/{id}/_board — iteration board fragment.
+pub async fn iteration_board_fragment(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
+  let id = match store::resolve_iteration_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response(),
+  };
+
+  let iteration = match store::read_iteration(&state.settings, &id) {
+    Ok(it) => it,
+    Err(e) => {
+      log::error!("failed to read iteration {id}: {e}");
+      return (StatusCode::INTERNAL_SERVER_ERROR, error_html(&e)).into_response();
+    }
+  };
+
+  let tasks = store::read_iteration_tasks(&state.settings, &iteration);
+
+  let open_tasks: Vec<_> = tasks.iter().filter(|t| t.status == Status::Open).cloned().collect();
+  let in_progress_tasks: Vec<_> = tasks
+    .iter()
+    .filter(|t| t.status == Status::InProgress)
+    .cloned()
+    .collect();
+  let done_tasks: Vec<_> = tasks.iter().filter(|t| t.status == Status::Done).cloned().collect();
+  let cancelled_tasks: Vec<_> = tasks
+    .iter()
+    .filter(|t| t.status == Status::Cancelled)
+    .cloned()
+    .collect();
+
+  templates::render(&IterationBoardFragmentTemplate {
+    iteration,
+    open_tasks,
+    in_progress_tasks,
+    done_tasks,
+    cancelled_tasks,
+  })
+}
+
+/// GET /iterations/{id}/_detail — iteration detail fragment.
+pub async fn iteration_detail_fragment(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
+  let id = match store::resolve_iteration_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>iteration not found</p>")).into_response(),
+  };
+
+  let iteration = match store::read_iteration(&state.settings, &id) {
+    Ok(it) => it,
+    Err(e) => {
+      log::error!("failed to read iteration {id}: {e}");
+      return (StatusCode::INTERNAL_SERVER_ERROR, error_html(&e)).into_response();
+    }
+  };
+
+  let tasks = store::read_iteration_tasks(&state.settings, &iteration);
+
+  let mut phase_map: BTreeMap<u16, Vec<crate::model::Task>> = BTreeMap::new();
+  for task in &tasks {
+    let phase = task.phase.unwrap_or(0);
+    phase_map.entry(phase).or_default().push(task.clone());
+  }
+  let phases: Vec<PhaseGroup> = phase_map
+    .into_iter()
+    .map(|(number, tasks)| PhaseGroup {
+      number,
+      tasks,
+    })
+    .collect();
+
+  templates::render(&IterationDetailFragmentTemplate {
+    iteration,
+    tasks,
+    phases,
+  })
+}
+
+/// GET /iterations/_list — iteration list fragment.
+pub async fn iteration_list_fragment(
+  State(state): State<ServerState>,
+  Query(params): Query<IterationListParams>,
+) -> Response {
+  let filter = IterationFilter {
+    all: true,
+    ..Default::default()
+  };
+
+  let all_iterations = match store::list_iterations(&state.settings, &filter) {
+    Ok(iterations) => iterations,
+    Err(e) => {
+      log::error!("failed to list iterations: {e}");
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Html("<p>failed to load iterations</p>"),
+      )
+        .into_response();
+    }
+  };
+
+  let active_count = all_iterations
+    .iter()
+    .filter(|i| i.status == IterationStatus::Active)
+    .count();
+  let completed_count = all_iterations
+    .iter()
+    .filter(|i| i.status == IterationStatus::Completed)
+    .count();
+  let failed_count = all_iterations
+    .iter()
+    .filter(|i| i.status == IterationStatus::Failed)
+    .count();
+  let current_status = params.status.unwrap_or_else(|| "active".to_string());
+
+  let iterations: Vec<_> = all_iterations
+    .into_iter()
+    .filter(|i| i.status.as_str() == current_status)
+    .collect();
+
+  templates::render(&IterationListFragmentTemplate {
+    iterations,
+    current_status,
+    active_count,
+    completed_count,
+    failed_count,
+  })
+}
+
+/// GET /tasks/{id}/_detail — task detail fragment.
+pub async fn task_detail_fragment(State(state): State<ServerState>, Path(id_str): Path<String>) -> Response {
+  let id = match store::resolve_task_id(&state.settings, &id_str, true) {
+    Ok(id) => id,
+    Err(_) => return (StatusCode::NOT_FOUND, Html("<p>404 — task not found</p>")).into_response(),
+  };
+
+  let task = match store::read_task(&state.settings, &id) {
+    Ok(t) => t,
+    Err(e) => {
+      log::error!("failed to read task {id}: {e}");
+      return (StatusCode::INTERNAL_SERVER_ERROR, error_html(&e)).into_response();
+    }
+  };
+
+  let blocking = store::resolve_blocking(&state.settings, &task);
+  let is_blocked = !blocking.blocked_by_ids.is_empty();
+  let description_html = render_markdown(&task.description);
+
+  let display_links: Vec<DisplayLink> = task
+    .links
+    .iter()
+    .map(|link| {
+      let ref_ = &link.ref_;
+      let internal_prefixes = ["tasks/", "artifacts/", "iterations/"];
+      if let Some(prefix) = internal_prefixes.iter().find(|p| ref_.starts_with(**p)) {
+        let id_part = &ref_[prefix.len()..];
+        let short = if id_part.len() > 8 { &id_part[..8] } else { id_part };
+        DisplayLink {
+          rel: link.rel.clone(),
+          href: Some(format!("/{ref_}")),
+          display_text: short.to_owned(),
+        }
+      } else if ref_.starts_with("http") {
+        DisplayLink {
+          rel: link.rel.clone(),
+          href: Some(ref_.clone()),
+          display_text: ref_.clone(),
+        }
+      } else {
+        DisplayLink {
+          rel: link.rel.clone(),
+          href: None,
+          display_text: ref_.clone(),
+        }
+      }
+    })
+    .collect();
+
+  let mut timeline: Vec<(chrono::DateTime<chrono::Utc>, TimelineEntry)> = Vec::new();
+
+  for note in &task.notes {
+    let author = note.author.clone();
+    let avatar_url = gravatar_url(note.author_email.as_deref());
+    timeline.push((
+      note.created_at,
+      TimelineEntry::Note(DisplayNote {
+        author,
+        avatar_url,
+        body_html: render_markdown(&note.body),
+        created_at: note.created_at.format("%Y-%m-%d %H:%M UTC").to_string(),
+        id_short: note.id.short(),
+        is_agent: matches!(note.author_type, AuthorType::Agent),
+      }),
+    ));
+  }
+
+  for event in &task.events {
+    let author = event.author.clone();
+    let avatar_url = gravatar_url(event.author_email.as_deref());
+    let description = match &event.kind {
+      EventKind::PhaseChange {
+        from,
+        to,
+      } => {
+        let f = from.map_or("none".to_string(), |v| v.to_string());
+        let t = to.map_or("none".to_string(), |v| v.to_string());
+        format!("phase changed from {f} to {t}")
+      }
+      EventKind::PriorityChange {
+        from,
+        to,
+      } => {
+        let f = from.map_or("none".to_string(), |v| format!("P{v}"));
+        let t = to.map_or("none".to_string(), |v| format!("P{v}"));
+        format!("priority changed from {f} to {t}")
+      }
+      EventKind::StatusChange {
+        from,
+        to,
+      } => {
+        format!("status changed from {from} to {to}")
+      }
+    };
+    timeline.push((
+      event.created_at,
+      TimelineEntry::Event(DisplayEvent {
+        author,
+        avatar_url,
+        created_at: event.created_at.format("%Y-%m-%d %H:%M UTC").to_string(),
+        description,
+        is_agent: matches!(event.author_type, AuthorType::Agent),
+      }),
+    ));
+  }
+
+  timeline.sort_by_key(|(ts, _)| *ts);
+  let timeline: Vec<TimelineEntry> = timeline.into_iter().map(|(_, entry)| entry).collect();
+
+  templates::render(&TaskDetailFragmentTemplate {
+    task,
+    blocking,
+    is_blocked,
+    description_html,
+    display_links,
+    timeline,
+  })
+}
+
+/// GET /tasks/_list — task list fragment.
+pub async fn task_list_fragment(State(state): State<ServerState>, Query(params): Query<TaskListParams>) -> Response {
+  let all_tasks = match store::list_tasks(
+    &state.settings,
+    &TaskFilter {
+      all: true,
+      ..Default::default()
+    },
+  ) {
+    Ok(t) => t,
+    Err(e) => {
+      log::error!("failed to list tasks: {e}");
+      return (StatusCode::INTERNAL_SERVER_ERROR, error_html(&e)).into_response();
+    }
+  };
+
+  let open_count = all_tasks.iter().filter(|t| t.status == Status::Open).count();
+  let in_progress_count = all_tasks.iter().filter(|t| t.status == Status::InProgress).count();
+  let done_count = all_tasks.iter().filter(|t| t.status == Status::Done).count();
+  let cancelled_count = all_tasks.iter().filter(|t| t.status == Status::Cancelled).count();
+
+  let current_status = match params.status.as_deref() {
+    Some("in_progress") => Status::InProgress,
+    Some("done") => Status::Done,
+    Some("cancelled") => Status::Cancelled,
+    _ => Status::Open,
+  };
+
+  let tasks: Vec<_> = all_tasks.into_iter().filter(|t| t.status == current_status).collect();
+
+  let blockings = store::resolve_blocking_batch(&state.settings, &tasks);
+
+  let rows: Vec<TaskRow> = tasks
+    .iter()
+    .zip(blockings)
+    .map(|(task, blocking)| {
+      let is_blocked = !blocking.blocked_by_ids.is_empty();
+      let blocked_by_display = blocking
+        .blocked_by_ids
+        .iter()
+        .map(|id| if id.len() > 8 { &id[..8] } else { id })
+        .collect::<Vec<_>>()
+        .join(", ");
+      TaskRow {
+        blocked_by_display,
+        blocking,
+        is_blocked,
+        task: task.clone(),
+      }
+    })
+    .collect();
+
+  templates::render(&TaskListFragmentTemplate {
+    tasks,
+    rows,
+    current_status,
+    open_count,
+    in_progress_count,
+    done_count,
+    cancelled_count,
+  })
 }

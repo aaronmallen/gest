@@ -2,60 +2,8 @@
 
 {% block title %}artifacts — gest{% endblock %}
 {% block nav_artifacts %}class="active"{% endblock %}
+{% block body_attrs %}data-live-reload{% endblock %}
 
 {% block content %}
-<h1 class="section-heading">Artifacts</h1>
-<div class="summary">
-  {% if current_status == "open" %}
-    <strong>{{ open_count }} open</strong>
-  {% else %}
-    <a href="/artifacts">{{ open_count }} open</a>
-  {% endif %}
-  ·
-  {% if current_status == "archived" %}
-    <strong>{{ archived_count }} archived</strong>
-  {% else %}
-    <a href="/artifacts?status=archived">{{ archived_count }} archived</a>
-  {% endif %}
-  &middot;
-  <a href="/artifacts/new">+ new</a>
-</div>
-
-{% if artifacts.is_empty() %}
-<p class="empty">No artifacts found.</p>
-{% else %}
-<div class="term">
-  <div class="term-bar">
-<span class="term-title">gest artifact list</span>
-  </div>
-  <div class="term-body">
-    <table class="list-table">
-      <thead>
-        <tr>
-          <th style="width:90px">ID</th>
-          <th style="width:auto">Title</th>
-          <th style="width:80px">Type</th>
-          <th style="width:120px">Tags</th>
-          <th style="width:90px"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for a in artifacts %}
-        <tr{% if a.archived_at.is_some() %} class="c-dim"{% endif %}>
-          <td>
-            <a href="/artifacts/{{ a.id }}">
-              <span class="id-prefix">{{ a.id.short() }}</span>
-            </a>
-          </td>
-          <td>{{ a.title }}</td>
-          <td class="c-pewter">{% match a.kind %}{% when Some with (k) %}{{ k }}{% when None %}{% endmatch %}</td>
-          <td>{% for t in a.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
-          <td>{% if a.archived_at.is_some() %}<span class="c-dim">[archived]</span>{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% endif %}
+{% include "artifacts/list_content.html" %}
 {% endblock %}

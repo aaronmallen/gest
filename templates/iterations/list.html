@@ -2,63 +2,8 @@
 
 {% block title %}iterations — gest{% endblock %}
 {% block nav_iterations %}class="active"{% endblock %}
+{% block body_attrs %}data-live-reload{% endblock %}
 
 {% block content %}
-<h1 class="section-heading">Iterations</h1>
-<div class="summary">
-  {% if current_status == "active" %}<strong>{{ active_count }} active</strong>{% else %}<a href="/iterations">{{ active_count }} active</a>{% endif %}
-  &middot;
-  {% if current_status == "completed" %}<strong>{{ completed_count }} completed</strong>{% else %}<a href="/iterations?status=completed">{{ completed_count }} completed</a>{% endif %}
-  &middot;
-  {% if current_status == "failed" %}<strong>{{ failed_count }} failed</strong>{% else %}<a href="/iterations?status=failed">{{ failed_count }} failed</a>{% endif %}
-</div>
-
-{% if iterations.is_empty() %}
-<p class="empty">No iterations found.</p>
-{% else %}
-<div class="term">
-  <div class="term-bar">
-<span class="term-title">gest iteration list</span>
-  </div>
-  <div class="term-body">
-    <table class="list-table">
-      <thead>
-        <tr>
-          <th style="width:90px">ID</th>
-          <th style="width:auto">Title</th>
-          <th style="width:90px">Status</th>
-          <th style="width:60px">Tasks</th>
-          <th style="width:60px">Phases</th>
-          <th style="width:120px">Tags</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for it in iterations %}
-        <tr>
-          <td>
-            <a href="/iterations/{{ it.id }}">
-              <span class="id-prefix">{{ it.id.short() }}</span>
-            </a>
-          </td>
-          <td>{{ it.title }}</td>
-          <td>
-            {% match it.status %}
-              {% when IterationStatus::Active %}
-                <span class="status-in-progress">active</span>
-              {% when IterationStatus::Completed %}
-                <span class="status-done">completed</span>
-              {% when IterationStatus::Failed %}
-                <span class="c-error">failed</span>
-            {% endmatch %}
-          </td>
-          <td class="c-pewter">{{ it.tasks.len() }}</td>
-          <td class="c-pewter">{% match it.phase_count %}{% when Some with (n) %}{{ n }}{% when None %}—{% endmatch %}</td>
-          <td>{% for t in it.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% endif %}
+{% include "iterations/list_content.html" %}
 {% endblock %}

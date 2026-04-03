@@ -701,7 +701,7 @@
   </style>
   {% block head %}{% endblock %}
 </head>
-<body>
+<body {% block body_attrs %}{% endblock %}>
   <a class="skip-link" href="#main-content">Skip to main content</a>
   <div class="shell">
     <header>
@@ -720,5 +720,40 @@
     </main>
   </div>
   <script src="/static/forms.js"></script>
+  <script>
+    (function() {
+      if (!document.body.hasAttribute('data-live-reload')) return;
+
+      var fragmentUrl = (function() {
+        var path = window.location.pathname;
+        if (path === '/') return '/_dashboard';
+        // Detail pages: /tasks/{id} -> /tasks/{id}/_detail
+        // List pages: /tasks -> /tasks/_list
+        // Board pages: /iterations/{id}/board -> /iterations/{id}/_board
+        var boardMatch = path.match(/^(\/iterations\/[^/]+)\/board$/);
+        if (boardMatch) return boardMatch[1] + '/_board';
+        var detailMatch = path.match(/^\/(tasks|artifacts|iterations)\/([^/]+)$/);
+        if (detailMatch) return '/' + detailMatch[1] + '/' + detailMatch[2] + '/_detail';
+        var listMatch = path.match(/^\/(tasks|artifacts|iterations)$/);
+        if (listMatch) return '/' + listMatch[1] + '/_list';
+        return null;
+      })();
+
+      if (!fragmentUrl) return;
+
+      var search = window.location.search;
+      if (search) fragmentUrl += search;
+
+      var source = new EventSource('/events');
+      source.addEventListener('ping', function() {
+        fetch(fragmentUrl)
+          .then(function(res) { return res.text(); })
+          .then(function(html) {
+            var main = document.getElementById('main-content');
+            if (main) main.innerHTML = html;
+          });
+      });
+    })();
+  </script>
 </body>
 </html>

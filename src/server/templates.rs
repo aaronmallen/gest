@@ -85,7 +85,7 @@ pub struct DashboardTemplate {
   pub cancelled_count: usize,
   pub completed_iteration_count: usize,
   pub done_count: usize,
-  pub failed_iteration_count: usize,
+  pub cancelled_iteration_count: usize,
   pub in_progress_count: usize,
   pub iteration_count: usize,
   pub open_count: usize,
@@ -159,7 +159,7 @@ pub struct IterationListTemplate {
   pub active_count: usize,
   pub completed_count: usize,
   pub current_status: String,
-  pub failed_count: usize,
+  pub cancelled_count: usize,
   pub iterations: Vec<Iteration>,
 }
 
@@ -299,7 +299,7 @@ pub struct DashboardFragmentTemplate {
   pub cancelled_count: usize,
   pub completed_iteration_count: usize,
   pub done_count: usize,
-  pub failed_iteration_count: usize,
+  pub cancelled_iteration_count: usize,
   pub in_progress_count: usize,
   pub iteration_count: usize,
   pub open_count: usize,
@@ -330,7 +330,7 @@ pub struct IterationListFragmentTemplate {
   pub active_count: usize,
   pub completed_count: usize,
   pub current_status: String,
-  pub failed_count: usize,
+  pub cancelled_count: usize,
   pub iterations: Vec<Iteration>,
 }
 

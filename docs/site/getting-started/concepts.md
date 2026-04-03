@@ -93,11 +93,12 @@ files and track which tasks belong to them, along with their phase assignments.
 
 ### Iteration Statuses
 
-| Status      | Meaning                         |
-|-------------|---------------------------------|
-| `active`    | Currently in progress (default) |
-| `completed` | All tasks finished successfully |
-| `failed`    | Iteration did not succeed       |
+| Status      | Meaning                                     |
+|-------------|---------------------------------------------|
+| `active`    | Currently in progress (default)             |
+| `cancelled` | Iteration was deliberately abandoned        |
+| `completed` | All tasks finished successfully             |
+| `failed`    | *(deprecated)* Alias for `cancelled`        |
 
 ### Dependency Graphs
 

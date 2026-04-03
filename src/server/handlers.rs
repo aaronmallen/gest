@@ -589,18 +589,18 @@ pub async fn dashboard(State(state): State<ServerState>) -> Response {
       .iter()
       .filter(|i| i.status == IterationStatus::Completed)
       .count();
-    let failed_iteration_count = iterations
+    let cancelled_iteration_count = iterations
       .iter()
-      .filter(|i| i.status == IterationStatus::Failed)
+      .filter(|i| matches!(i.status, IterationStatus::Cancelled | IterationStatus::Failed))
       .count();
 
     DashboardTemplate {
       active_iteration_count,
       artifact_count,
       cancelled_count,
+      cancelled_iteration_count,
       completed_iteration_count,
       done_count,
-      failed_iteration_count,
       in_progress_count,
       iteration_count: active_iteration_count,
       open_count,
@@ -739,9 +739,9 @@ pub async fn iteration_list(State(state): State<ServerState>, Query(params): Que
       .iter()
       .filter(|i| i.status == IterationStatus::Completed)
       .count();
-    let failed_count = all_iterations
+    let cancelled_count = all_iterations
       .iter()
-      .filter(|i| i.status == IterationStatus::Failed)
+      .filter(|i| matches!(i.status, IterationStatus::Cancelled | IterationStatus::Failed))
       .count();
     let current_status = params.status.unwrap_or_else(|| "active".to_string());
 
@@ -754,8 +754,8 @@ pub async fn iteration_list(State(state): State<ServerState>, Query(params): Que
       iterations,
       current_status,
       active_count,
+      cancelled_count,
       completed_count,
-      failed_count,
     }
     .into_response()
   })
@@ -1363,18 +1363,18 @@ pub async fn dashboard_fragment(State(state): State<ServerState>) -> Response {
       .iter()
       .filter(|i| i.status == IterationStatus::Completed)
       .count();
-    let failed_iteration_count = iterations
+    let cancelled_iteration_count = iterations
       .iter()
-      .filter(|i| i.status == IterationStatus::Failed)
+      .filter(|i| matches!(i.status, IterationStatus::Cancelled | IterationStatus::Failed))
       .count();
 
     templates::render(&DashboardFragmentTemplate {
       active_iteration_count,
       artifact_count,
       cancelled_count,
+      cancelled_iteration_count,
       completed_iteration_count,
       done_count,
-      failed_iteration_count,
       in_progress_count,
       iteration_count: active_iteration_count,
       open_count,
@@ -1513,9 +1513,9 @@ pub async fn iteration_list_fragment(
       .iter()
       .filter(|i| i.status == IterationStatus::Completed)
       .count();
-    let failed_count = all_iterations
+    let cancelled_count = all_iterations
       .iter()
-      .filter(|i| i.status == IterationStatus::Failed)
+      .filter(|i| matches!(i.status, IterationStatus::Cancelled | IterationStatus::Failed))
       .count();
     let current_status = params.status.unwrap_or_else(|| "active".to_string());
 
@@ -1528,8 +1528,8 @@ pub async fn iteration_list_fragment(
       iterations,
       current_status,
       active_count,
+      cancelled_count,
       completed_count,
-      failed_count,
     })
   })
   .await

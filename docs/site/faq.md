@@ -37,7 +37,7 @@ artifacts/        # Markdown files with YAML frontmatter
 tasks/            # TOML files
   resolved/       # Done or cancelled tasks
 iterations/       # TOML files
-  resolved/       # Completed or failed iterations
+  resolved/       # Completed or cancelled iterations
 ```
 
 ## What's the difference between global and local stores?

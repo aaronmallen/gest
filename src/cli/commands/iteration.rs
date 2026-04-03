@@ -1,5 +1,6 @@
 mod add;
 mod advance;
+mod cancel;
 mod create;
 mod graph;
 mod link;
@@ -7,6 +8,7 @@ mod list;
 mod meta;
 mod next;
 mod remove;
+mod reopen;
 mod show;
 mod status;
 mod tag;
@@ -30,6 +32,7 @@ impl Command {
     match &self.command {
       IterationCommand::Add(cmd) => cmd.call(ctx),
       IterationCommand::Advance(cmd) => cmd.call(ctx),
+      IterationCommand::Cancel(cmd) => cmd.call(ctx),
       IterationCommand::Create(cmd) => cmd.call(ctx),
       IterationCommand::Graph(cmd) => cmd.call(ctx),
       IterationCommand::Link(cmd) => cmd.call(ctx),
@@ -37,6 +40,7 @@ impl Command {
       IterationCommand::Meta(cmd) => cmd.call(ctx),
       IterationCommand::Next(cmd) => cmd.call(ctx),
       IterationCommand::Remove(cmd) => cmd.call(ctx),
+      IterationCommand::Reopen(cmd) => cmd.call(ctx),
       IterationCommand::Show(cmd) => cmd.call(ctx),
       IterationCommand::Status(cmd) => cmd.call(ctx),
       IterationCommand::Tag(cmd) => cmd.call(ctx),
@@ -50,6 +54,7 @@ impl Command {
 enum IterationCommand {
   Add(add::Command),
   Advance(advance::Command),
+  Cancel(cancel::Command),
   #[command(visible_alias = "new")]
   Create(create::Command),
   Graph(graph::Command),
@@ -60,6 +65,7 @@ enum IterationCommand {
   Next(next::Command),
   #[command(visible_alias = "rm")]
   Remove(remove::Command),
+  Reopen(reopen::Command),
   #[command(visible_alias = "view")]
   Show(show::Command),
   Status(status::Command),

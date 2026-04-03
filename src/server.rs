@@ -5,6 +5,7 @@ mod handlers;
 mod routes;
 mod state;
 mod templates;
+pub mod watcher;
 
 pub use routes::router;
 pub use state::ServerState;

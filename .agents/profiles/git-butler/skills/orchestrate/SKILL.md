@@ -57,16 +57,17 @@ phase 2 must not start until all phase 1 tasks are complete.
 
 For each phase:
 
-1. **Claim tasks** using the orchestration commands:
+1. **Claim tasks** using `iteration next`. Use `--json` for structured output or `-q` for bare task ID:
 
    ```sh
-   # Claim the next available task in priority order:
-   GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration next <iteration-id> --claim --agent implement-agent
+   # Claim next available task in priority order (returns JSON with task details):
+   GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration next <iteration-id> --claim --agent implement-agent --json
+
+   # Or get just the task ID for scripting:
+   GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration next <iteration-id> --claim --agent implement-agent -q
    ```
 
-   Or set `assigned_to` directly if you need specific task ordering:
-   `GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task update <task-id>
-   --assigned-to implement-agent`
+   Exit code **2** means no tasks are available (distinguishes idle from errors).
 
 2. For each task in the phase (in priority order):
    - Run `/implement <task-id>` in the main workspace.
@@ -96,12 +97,20 @@ After all phases complete:
 
 1. Check for failed tasks -- any task still `in-progress` represents a failure. Report these to the user with their IDs
    and titles.
-2. Update the iteration status:
+2. Update the iteration status using lifecycle shortcuts:
    - If **all tasks** completed successfully (`done`):
-    `GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration update <iteration-id>
-    --status completed`
+
+     ```sh
+     GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- \
+       iteration update <iteration-id> --status completed -q
+     ```
+
    - If **any tasks** remain `in-progress`:
-     `GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration update <iteration-id>
-     --status failed`
+
+     ```sh
+     GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- \
+       iteration cancel <iteration-id> -q
+     ```
+
      Flag this to the user and list the incomplete tasks.
 3. Present a summary of all implemented tasks, including successes and failures.

@@ -33,16 +33,27 @@ As a <role>, I want <goal> so that <benefit>.
 
 ### 2. Save
 
-Create a gest task with the issue content. Apply tags for type, area, and priority using the vocabulary from
+Pipe the issue content via stdin as the description. When `-d` is omitted and stdin is piped, gest reads the description
+automatically. Use `-q` to get the bare task ID. Apply tags for type, area, and priority using the vocabulary from
 `docs/process/labels.md`. Use bare tags -- no namespace prefixes like `area:` or `type:`:
 
 ```sh
-GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task create "<title>" --description "<content>" --tag "enhancement,cli,p2"
+cat <<'EOF' | GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task create "<title>" \
+  --tag "enhancement,cli,p2" -q
+<issue content here>
+EOF
 ```
 
 Tag examples: `bug`, `enhancement`, `chore`, `cli`, `model`, `storage`, `server`, `ui`, `config`, `docs`, `p0`-`p4`.
 
-Extract the task ID from the output.
+Inline flags available at creation time (use when the caller provides context):
+
+- `--phase <n>` -- execution phase for parallel grouping
+- `-p <0-4>` -- priority level (0 is highest)
+- `-l <rel>:<target_id>` -- create a link (repeatable, e.g. `-l child-of:abcd1234 -l blocked-by:efgh5678`)
+- `-i <iteration-id>` -- add the task to an iteration
+
+The `-q` flag prints only the task ID, ready for downstream use.
 
 ### 3. Next Step
 

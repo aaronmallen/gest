@@ -12,7 +12,8 @@ Assess a spec and produce an implementation plan.
 
 ### 1. Read and Understand the Spec
 
-Read the spec via `GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- artifact show <id>`. Identify:
+Read the spec via `GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- artifact show <id>` (add `--json`
+for structured parsing). Identify:
 
 - Acceptance criteria (these become the basis for tasks)
 - Components or subsystems affected
@@ -43,33 +44,65 @@ For **multi-issue**:
 
 1. Identify the natural breakdown (by component, by layer, by acceptance criteria groups)
 2. Determine dependencies between tasks (what must be done first)
-3. Invoke `/write-issue` for each task, including dependency references
-4. Link each task to the source spec:
-   `GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task link <task-id> child-of <spec-id>
-   --artifact`
-5. For issues that affect CLI behavior (commands, flags, output format), include integration test acceptance criteria in
+3. For issues that affect CLI behavior (commands, flags, output format), include integration test acceptance criteria in
    the task description. Example: "Integration test verifies `gest task create --description` outputs the created task
    ID."
-6. Assign phases and priorities. A phase is a parallelization boundary: **every task in the same phase runs
-   concurrently in its own workspace**, so tasks within a phase must be fully independent. If task A blocks task B, they
-   **must** be in different phases (A in an earlier phase, B in a later one). Put tasks that share no dependencies in
-   the
-   same phase to maximize parallelism.
-   - `GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task update <task-id> --phase <n>`
-   - `GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task update <task-id> --priority <0-4>`
-     -- priority within the phase (used for sequential fallback ordering)
-7. Set blocking dependencies:
-   `GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task link <task-id> blocked-by <other-task-id>`
-8. Create an iteration and add all tasks:
-   - `GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration create "<plan title>"`
-   - Link iteration to spec:
+4. **Batch-create all tasks** using NDJSON via `--batch`. Include phase, priority, tags, and the `child-of` link to the
+   spec inline. Each line is a JSON object:
 
-     ```sh
-     GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration link <iteration-id> child-of <spec-id> --artifact
-     ```
+   ```sh
+   cat <<'EOF' | GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task create --batch -q
+   {"title":"First task","description":"...","phase":1,"priority":0,"tags":["storage"],"links":["child-of:<spec-id>"]}
+   {"title":"Second task","description":"...","phase":1,"priority":1,"tags":["config"],"links":["child-of:<spec-id>"]}
+   {"title":"Third task","description":"...","phase":2,"priority":0,"tags":["storage"],"links":["child-of:<spec-id>"]}
+   EOF
+   ```
 
-   - `GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration add <iteration-id> <task-id>`
-     for each task
+   Links use the format `"rel:target_id"` (e.g. `"child-of:abcd1234"`, `"blocked-by:efgh5678"`). Artifact vs task
+   targets are auto-detected.
+
+   The NDJSON schema for tasks:
+
+   ```json
+   {
+     "title": "string (required)",
+     "description": "string",
+     "assigned_to": "string",
+     "phase": 1,
+     "priority": 0,
+     "status": "open",
+     "tags": ["tag1", "tag2"],
+     "links": ["rel:target_id"],
+     "iteration": "iteration-id",
+     "metadata": {"key": "value"}
+   }
+   ```
+
+   With `-q`, each created task's bare ID is printed on its own line, in input order. Capture these for linking.
+
+   A phase is a parallelization boundary: **every task in the same phase runs concurrently in its own workspace**, so
+   tasks within a phase must be fully independent. If task A blocks task B, they **must** be in different phases (A in
+   an
+   earlier phase, B in a later one). Put tasks that share no dependencies in the same phase to maximize parallelism.
+
+5. **Set blocking dependencies** for tasks that span phases:
+
+   ```sh
+   GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- task link <task-id> blocked-by <other-task-id> -q
+   ```
+
+6. **Create an iteration**, link it to the spec, and add all tasks:
+
+   ```sh
+   # Create iteration and capture ID
+   GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration create "<plan title>" -q
+
+   # Link iteration to spec
+   GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration link <iteration-id> child-of <spec-id> --artifact -q
+
+   # Add each task
+   GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- iteration add <iteration-id> <task-id> -q
+   ```
 
 ### 5. Output
 

@@ -49,16 +49,21 @@ minutes.
 
 ### 3. Save
 
-Create a gest artifact with the spec content inline:
+Pipe the spec content via stdin. When `--body` is omitted and stdin is piped, gest reads the body automatically. Use
+`-q`
+to get the bare artifact ID:
 
 ```sh
-GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- artifact create --title "<title>" --type spec --tag "<area>,spec" --body "<content>"
+cat <<'EOF' | GEST_PROJECT_DIR=$XDG_DATA_HOME/gest/2f8de7bc06014bd7 cargo run -- artifact create \
+  --title "<title>" --type spec --tag "<area>,spec" -q
+<spec content here>
+EOF
 ```
 
 Use bare tags (no `area:` or `type:` prefixes). Include the relevant area tag(s) from `docs/process/labels.md` and the
 `spec` type tag.
 
-Extract the artifact ID from the output.
+The `-q` flag prints only the artifact ID, ready for downstream use.
 
 ### 4. Next Step
 

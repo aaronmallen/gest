@@ -7,6 +7,22 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+## [v0.4.4] - 2026-04-04
+
+### Added
+
+- Security headers (`Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`) on all web server responses
+
+### Changed
+
+- Faster iteration orchestration via optimized collection operations and reduced cloning
+
+### Fixed
+
+- `-q` flag now outputs the 8-character short ID instead of the full 32-character ID
+- Store writes use proper temporary files to avoid collisions under concurrent access
+- `config get storage.project_dir` now returns the resolved path instead of `null` (see [#31])
+
 ## [v0.4.3] - 2026-04-03
 
 ### Added
@@ -282,7 +298,9 @@ Initial release
 [#23]: https://github.com/aaronmallen/gest/issues/23
 [#24]: https://github.com/aaronmallen/gest/issues/24
 
-[Unreleased]: https://github.com/aaronmallen/gest/compare/0.4.3...main
+[#31]: https://github.com/aaronmallen/gest/issues/31
+
+[Unreleased]: https://github.com/aaronmallen/gest/compare/0.4.4...main
 [v0.2.0]: https://github.com/aaronmallen/gest/compare/0.1.0...0.2.0
 [v0.2.1]: https://github.com/aaronmallen/gest/compare/0.2.0...0.2.1
 [v0.2.2]: https://github.com/aaronmallen/gest/compare/0.2.1...0.2.2
@@ -297,3 +315,4 @@ Initial release
 [v0.4.1]: https://github.com/aaronmallen/gest/compare/0.4.0...0.4.1
 [v0.4.2]: https://github.com/aaronmallen/gest/compare/0.4.1...0.4.2
 [v0.4.3]: https://github.com/aaronmallen/gest/compare/0.4.2...0.4.3
+[v0.4.4]: https://github.com/aaronmallen/gest/compare/0.4.3...0.4.4

@@ -74,9 +74,11 @@ We follow responsible disclosure practices:
 
 ## Supported Versions
 
-| Package | Version |    Support     |
-|:-------:|:-------:|:--------------:|
-|  gest   |  0.1.0  | In Development |
+| Version |    Support     |
+|:-------:|:--------------:|
+|  0.5.0  | In Development |
+|  0.4.x  |   Supported    |
+|  < 0.4  |  Unsupported   |
 
 ## Security Best Practices
 

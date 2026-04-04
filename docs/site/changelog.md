@@ -2,6 +2,29 @@
 
 What's new in gest — told version by version.
 
+## v0.4.4
+
+<span style="opacity: 0.5">2026-04-04</span>
+
+### Security Headers
+
+The web server now sets `Content-Security-Policy`, `X-Frame-Options`, and `X-Content-Type-Options` on
+every response, hardening the default setup against clickjacking and content-type sniffing.
+
+### Bug Fixes
+
+- The `-q` flag on mutation commands was printing the full 32-character ID — it now outputs the
+  8-character short ID, matching how IDs are displayed everywhere else
+- Store writes use the `tempfile` crate for proper temporary files, avoiding collisions when multiple
+  agents write concurrently
+- `config get storage.project_dir` now returns the resolved path instead of `null` when no explicit
+  override is set ([#31](https://github.com/aaronmallen/gest/issues/31))
+
+### Performance
+
+Iteration orchestration operations (`all_phases`, `assignees`, `phases_with_incomplete`) now use
+sort+dedup instead of HashSet round-trips, and an unnecessary double-clone has been eliminated.
+
 ## v0.4.3
 
 <span style="opacity: 0.5">2026-04-03</span>

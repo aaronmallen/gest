@@ -1,8 +1,3 @@
-use std::{
-  fmt::{self, Display, Formatter},
-  str::FromStr,
-};
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -11,6 +6,7 @@ use super::{
   id::Id,
   link::Link,
   note::Note,
+  status::impl_status,
 };
 use crate::{
   action::{HasMetadata, HasStatus, Linkable, Resolvable, Storable, Taggable},
@@ -47,38 +43,12 @@ pub enum Status {
   Open,
 }
 
-impl Status {
-  pub fn as_str(&self) -> &'static str {
-    match self {
-      Self::Cancelled => "cancelled",
-      Self::Done => "done",
-      Self::InProgress => "in-progress",
-      Self::Open => "open",
-    }
-  }
-
-  pub fn is_terminal(&self) -> bool {
-    matches!(self, Self::Done | Self::Cancelled)
-  }
-}
-
-impl Display for Status {
-  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-    f.write_str(self.as_str())
-  }
-}
-
-impl FromStr for Status {
-  type Err = String;
-
-  fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-    match s {
-      "cancelled" => Ok(Self::Cancelled),
-      "done" => Ok(Self::Done),
-      "in-progress" => Ok(Self::InProgress),
-      "open" => Ok(Self::Open),
-      other => Err(format!("unknown status: {other}")),
-    }
+impl_status! {
+  Status {
+    Cancelled => "cancelled" [terminal],
+    Done => "done" [terminal],
+    InProgress => "in-progress",
+    Open => "open",
   }
 }
 

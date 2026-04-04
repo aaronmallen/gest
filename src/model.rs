@@ -11,6 +11,7 @@ pub mod id;
 pub mod iteration;
 pub mod link;
 pub mod note;
+mod status;
 pub mod task;
 
 pub use artifact::{Artifact, ArtifactFilter, ArtifactPatch, NewArtifact};

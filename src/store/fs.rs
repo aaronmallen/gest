@@ -45,9 +45,9 @@ pub(crate) fn move_entity_file(config: &Settings, content: &str, dest: &Path, sr
 
   // Write to a sibling temp file, then atomically rename into place.
   let dest_dir = dest.parent().unwrap_or(dest);
-  let tmp = dest_dir.join(format!(".tmp_{}", std::process::id()));
-  fs::write(&tmp, content)?;
-  fs::rename(&tmp, dest)?;
+  let tmp = tempfile::Builder::new().prefix(".tmp_").tempfile_in(dest_dir)?;
+  fs::write(tmp.path(), content)?;
+  tmp.persist(dest).map_err(|e| e.error)?;
 
   // Clean up the old location when it differs from the new one.
   if src != dest

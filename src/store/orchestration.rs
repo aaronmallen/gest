@@ -74,13 +74,9 @@ pub fn advance_phase(config: &Settings, id: &Id, force: bool) -> super::Result<A
   }
 
   // Find the next phase after the current active phase.
-  let mut all_phases: Vec<u16> = tasks
-    .iter()
-    .map(|t| t.phase.unwrap_or(0))
-    .collect::<HashSet<_>>()
-    .into_iter()
-    .collect();
+  let mut all_phases: Vec<u16> = tasks.iter().map(|t| t.phase.unwrap_or(0)).collect();
   all_phases.sort();
+  all_phases.dedup();
 
   let to_phase = all_phases.into_iter().find(|&p| p > from_phase);
 
@@ -151,10 +147,9 @@ pub fn iteration_status(config: &Settings, id: &Id) -> super::Result<IterationPr
     .iter()
     .filter(|t| t.status == TaskStatus::InProgress)
     .filter_map(|t| t.assigned_to.clone())
-    .collect::<HashSet<_>>()
-    .into_iter()
     .collect();
   assignees.sort();
+  assignees.dedup();
 
   let overall_done = tasks.iter().filter(|t| t.status.is_terminal()).count();
   let overall_total = tasks.len();
@@ -208,7 +203,7 @@ pub fn next_available_task(config: &Settings, id: &Id) -> super::Result<Option<T
     pa.cmp(&pb).then_with(|| a.created_at.cmp(&b.created_at))
   });
 
-  Ok(candidates.first().cloned().cloned())
+  Ok(candidates.into_iter().next().cloned())
 }
 
 /// Internal helper: find the lowest phase with incomplete tasks.
@@ -217,10 +212,9 @@ fn compute_active_phase(tasks: &[Task]) -> Option<u16> {
     .iter()
     .filter(|t| !t.status.is_terminal())
     .map(|t| t.phase.unwrap_or(0))
-    .collect::<HashSet<_>>()
-    .into_iter()
     .collect();
   phases_with_incomplete.sort();
+  phases_with_incomplete.dedup();
   phases_with_incomplete.first().copied()
 }
 

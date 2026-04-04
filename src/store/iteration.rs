@@ -105,6 +105,11 @@ pub fn read_iteration(config: &Settings, id: &Id) -> super::Result<Iteration> {
 
 /// Load all tasks referenced by an iteration, silently skipping any that
 /// cannot be parsed or read.
+///
+/// NOTE: Unlike `resolve_blocking_batch`, a batch-loading optimization does not
+/// apply here. Each task lives in its own file keyed by ID, so there is no
+/// redundant I/O to deduplicate — every iteration task reference maps to a
+/// unique file that must be read exactly once.
 pub fn read_iteration_tasks(config: &Settings, iteration: &Iteration) -> Vec<Task> {
   let mut tasks = Vec::new();
   for task_ref in &iteration.tasks {

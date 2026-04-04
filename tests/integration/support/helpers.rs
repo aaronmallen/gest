@@ -80,6 +80,43 @@ impl GestCmd {
       .unwrap_or_else(|| panic!("could not extract artifact ID from output:\n{stdout}"))
   }
 
+  /// Create an iteration with the given title, returning the new iteration ID.
+  pub fn create_iteration(&self, title: &str) -> String {
+    let output = self
+      .cmd()
+      .args(["iteration", "create", title])
+      .output()
+      .expect("failed to run iteration create");
+
+    assert!(
+      output.status.success(),
+      "iteration create failed: {}",
+      String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    extract_id_from_create_output(&stdout)
+      .unwrap_or_else(|| panic!("could not extract iteration ID from output:\n{stdout}"))
+  }
+
+  /// Create a task with the given title, returning the new task ID.
+  pub fn create_task(&self, title: &str) -> String {
+    let output = self
+      .cmd()
+      .args(["task", "create", title])
+      .output()
+      .expect("failed to run task create");
+
+    assert!(
+      output.status.success(),
+      "task create failed: {}",
+      String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    extract_id_from_create_output(&stdout).unwrap_or_else(|| panic!("could not extract task ID from output:\n{stdout}"))
+  }
+
   fn data_dir(&self) -> PathBuf {
     self.temp_dir.path().join(".gest")
   }

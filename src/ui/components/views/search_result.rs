@@ -11,6 +11,7 @@ pub struct Component {
   entity_type: EntityType,
   expanded: bool,
   id: String,
+  prefix_len: usize,
   status_or_kind: Option<String>,
   title: String,
 }
@@ -33,36 +34,39 @@ impl EntityType {
 
 impl Component {
   /// Create a search result for an artifact.
-  pub fn artifact(id: String, title: String) -> Self {
+  pub fn artifact(id: String, title: String, prefix_len: usize) -> Self {
     Self {
       body: None,
       entity_type: EntityType::Artifact,
       expanded: false,
       id,
+      prefix_len,
       status_or_kind: None,
       title,
     }
   }
 
   /// Create a search result for an iteration.
-  pub fn iteration(id: String, title: String, status: String) -> Self {
+  pub fn iteration(id: String, title: String, status: String, prefix_len: usize) -> Self {
     Self {
       body: None,
       entity_type: EntityType::Iteration,
       expanded: false,
       id,
+      prefix_len,
       status_or_kind: Some(status),
       title,
     }
   }
 
   /// Create a search result for a task.
-  pub fn task(id: String, title: String, status: String) -> Self {
+  pub fn task(id: String, title: String, status: String, prefix_len: usize) -> Self {
     Self {
       body: None,
       entity_type: EntityType::Task,
       expanded: false,
       id,
+      prefix_len,
       status_or_kind: Some(status),
       title,
     }
@@ -101,7 +105,7 @@ impl Display for Component {
     write!(f, "  {}", self.entity_type.label().paint(*type_style))?;
 
     // ID
-    write!(f, "  {}", Id::new(&self.id))?;
+    write!(f, "  {}", Id::new(&self.id).prefix_len(self.prefix_len))?;
 
     // Title
     write!(f, "  {}", self.title)?;

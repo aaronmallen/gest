@@ -87,9 +87,14 @@ impl Display for Component {
         write!(
           f,
           "{}",
-          SearchResult::task(task.id().short(), task.title().to_string(), task.status().to_string())
-            .body(body)
-            .expanded(self.expanded),
+          SearchResult::task(
+            task.id().short(),
+            task.title().to_string(),
+            task.status().to_string(),
+            2
+          )
+          .body(body)
+          .expanded(self.expanded),
         )?;
       }
     }
@@ -113,7 +118,7 @@ impl Display for Component {
         write!(
           f,
           "{}",
-          SearchResult::artifact(artifact.id().short(), artifact.title().to_string())
+          SearchResult::artifact(artifact.id().short(), artifact.title().to_string(), 2)
             .body(body)
             .expanded(self.expanded),
         )?;
@@ -143,6 +148,7 @@ impl Display for Component {
             iteration.id().short(),
             iteration.title().to_string(),
             iteration.status().to_string(),
+            2,
           )
           .body(body)
           .expanded(self.expanded),

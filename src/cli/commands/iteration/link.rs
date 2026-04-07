@@ -73,10 +73,13 @@ impl Command {
       .await?;
     }
 
+    let prefix_len = repo::iteration::shortest_active_prefix(&conn, project_id).await?;
+
     let short_id = source_id.short();
     self.output.print_entity(&rel, &short_id, || {
       SuccessMessage::new("linked iteration")
         .id(source_id.short())
+        .prefix_len(prefix_len)
         .field("rel", self.rel.to_string())
         .field("target", target_id.short())
         .to_string()

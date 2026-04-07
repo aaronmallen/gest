@@ -3,7 +3,7 @@ use clap::Args;
 use crate::{
   AppContext,
   cli::Error,
-  store::repo,
+  store::{model::primitives::IterationStatus, repo},
   ui::{
     components::{IterationDetail, TaskCounts},
     json,
@@ -21,6 +21,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
 
     let id = repo::resolve::resolve_id(&conn, "iterations", &self.id).await?;
@@ -48,12 +49,20 @@ impl Command {
       total: status_counts.total as usize,
     };
 
+    let prefix_len = match iteration.status() {
+      IterationStatus::Completed | IterationStatus::Cancelled => {
+        repo::iteration::shortest_all_prefix(&conn, project_id).await?
+      }
+      _ => repo::iteration::shortest_active_prefix(&conn, project_id).await?,
+    };
+
     let view = IterationDetail::new(
       iteration.id().short(),
       iteration.title().to_string(),
       phase_count,
       counts,
-    );
+    )
+    .prefix_len(prefix_len);
 
     print!("{view}");
     Ok(())

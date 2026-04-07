@@ -43,10 +43,13 @@ impl Command {
       .await?;
     }
 
+    let prefix_len = repo::iteration::shortest_active_prefix(&conn, project_id).await?;
+
     let short_id = id.short();
     self.output.print_delete(|| {
       SuccessMessage::new("untagged iteration")
         .id(short_id.clone())
+        .prefix_len(prefix_len)
         .field("tag", self.label.clone())
         .to_string()
     })?;

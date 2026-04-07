@@ -7,6 +7,8 @@ use std::{
 
 use yansi::Paint;
 
+use crate::ui::components::atoms::Id;
+
 /// A task entry for the graph.
 pub struct GraphTask {
   pub id_short: String,
@@ -18,6 +20,7 @@ pub struct GraphTask {
 /// Phased dependency graph with box-drawing connectors.
 pub struct Component {
   iteration_title: String,
+  prefix_len: usize,
   tasks: Vec<GraphTask>,
 }
 
@@ -25,8 +28,15 @@ impl Component {
   pub fn new(iteration_title: impl Into<String>, tasks: Vec<GraphTask>) -> Self {
     Self {
       iteration_title: iteration_title.into(),
+      prefix_len: 2,
       tasks,
     }
+  }
+
+  /// Sets the highlighted prefix length passed to rendered task IDs.
+  pub fn prefix_len(mut self, len: usize) -> Self {
+    self.prefix_len = len;
+    self
   }
 }
 
@@ -66,12 +76,13 @@ impl Display for Component {
           "cancelled" => "⊘".paint(*theme.status_cancelled()),
           _ => "●".paint(*theme.status_open()),
         };
+        let id = Id::new(&task.id_short).prefix_len(self.prefix_len);
         writeln!(
           f,
           "  {}   {} {} {}",
           "│".paint(*theme.iteration_graph_separator()),
           icon,
-          task.id_short.paint(*theme.id_rest()),
+          id,
           task.title,
         )?;
       }

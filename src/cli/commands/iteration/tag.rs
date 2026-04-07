@@ -27,10 +27,13 @@ impl Command {
     let tag = repo::tag::attach(&conn, EntityType::Iteration, &id, &self.label).await?;
     repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
 
+    let prefix_len = repo::iteration::shortest_active_prefix(&conn, project_id).await?;
+
     let short_id = id.short();
     self.output.print_entity(&tag, &short_id, || {
       SuccessMessage::new("tagged iteration")
         .id(id.short())
+        .prefix_len(prefix_len)
         .field("tag", self.label.clone())
         .to_string()
     })?;

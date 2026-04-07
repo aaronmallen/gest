@@ -13,6 +13,7 @@ pub struct Component {
   counts: TaskCounts,
   id: String,
   phase_count: usize,
+  prefix_len: usize,
   title: String,
 }
 
@@ -22,8 +23,15 @@ impl Component {
       id: id.into(),
       title: title.into(),
       phase_count,
+      prefix_len: 2,
       counts,
     }
+  }
+
+  /// Sets the highlighted prefix length passed to the rendered ID.
+  pub fn prefix_len(mut self, len: usize) -> Self {
+    self.prefix_len = len;
+    self
   }
 
   fn task_counts_line(&self) -> String {
@@ -70,7 +78,7 @@ impl Display for Component {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     let theme = style::global();
 
-    let id = Id::new(&self.id);
+    let id = Id::new(&self.id).prefix_len(self.prefix_len);
 
     let title_label = Label::new("title", *theme.iteration_detail_label()).pad_to(LABEL_PAD);
     let title_value = Value::new(&self.title, *theme.iteration_detail_value());

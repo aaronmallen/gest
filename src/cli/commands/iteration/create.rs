@@ -4,7 +4,10 @@ use crate::{
   AppContext,
   cli::{Error, meta_args},
   store::{
-    model::{iteration::New, primitives::EntityType},
+    model::{
+      iteration::New,
+      primitives::{EntityType, IterationStatus},
+    },
     repo,
   },
   ui::{components::SuccessMessage, json},
@@ -74,10 +77,18 @@ impl Command {
       repo::tag::attach(&conn, EntityType::Iteration, iteration.id(), label).await?;
     }
 
+    let prefix_len = match iteration.status() {
+      IterationStatus::Completed | IterationStatus::Cancelled => {
+        repo::iteration::shortest_all_prefix(&conn, project_id).await?
+      }
+      _ => repo::iteration::shortest_active_prefix(&conn, project_id).await?,
+    };
+
     let short_id = iteration.id().short();
     self.output.print_entity(&iteration, &short_id, || {
       SuccessMessage::new("created iteration")
         .id(iteration.id().short())
+        .prefix_len(prefix_len)
         .field("title", iteration.title().to_string())
         .to_string()
     })?;

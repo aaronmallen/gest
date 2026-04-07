@@ -21,6 +21,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
     let id = repo::resolve::resolve_id(&conn, "iterations", &self.id).await?;
     let iteration = repo::iteration::find_by_id(&conn, id.clone())
@@ -53,6 +54,7 @@ impl Command {
       .min();
 
     let max_phase = tasks.iter().map(|t| t.phase).max().unwrap_or(0);
+    let prefix_len = repo::iteration::shortest_active_prefix(&conn, project_id).await?;
 
     match active_phase {
       None => {
@@ -96,6 +98,7 @@ impl Command {
             self.output.print_entity(&result, &short_id, || {
               SuccessMessage::new("advanced iteration")
                 .id(id.short())
+                .prefix_len(prefix_len)
                 .field("title", iteration.title().to_string())
                 .field("from phase", phase.to_string())
                 .field("to phase", next.to_string())
@@ -118,6 +121,7 @@ impl Command {
             self.output.print_entity(&result, &short_id, || {
               SuccessMessage::new("all phases complete")
                 .id(id.short())
+                .prefix_len(prefix_len)
                 .field("title", iteration.title().to_string())
                 .to_string()
             })?;

@@ -21,6 +21,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
     let id = repo::resolve::resolve_id(&conn, "iterations", &self.id).await?;
     let iteration = repo::iteration::find_by_id(&conn, id.clone())
@@ -65,7 +66,12 @@ impl Command {
       })
       .collect();
 
-    print!("{}", IterationGraphView::new(iteration.title(), graph_tasks));
+    let task_prefix_len = repo::task::shortest_all_prefix(&conn, project_id).await?;
+
+    print!(
+      "{}",
+      IterationGraphView::new(iteration.title(), graph_tasks).prefix_len(task_prefix_len)
+    );
 
     Ok(())
   }

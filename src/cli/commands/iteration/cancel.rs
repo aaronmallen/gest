@@ -38,10 +38,13 @@ impl Command {
     let iteration = repo::iteration::update(&conn, &id, &patch).await?;
     repo::transaction::record_event(&conn, tx.id(), "iterations", &id.to_string(), "modified", Some(&before)).await?;
 
+    let prefix_len = repo::iteration::shortest_all_prefix(&conn, project_id).await?;
+
     let short_id = iteration.id().short();
     self.output.print_entity(&iteration, &short_id, || {
       SuccessMessage::new("cancelled iteration")
         .id(iteration.id().short())
+        .prefix_len(prefix_len)
         .field("title", iteration.title().to_string())
         .to_string()
     })?;

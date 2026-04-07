@@ -3,7 +3,10 @@ use clap::Args;
 use crate::{
   AppContext,
   cli::{Error, meta_args},
-  store::{model::iteration::Patch, repo},
+  store::{
+    model::{iteration::Patch, primitives::IterationStatus},
+    repo,
+  },
   ui::{components::SuccessMessage, json},
 };
 
@@ -60,10 +63,18 @@ impl Command {
     let iteration = repo::iteration::update(&conn, &id, &patch).await?;
     repo::transaction::record_event(&conn, tx.id(), "iterations", &id.to_string(), "modified", Some(&before)).await?;
 
+    let prefix_len = match iteration.status() {
+      IterationStatus::Completed | IterationStatus::Cancelled => {
+        repo::iteration::shortest_all_prefix(&conn, project_id).await?
+      }
+      _ => repo::iteration::shortest_active_prefix(&conn, project_id).await?,
+    };
+
     let short_id = iteration.id().short();
     self.output.print_entity(&iteration, &short_id, || {
       SuccessMessage::new("updated iteration")
         .id(iteration.id().short())
+        .prefix_len(prefix_len)
         .field("title", iteration.title().to_string())
         .to_string()
     })?;

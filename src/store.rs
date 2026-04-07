@@ -4,6 +4,7 @@
 pub mod migration;
 pub mod model;
 pub mod repo;
+pub mod sync;
 
 mod artifact;
 pub mod artifact_meta;

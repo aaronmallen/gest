@@ -3,7 +3,7 @@ mod cli;
 mod config;
 mod event_store;
 mod io;
-mod logger;
+mod logging;
 mod model;
 mod server;
 mod store;

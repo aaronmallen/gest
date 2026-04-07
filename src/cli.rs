@@ -101,9 +101,9 @@ impl Cli {
     };
 
     let env_level = crate::config::env::GEST_LOG_LEVEL.value().ok();
-    let level = crate::logger::resolve_level(self.verbose, env_level.as_deref(), settings.log().level());
+    let level = crate::logging::resolve_level(self.verbose, env_level.as_deref(), settings.log().level());
     let theme = Theme::from_config(&settings);
-    crate::logger::init(level, &theme);
+    crate::logging::init(level, &theme);
 
     log::debug!("log level set to {level}");
     log::debug!("project directory: {}", settings.storage().project_dir().display());
@@ -184,8 +184,8 @@ impl Command {
 /// Entry point for the CLI: loads configuration then parses and dispatches the command.
 pub fn run() -> Result<()> {
   let verbosity = pre_parse_verbosity();
-  let early_level = crate::logger::resolve_level(verbosity, None, None);
-  crate::logger::init_early(early_level);
+  let early_level = crate::logging::resolve_level(verbosity, None, None);
+  crate::logging::init_early(early_level);
 
   let cwd = std::env::current_dir()?;
   let settings = crate::config::load(&cwd)?;

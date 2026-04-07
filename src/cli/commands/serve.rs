@@ -33,7 +33,7 @@ impl Command {
     // `Info` as the default (instead of the CLI-wide `Warn`).
     let env_level = crate::config::env::GEST_LOG_LEVEL.value().ok();
     let serve_log_level = serve_config.log_level().or(ctx.settings.log().level());
-    let level = crate::logger::resolve_level_with_default(
+    let level = crate::logging::resolve_level_with_default(
       ctx.verbosity,
       env_level.as_deref(),
       serve_log_level,

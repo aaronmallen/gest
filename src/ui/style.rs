@@ -100,6 +100,8 @@ pub const ALL_TOKENS: &[&str] = &[
   "note.detail.value",
   "note.list.body",
   "note.list.id",
+  "project.list.root",
+  "project.show.value",
   "search.expand.separator",
   "search.no_results.hint",
   "search.query",
@@ -392,6 +394,11 @@ pub struct Theme {
   note_list_id: Style,
 
   #[get = "pub"]
+  project_list_root: Style,
+  #[get = "pub"]
+  project_show_value: Style,
+
+  #[get = "pub"]
   search_expand_separator: Style,
   #[get = "pub"]
   search_no_results_hint: Style,
@@ -556,6 +563,9 @@ impl Default for Theme {
       note_detail_value: Style::new().fg(c(Text)),
       note_list_body: Style::new().fg(c(TextMuted)),
       note_list_id: Style::new().fg(c(Primary)),
+
+      project_list_root: Style::new().fg(c(Text)),
+      project_show_value: Style::new().fg(c(Text)),
 
       search_expand_separator: Style::new().fg(c(Border)),
       search_no_results_hint: Style::new().fg(c(TextDim)),
@@ -741,6 +751,9 @@ impl Theme {
       "note.list.body" => Some(&mut self.note_list_body),
       "note.list.id" => Some(&mut self.note_list_id),
 
+      "project.list.root" => Some(&mut self.project_list_root),
+      "project.show.value" => Some(&mut self.project_show_value),
+
       "search.expand.separator" => Some(&mut self.search_expand_separator),
       "search.no_results.hint" => Some(&mut self.search_no_results_hint),
       "search.query" => Some(&mut self.search_query),
@@ -918,6 +931,10 @@ fn palette_for_token(key: &str) -> Option<Palette> {
     "note.list.body" => Some(TextMuted),
     "note.list.id" => Some(Primary),
 
+    // ── Project ──────────────────────────────────────────────
+    "project.list.root" => Some(Text),
+    "project.show.value" => Some(Text),
+
     // ── Search ───────────────────────────────────────────────
     "search.expand.separator" => Some(Border),
     "search.no_results.hint" => Some(TextDim),
@@ -994,8 +1011,8 @@ mod tests {
     }
 
     #[test]
-    fn it_has_108_token_keys() {
-      assert_eq!(ALL_TOKENS.len(), 108);
+    fn it_has_110_token_keys() {
+      assert_eq!(ALL_TOKENS.len(), 110);
     }
   }
 

@@ -19,7 +19,7 @@ pub struct Command {
   /// The task ID or prefix.
   id: String,
   /// The relationship type.
-  #[arg(long, short, default_value = "relates-to")]
+  #[arg(long, default_value = "relates-to")]
   rel: RelationshipType,
   /// The target entity ID or prefix.
   target: String,

@@ -4,30 +4,44 @@ use crate::{
   AppContext,
   cli::Error,
   store::repo,
-  ui::components::{EmptyList, ProjectListRow},
+  ui::components::{ProjectEntry, ProjectListView, min_unique_prefix},
 };
 
 /// List all known projects.
 #[derive(Args, Debug)]
-pub struct Command;
+pub struct Command {
+  /// Emit output as JSON.
+  #[arg(long)]
+  json: bool,
+}
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
     let conn = context.store().connect().await?;
     let projects = repo::project::all(&conn).await?;
 
-    if projects.is_empty() {
-      println!("{}", EmptyList::new("projects"));
+    if self.json {
+      let json = serde_json::to_string_pretty(&projects)?;
+      println!("{json}");
       return Ok(());
     }
 
-    for (i, project) in projects.iter().enumerate() {
-      if i > 0 {
-        println!();
-      }
-      let row = ProjectListRow::new(project.id().to_string(), project.root().display().to_string());
-      println!("{row}");
-    }
+    let id_shorts: Vec<String> = projects.iter().map(|p| p.id().short()).collect();
+    let prefix_len = {
+      let refs: Vec<&str> = id_shorts.iter().map(String::as_str).collect();
+      min_unique_prefix(&refs)
+    };
+
+    let entries: Vec<ProjectEntry> = projects
+      .iter()
+      .zip(id_shorts.iter())
+      .map(|(project, id_short)| ProjectEntry {
+        id: id_short.clone(),
+        root: project.root().display().to_string(),
+      })
+      .collect();
+
+    println!("{}", ProjectListView::new(entries, prefix_len));
 
     Ok(())
   }

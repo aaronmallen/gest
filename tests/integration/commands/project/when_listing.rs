@@ -1,29 +1,4 @@
-use assert_cmd::Command;
-
 use crate::support::helpers::GestCmd;
-
-/// Build a second `gest init` command against the same data store as `g` but
-/// running from `dir`. Used to seed a second project entry in the shared store.
-fn init_extra_project(g: &GestCmd, dir: &std::path::Path) {
-  std::fs::create_dir_all(dir).expect("failed to create extra project dir");
-  let data_dir = g.temp_dir_path().join(".gest-data");
-  let state_dir = g.temp_dir_path().join(".gest-state");
-  let config = g.temp_dir_path().join("gest.toml");
-  let project_dir = dir.join(".gest");
-  std::fs::create_dir_all(&project_dir).expect("failed to create extra .gest dir");
-
-  Command::cargo_bin("gest")
-    .expect("gest binary not found")
-    .current_dir(dir)
-    .env("GEST_CONFIG", config)
-    .env("GEST_STORAGE__DATA_DIR", data_dir)
-    .env("GEST_PROJECT_DIR", project_dir)
-    .env("GEST_STATE_DIR", state_dir)
-    .env("NO_COLOR", "1")
-    .args(["init"])
-    .assert()
-    .success();
-}
 
 #[test]
 fn it_lists_projects_in_grid_format() {
@@ -70,7 +45,7 @@ fn it_lists_projects_as_json() {
 fn it_lists_multiple_projects_with_plural_summary() {
   let g = GestCmd::new();
   let extra_dir = g.temp_dir_path().join("other-project");
-  init_extra_project(&g, &extra_dir);
+  g.init_extra_project(&extra_dir);
 
   let output = g
     .cmd()
@@ -91,7 +66,7 @@ fn it_lists_multiple_projects_with_plural_summary() {
 fn it_lists_multiple_projects_shows_all_roots() {
   let g = GestCmd::new();
   let extra_dir = g.temp_dir_path().join("second-project");
-  init_extra_project(&g, &extra_dir);
+  g.init_extra_project(&extra_dir);
 
   let output = g
     .cmd()
@@ -118,7 +93,7 @@ fn it_lists_multiple_projects_shows_all_roots() {
 fn it_lists_multiple_projects_as_json_with_correct_count() {
   let g = GestCmd::new();
   let extra_dir = g.temp_dir_path().join("third-project");
-  init_extra_project(&g, &extra_dir);
+  g.init_extra_project(&extra_dir);
 
   let output = g
     .cmd()

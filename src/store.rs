@@ -176,6 +176,90 @@ pub fn resolve_any_id(config: &Settings, prefix: &str) -> Result<ResolvedEntity>
   }
 }
 
+/// Thin wrapper around a [`libsql::Database`] with optional transparent sync.
+pub struct Db {
+  inner: libsql::Database,
+  /// Whether the initial sync import has already run this process.
+  imported: std::sync::atomic::AtomicBool,
+  /// Sync context set after project resolution: `(project_id, gest_dir)`.
+  sync_ctx: std::sync::OnceLock<(model::primitives::Id, std::path::PathBuf)>,
+}
+
+impl std::fmt::Debug for Db {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("Db").finish_non_exhaustive()
+  }
+}
+
+impl Db {
+  /// Obtain a new connection to the underlying database.
+  ///
+  /// Each connection has `PRAGMA foreign_keys = ON` enabled so that
+  /// `REFERENCES` constraints are enforced.
+  pub async fn connect(&self) -> std::result::Result<libsql::Connection, DbError> {
+    let conn = self.inner.connect()?;
+    conn.execute("PRAGMA foreign_keys = ON", ()).await?;
+    Ok(conn)
+  }
+
+  /// Configure transparent sync with a `.gest/` directory.
+  ///
+  /// Must be called after project resolution and before the first
+  /// `import_if_needed()` call. Subsequent calls are no-ops.
+  pub fn configure_sync(&self, project_id: model::primitives::Id, gest_dir: std::path::PathBuf) {
+    self.sync_ctx.set((project_id, gest_dir)).ok();
+  }
+}
+
+/// Errors that can occur when opening the database store.
+#[derive(Debug, thiserror::Error)]
+pub enum DbError {
+  #[error(transparent)]
+  Database(#[from] libsql::Error),
+  #[error(transparent)]
+  Io(#[from] std::io::Error),
+}
+
+/// Open (or create) the local database at `<data_dir>/gest.db`.
+pub async fn open(settings: &crate::config::Settings) -> std::result::Result<std::sync::Arc<Db>, DbError> {
+  let data_dir = settings.storage().data_dir();
+  std::fs::create_dir_all(data_dir)?;
+  let path = data_dir.join("gest.db");
+  log::debug!("opening local database at {}", path.display());
+  let db = libsql::Builder::new_local(path).build().await?;
+
+  let store = std::sync::Arc::new(Db {
+    inner: db,
+    imported: std::sync::atomic::AtomicBool::new(false),
+    sync_ctx: std::sync::OnceLock::new(),
+  });
+
+  let conn = store.connect().await?;
+  migration::run(&conn).await?;
+
+  Ok(store)
+}
+
+/// Open a temporary local database. Useful for tests that need a database
+/// but don't exercise persistence.
+#[cfg(test)]
+pub async fn open_temp() -> std::result::Result<(std::sync::Arc<Db>, tempfile::TempDir), DbError> {
+  let tmp = tempfile::tempdir()?;
+  let path = tmp.path().join("gest-test.db");
+  let db = libsql::Builder::new_local(path).build().await?;
+
+  let store = std::sync::Arc::new(Db {
+    inner: db,
+    imported: std::sync::atomic::AtomicBool::new(false),
+    sync_ctx: std::sync::OnceLock::new(),
+  });
+
+  let conn = store.connect().await?;
+  migration::run(&conn).await?;
+
+  Ok((store, tmp))
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

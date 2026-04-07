@@ -6,6 +6,7 @@ mod gravatar;
 mod handlers;
 mod markdown;
 mod note_display;
+mod reload_ipc;
 mod request_log;
 mod security_headers;
 mod sse;
@@ -46,11 +47,16 @@ pub fn reload_socket_path(gest_dir: Option<&Path>, data_dir: &Path) -> PathBuf {
 ///
 /// When `gest_dir` is provided, a file watcher monitors the `.gest/`
 /// directory and sends SSE reload pings on changes (debounced).
+///
+/// When `socket_path` is provided (and the platform is unix), a unix domain socket
+/// listener is bound there and forwards bare connection signals to the SSE reload
+/// channel — letting CLI mutations wake browser tabs without polling the filesystem.
 pub async fn serve(
   store: Arc<Db>,
   project_id: crate::store::model::primitives::Id,
   addr: SocketAddr,
   gest_dir: Option<PathBuf>,
+  socket_path: Option<PathBuf>,
   debounce_ms: u64,
 ) -> Result<(), Error> {
   let mut state = AppState::new(store, project_id);
@@ -96,6 +102,25 @@ pub async fn serve(
   } else {
     None
   };
+
+  // Bind the unix socket reload listener (no-op on non-unix targets).
+  #[cfg(unix)]
+  let _reload_socket_guard = match socket_path {
+    Some(path) => match reload_ipc::bind_reload_socket(&path) {
+      Ok(listener) => {
+        log::info!("listening for reload signals at {}", path.display());
+        reload_ipc::spawn_reload_listener(listener, state.reload_tx().clone());
+        Some(reload_ipc::ReloadSocketGuard::new(path))
+      }
+      Err(err) => {
+        log::warn!("failed to bind reload socket at {}: {err}", path.display());
+        None
+      }
+    },
+    None => None,
+  };
+  #[cfg(not(unix))]
+  let _ = socket_path;
 
   let app = router(state);
 

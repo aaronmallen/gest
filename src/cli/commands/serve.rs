@@ -43,11 +43,15 @@ impl Command {
       log::warn!("failed to open browser: {e}");
     }
 
+    let data_dir = context.settings().storage().data_dir()?;
+    let socket_path = crate::web::reload_socket_path(context.gest_dir().as_deref(), &data_dir);
+
     crate::web::serve(
       context.store().clone(),
       project_id.clone(),
       addr,
       context.gest_dir().clone(),
+      Some(socket_path),
       debounce_ms,
     )
     .await

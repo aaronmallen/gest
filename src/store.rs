@@ -3,6 +3,7 @@
 /// Sequential schema migrations applied at startup.
 pub mod migration;
 pub mod model;
+pub mod repo;
 
 mod artifact;
 pub mod artifact_meta;

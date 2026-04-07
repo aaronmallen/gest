@@ -1,5 +1,4 @@
 use clap::Args;
-use serde_json::Value;
 
 use crate::{
   AppContext,
@@ -8,18 +7,13 @@ use crate::{
   ui::{components::SuccessMessage, json},
 };
 
-/// Set a metadata value on a task at a dot-delimited path.
+/// Remove a metadata value from a task at a dot-delimited path.
 #[derive(Args, Debug)]
 pub struct Command {
   /// The task ID or prefix.
   id: String,
   /// The dot-delimited metadata path.
   path: String,
-  /// The metadata value (auto-detected scalar unless --as-json is set).
-  value: String,
-  /// Parse the value as a JSON literal instead of auto-detecting.
-  #[arg(long)]
-  as_json: bool,
   #[command(flatten)]
   output: json::Flags,
 }
@@ -33,22 +27,13 @@ impl Command {
       .await?
       .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
 
-    let parsed = if self.as_json {
-      serde_json::from_str(&self.value)?
-    } else {
-      meta::parse_scalar(&self.value)
-    };
-
     let mut metadata = task.metadata().clone();
-    if !metadata.is_object() {
-      metadata = Value::Object(serde_json::Map::new());
-    }
-    if !meta::set_path(&mut metadata, &self.path, parsed) {
+    if !meta::unset_path(&mut metadata, &self.path) {
       return Err(Error::MetaKeyNotFound(self.path.clone()));
     }
 
     let before = serde_json::to_value(&task)?;
-    let tx = repo::transaction::begin(&conn, project_id, "task meta set").await?;
+    let tx = repo::transaction::begin(&conn, project_id, "task meta unset").await?;
 
     let patch = Patch {
       metadata: Some(metadata),
@@ -62,7 +47,7 @@ impl Command {
       .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
     let short_id = id.short();
     self.output.print_entity(&updated, &short_id, || {
-      SuccessMessage::new("set metadata")
+      SuccessMessage::new("unset metadata")
         .id(id.short())
         .field("path", self.path.clone())
         .to_string()

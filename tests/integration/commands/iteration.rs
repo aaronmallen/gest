@@ -9,3 +9,4 @@ mod when_removing;
 mod when_reopening;
 mod when_showing;
 mod when_untagging;
+mod when_updating;

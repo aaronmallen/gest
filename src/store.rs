@@ -1,5 +1,7 @@
 //! Persistence layer for reading, writing, and querying entities on disk.
 
+/// Sequential schema migrations applied at startup.
+pub mod migration;
 pub mod model;
 
 mod artifact;

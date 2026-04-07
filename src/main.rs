@@ -2,6 +2,7 @@ mod action;
 mod cli;
 mod config;
 mod event_store;
+mod io;
 mod logger;
 mod model;
 mod server;

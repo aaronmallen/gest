@@ -10,6 +10,7 @@ mod indicators;
 pub mod row;
 mod status_badge;
 mod success_message;
+mod update_notice;
 
 pub use banner::Component as Banner;
 pub use empty_list::Component as EmptyList;
@@ -21,3 +22,4 @@ pub use indicators::Component as Indicators;
 pub use row::Component as Row;
 pub use status_badge::Component as StatusBadge;
 pub use success_message::Component as SuccessMessage;
+pub use update_notice::Component as UpdateNotice;

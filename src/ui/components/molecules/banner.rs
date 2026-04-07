@@ -21,8 +21,6 @@ const SHADOW_CHARS: &[char] = &['╗', '╚', '╝', '╔', '║'];
 /// Renders the application startup banner with gradient ASCII art and optional
 /// author and version lines.
 pub struct Component {
-  /// When set, a version-update notice is appended after the version line.
-  new_version: Option<String>,
   show_author: bool,
   show_version: bool,
 }
@@ -31,7 +29,6 @@ impl Component {
   /// Create a banner with no optional lines enabled.
   pub fn new() -> Self {
     Self {
-      new_version: None,
       show_author: false,
       show_version: false,
     }
@@ -44,11 +41,7 @@ impl Component {
   }
 
   /// Enable the version info line beneath the ASCII art.
-  ///
-  /// If `new_version` is `Some`, an update notice is appended after the
-  /// version line showing the available release and upgrade instructions.
-  pub fn with_version(mut self, new_version: Option<String>) -> Self {
-    self.new_version = new_version;
+  pub fn with_version(mut self) -> Self {
     self.show_version = true;
     self
   }
@@ -102,22 +95,6 @@ impl Display for Component {
         env!("BUILD_DATE").paint(*theme.banner_version_date()),
         env!("GIT_SHA").paint(*theme.banner_version_revision()),
       )?;
-
-      if let Some(new_version) = &self.new_version {
-        write!(
-          f,
-          "\n\n{} {}",
-          "a newer version is available".paint(*theme.banner_update_message()),
-          new_version.paint(*theme.banner_update_version())
-        )?;
-        write!(
-          f,
-          "\n{}{}{}",
-          "run ".paint(*theme.banner_update_hint()),
-          "gest self-update".paint(*theme.banner_update_command()),
-          " to upgrade".paint(*theme.banner_update_hint())
-        )?;
-      }
     }
 
     Ok(())
@@ -265,7 +242,7 @@ mod tests {
 
     #[test]
     fn it_includes_version_when_enabled() {
-      let banner = Component::new().with_version(None);
+      let banner = Component::new().with_version();
 
       let output = banner.to_string();
 
@@ -276,33 +253,8 @@ mod tests {
     }
 
     #[test]
-    fn it_includes_version_update_when_new_version_provided() {
-      let banner = Component::new().with_version(Some("9.9.9".to_string()));
-
-      let output = banner.to_string();
-
-      assert!(
-        output.contains("a newer version is available"),
-        "output should contain update message"
-      );
-      assert!(output.contains("9.9.9"), "output should contain the new version");
-    }
-
-    #[test]
-    fn it_does_not_include_version_update_when_none() {
-      let banner = Component::new().with_version(None);
-
-      let output = banner.to_string();
-
-      assert!(
-        !output.contains("a newer version is available"),
-        "output should not contain update message when no new version"
-      );
-    }
-
-    #[test]
     fn it_includes_both_author_and_version_when_enabled() {
-      let banner = Component::new().with_author().with_version(None);
+      let banner = Component::new().with_author().with_version();
 
       let output = banner.to_string();
 

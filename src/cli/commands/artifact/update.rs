@@ -3,7 +3,7 @@ use serde_json::Value;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, meta_args},
   store::{
     model::{artifact::Patch, primitives::EntityType},
     repo,
@@ -22,9 +22,12 @@ pub struct Command {
   /// Open `$EDITOR` pre-filled with the current body for editing.
   #[arg(long, short, conflicts_with = "body")]
   edit: bool,
-  /// Set custom metadata as a JSON string (e.g. `--metadata '{"key":"value"}'`).
-  #[arg(long, short)]
-  metadata: Option<String>,
+  /// Set a metadata key=value pair (repeatable; supports dot-paths and scalar inference).
+  #[arg(long = "metadata", short = 'm', value_name = "KEY=VALUE")]
+  metadata: Vec<String>,
+  /// Merge a JSON object into metadata (repeatable; applied after --metadata pairs).
+  #[arg(long = "metadata-json", value_name = "JSON")]
+  metadata_json: Vec<String>,
   /// Replace all tags on the artifact (can be repeated).
   #[arg(long, short)]
   tag: Vec<String>,
@@ -56,11 +59,11 @@ impl Command {
       self.body.clone()
     };
 
-    let metadata = self.parse_metadata()?;
-
     let before_artifact = repo::artifact::find_by_id(&conn, id.clone())
       .await?
       .ok_or(Error::UninitializedProject)?;
+    let metadata = self.build_metadata(before_artifact.metadata())?;
+
     let before = serde_json::to_value(&before_artifact)?;
     let tx = repo::transaction::begin(&conn, project_id, "artifact update").await?;
     let patch = Patch {
@@ -94,14 +97,10 @@ impl Command {
     Ok(())
   }
 
-  fn parse_metadata(&self) -> Result<Option<Value>, Error> {
-    match &self.metadata {
-      Some(json_str) => {
-        let value: Value =
-          serde_json::from_str(json_str).map_err(|e| Error::Editor(format!("invalid metadata JSON: {e}")))?;
-        Ok(Some(value))
-      }
-      None => Ok(None),
+  fn build_metadata(&self, existing: &Value) -> Result<Option<Value>, Error> {
+    if self.metadata.is_empty() && self.metadata_json.is_empty() {
+      return Ok(None);
     }
+    meta_args::build_metadata(Some(existing.clone()), &self.metadata, &self.metadata_json)
   }
 }

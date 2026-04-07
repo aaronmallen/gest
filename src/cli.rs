@@ -1,6 +1,7 @@
 //! CLI entry point and command dispatch for `gest`.
 
 mod commands;
+pub mod meta_args;
 
 use clap::{ArgAction, CommandFactory, Parser, Subcommand};
 use getset::Getters;

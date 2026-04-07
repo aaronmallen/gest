@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, meta_args},
   store::{
     model::{
       artifact::New,
@@ -27,7 +27,7 @@ pub struct Command {
   /// The artifact title (extracted from the first `# heading` when piping stdin).
   title: Option<String>,
   /// Read NDJSON artifacts from stdin (one JSON object per line).
-  #[arg(long, conflicts_with_all = ["title", "body", "iteration", "metadata", "source", "tag"])]
+  #[arg(long, conflicts_with_all = ["title", "body", "iteration", "metadata", "metadata_json", "source", "tag"])]
   batch: bool,
   /// The artifact body (markdown; opens `$EDITOR` if omitted and stdin is a terminal).
   #[arg(long, short)]
@@ -35,9 +35,12 @@ pub struct Command {
   /// Link the artifact to an iteration by ID or prefix.
   #[arg(long, short)]
   iteration: Option<String>,
-  /// Set custom metadata as a JSON string (e.g. `--metadata '{"key":"value"}'`).
-  #[arg(long, short)]
-  metadata: Option<String>,
+  /// Set a metadata key=value pair (repeatable; supports dot-paths and scalar inference).
+  #[arg(long = "metadata", short = 'm', value_name = "KEY=VALUE")]
+  metadata: Vec<String>,
+  /// Merge a JSON object into metadata (repeatable; applied after --metadata pairs).
+  #[arg(long = "metadata-json", value_name = "JSON")]
+  metadata_json: Vec<String>,
   /// Read the body from a file path instead of stdin or `$EDITOR`.
   #[arg(long, short, conflicts_with = "body")]
   source: Option<String>,
@@ -172,14 +175,7 @@ impl Command {
   }
 
   fn parse_metadata(&self) -> Result<Option<Value>, Error> {
-    match &self.metadata {
-      Some(json_str) => {
-        let value: Value =
-          serde_json::from_str(json_str).map_err(|e| Error::Editor(format!("invalid metadata JSON: {e}")))?;
-        Ok(Some(value))
-      }
-      None => Ok(None),
-    }
+    meta_args::build_metadata(None, &self.metadata, &self.metadata_json)
   }
 
   fn resolve_title_and_body(&self) -> Result<(String, String), Error> {

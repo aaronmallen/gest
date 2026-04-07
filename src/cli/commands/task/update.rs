@@ -1,9 +1,8 @@
 use clap::Args;
-use serde_json::Value;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, meta_args},
   store::{
     model::{
       primitives::{AuthorType, EntityType, TaskStatus},
@@ -25,9 +24,12 @@ pub struct Command {
   /// Set the task description.
   #[arg(long, short)]
   description: Option<String>,
-  /// Set a metadata key=value pair. Repeatable.
-  #[arg(long, short)]
+  /// Set a metadata key=value pair (repeatable; supports dot-paths and scalar inference).
+  #[arg(long = "metadata", short = 'm', value_name = "KEY=VALUE")]
   metadata: Vec<String>,
+  /// Merge a JSON object into metadata (repeatable; applied after --metadata pairs).
+  #[arg(long = "metadata-json", value_name = "JSON")]
+  metadata_json: Vec<String>,
   /// Move the task to a phase within its iteration.
   #[arg(long)]
   phase: Option<u32>,
@@ -59,19 +61,14 @@ impl Command {
     let before = serde_json::to_value(&before_task)?;
     let tx = repo::transaction::begin(&conn, project_id, "task update").await?;
 
-    // Build metadata from existing + new key=value pairs
-    let metadata = if !self.metadata.is_empty() {
-      let mut existing = before_task.metadata().clone();
-      for pair in &self.metadata {
-        let (key, value) = pair
-          .split_once('=')
-          .ok_or_else(|| Error::Editor(format!("invalid metadata format (expected key=value): {pair}")))?;
-        let parsed: Value = serde_json::from_str(value).unwrap_or_else(|_| Value::String(value.to_string()));
-        existing[key] = parsed;
-      }
-      Some(existing)
-    } else {
+    let metadata = if self.metadata.is_empty() && self.metadata_json.is_empty() {
       None
+    } else {
+      meta_args::build_metadata(
+        Some(before_task.metadata().clone()),
+        &self.metadata,
+        &self.metadata_json,
+      )?
     };
 
     // Resolve assigned_to

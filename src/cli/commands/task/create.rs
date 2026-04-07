@@ -2,11 +2,10 @@ use std::io::IsTerminal;
 
 use clap::Args;
 use libsql::Connection;
-use serde_json::Value;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, meta_args},
   store::{
     model::{
       primitives::{AuthorType, EntityType, Id, RelationshipType, TaskStatus},
@@ -41,9 +40,12 @@ pub struct Command {
   /// Link the task to another entity (format: `rel:target`). Repeatable.
   #[arg(long, short)]
   link: Vec<String>,
-  /// Set a metadata key=value pair. Repeatable.
-  #[arg(long, short)]
+  /// Set a metadata key=value pair (repeatable; supports dot-paths and scalar inference).
+  #[arg(long = "metadata", short = 'm', value_name = "KEY=VALUE")]
   metadata: Vec<String>,
+  /// Merge a JSON object into metadata (repeatable; applied after --metadata pairs).
+  #[arg(long = "metadata-json", value_name = "JSON")]
+  metadata_json: Vec<String>,
   /// The phase within the iteration (defaults to 1 or max existing + 1).
   #[arg(long)]
   phase: Option<u32>,
@@ -77,7 +79,7 @@ impl Command {
     };
 
     let (title, description) = self.resolve_title_and_description()?;
-    let metadata = parse_metadata_pairs(&self.metadata)?;
+    let metadata = meta_args::build_metadata(None, &self.metadata, &self.metadata_json)?;
 
     let new = New {
       assigned_to,
@@ -199,22 +201,6 @@ fn parse_link_spec(spec: &str) -> Result<(RelationshipType, String), Error> {
   }
 }
 
-/// Parse repeated key=value metadata pairs into a JSON object.
-fn parse_metadata_pairs(pairs: &[String]) -> Result<Option<Value>, Error> {
-  if pairs.is_empty() {
-    return Ok(None);
-  }
-  let mut map = serde_json::Map::new();
-  for pair in pairs {
-    let (key, value) = pair
-      .split_once('=')
-      .ok_or_else(|| Error::Editor(format!("invalid metadata format (expected key=value): {pair}")))?;
-    let parsed: Value = serde_json::from_str(value).unwrap_or_else(|_| Value::String(value.to_string()));
-    map.insert(key.to_string(), parsed);
-  }
-  Ok(Some(Value::Object(map)))
-}
-
 /// Try to resolve the table for a target entity ID by checking multiple tables.
 async fn resolve_entity_table(conn: &Connection, id: &str) -> String {
   // Try tasks first, then artifacts, then iterations
@@ -281,38 +267,6 @@ mod tests {
       let result = parse_link_spec("invalid:abc123");
 
       assert!(result.is_err());
-    }
-  }
-
-  mod parse_metadata_pairs_fn {
-    use super::*;
-
-    #[test]
-    fn it_returns_none_for_empty() {
-      assert_eq!(parse_metadata_pairs(&[]).unwrap(), None);
-    }
-
-    #[test]
-    fn it_parses_string_values() {
-      let pairs = vec!["env=prod".to_string()];
-      let result = parse_metadata_pairs(&pairs).unwrap().unwrap();
-
-      assert_eq!(result["env"], "prod");
-    }
-
-    #[test]
-    fn it_parses_json_values() {
-      let pairs = vec!["count=42".to_string()];
-      let result = parse_metadata_pairs(&pairs).unwrap().unwrap();
-
-      assert_eq!(result["count"], 42);
-    }
-
-    #[test]
-    fn it_rejects_missing_equals() {
-      let pairs = vec!["noequals".to_string()];
-
-      assert!(parse_metadata_pairs(&pairs).is_err());
     }
   }
 }

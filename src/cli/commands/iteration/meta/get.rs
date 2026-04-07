@@ -1,19 +1,20 @@
 use clap::Args;
+use serde_json::{Map, Value};
 
 use crate::{
   AppContext,
   cli::Error,
-  store::repo,
+  store::{meta, repo},
   ui::{components::MetaGet, json},
 };
 
-/// Get a metadata value from an iteration.
+/// Get a metadata value from an iteration by dot-delimited path.
 #[derive(Args, Debug)]
 pub struct Command {
   /// The iteration ID or prefix.
   id: String,
-  /// The metadata key.
-  key: String,
+  /// The dot-delimited metadata path.
+  path: String,
   #[command(flatten)]
   output: json::Flags,
 }
@@ -26,14 +27,17 @@ impl Command {
       .await?
       .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
 
-    let value = iteration
-      .metadata()
-      .get(&self.key)
-      .ok_or_else(|| Error::MetaKeyNotFound(self.key.clone()))?;
+    let value =
+      meta::resolve_path(iteration.metadata(), &self.path).ok_or_else(|| Error::MetaKeyNotFound(self.path.clone()))?;
 
-    self
-      .output
-      .print_json_or(value, || MetaGet::new(value.to_string()).to_string())?;
-    Ok(())
+    let mut wrapped = Map::new();
+    wrapped.insert(self.path.clone(), value.clone());
+    let wrapped = Value::Object(wrapped);
+
+    self.output.print_raw_or(
+      &wrapped,
+      || meta::format_meta_value(value),
+      || MetaGet::new(meta::format_meta_value(value)).to_string(),
+    )
   }
 }

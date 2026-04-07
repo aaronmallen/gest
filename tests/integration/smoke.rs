@@ -13,6 +13,7 @@ mod when_artifact;
 mod when_config;
 mod when_init;
 mod when_iteration;
+mod when_iteration_meta;
 mod when_search;
 mod when_tag;
 mod when_task;

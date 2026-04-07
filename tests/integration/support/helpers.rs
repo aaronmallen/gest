@@ -14,6 +14,7 @@ impl GestCmd {
     let path = temp_dir.path();
     cmd.current_dir(path);
     cmd.env("GEST_CONFIG", path.join("gest.toml"));
+    cmd.env("GEST_STORAGE__DATA_DIR", path.join(".gest-data"));
     cmd.env("GEST_PROJECT_DIR", path.join(".gest"));
     cmd.env("GEST_STATE_DIR", path.join(".gest-state"));
     cmd
@@ -26,6 +27,7 @@ impl GestCmd {
     // Pre-create the data and state directories so config resolution succeeds
     // before `init` populates the full directory tree.
     std::fs::create_dir_all(temp_dir.path().join(".gest")).expect("failed to create .gest dir");
+    std::fs::create_dir_all(temp_dir.path().join(".gest-data")).expect("failed to create .gest-data dir");
     std::fs::create_dir_all(temp_dir.path().join(".gest-state")).expect("failed to create .gest-state dir");
 
     // Initialize a gest project in the temp dir
@@ -47,6 +49,7 @@ impl GestCmd {
     let temp_dir = TempDir::new().expect("failed to create temp dir");
 
     std::fs::create_dir_all(temp_dir.path().join(".gest")).expect("failed to create .gest dir");
+    std::fs::create_dir_all(temp_dir.path().join(".gest-data")).expect("failed to create .gest-data dir");
     std::fs::create_dir_all(temp_dir.path().join(".gest-state")).expect("failed to create .gest-state dir");
 
     Self {
@@ -65,7 +68,7 @@ impl GestCmd {
   pub fn create_artifact(&self, title: &str, body: &str) -> String {
     let output = self
       .cmd()
-      .args(["artifact", "create", "--title", title, "--body", body])
+      .args(["artifact", "create", title, "--body", body])
       .output()
       .expect("failed to run artifact create");
 

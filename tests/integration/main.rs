@@ -1,3 +1,2 @@
-mod behavior;
-mod commands;
+mod smoke;
 mod support;

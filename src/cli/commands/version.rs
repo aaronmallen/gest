@@ -1,17 +1,24 @@
-use std::thread;
+//! The `version` subcommand — prints version and platform information.
 
 use clap::Args;
 
-use crate::{cli::AppContext, ui::composites::banner::Banner};
+use crate::{AppContext, cli::Error, ui::components::Banner};
 
 /// Print the current version, platform info, and check for available updates.
 #[derive(Args, Debug)]
 pub struct Command;
 
 impl Command {
-  /// Display a version banner, appending an update notice if a newer release exists.
-  pub fn call(&self, ctx: &AppContext) -> crate::cli::Result<()> {
-    let check_handle = thread::spawn(|| -> Option<String> {
+  /// Display the version banner including author, version details, and an
+  /// update notice when a newer release exists on GitHub.
+  ///
+  /// The GitHub release check runs on a background task so the banner can
+  /// render immediately if the network is slow. If the check fails or the
+  /// local version is already current, no update notice is shown.
+  pub async fn call(&self, _context: &AppContext) -> Result<(), Error> {
+    // Fetch the latest release from GitHub on a background task so network
+    // latency doesn't block banner rendering.
+    let check_handle = tokio::spawn(async {
       let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner("aaronmallen")
         .repo_name("gest")
@@ -29,21 +36,8 @@ impl Command {
       }
     });
 
-    let platform = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
-    let mut banner = Banner::new(
-      env!("CARGO_PKG_VERSION"),
-      &platform,
-      env!("BUILD_DATE"),
-      env!("GIT_SHA"),
-      "aaronmallen",
-      &ctx.theme,
-    );
-
-    if let Ok(Some(latest_version)) = check_handle.join() {
-      banner = banner.update_version(latest_version);
-    }
-
-    println!("{banner}");
+    let new_version = check_handle.await.unwrap_or(None);
+    println!("{}", Banner::new().with_author().with_version(new_version));
     Ok(())
   }
 }

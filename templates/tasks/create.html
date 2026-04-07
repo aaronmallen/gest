@@ -1,91 +1,29 @@
 {% extends "base.html" %}
 
-{% block title %}New Task — gest{% endblock %}
+{% block title %}New Task - gest{% endblock %}
 {% block nav_tasks %}class="active"{% endblock %}
 
 {% block content %}
 <h1 class="section-heading">New Task</h1>
-<div class="summary"><a href="/tasks">&larr; tasks</a></div>
-
 <div class="term">
-  <div class="term-bar">
-    <span class="term-title">gest task create</span>
-  </div>
+  <div class="term-bar"><span class="term-title">create task</span></div>
   <div class="term-body">
     <form method="post" action="/tasks">
-      <p class="visually-hidden">Fields marked with * are required.</p>
       <div class="form-group">
-        <label for="title">Title <span class="c-error" aria-hidden="true">*</span></label>
-        <input
-          type="text"
-          id="title"
-          name="title"
-          class="form-input{% if error.is_some() %} input-error{% endif %}"
-          value="{{ title }}"
-          placeholder="Task title"
-          aria-required="true"
-        >
-        {% if let Some(msg) = error %}
-          <div class="form-error">{{ msg }}</div>
-        {% endif %}
+        <label for="title">Title</label>
+        <input class="form-input" type="text" id="title" name="title" required autofocus placeholder="Task title...">
       </div>
-
-      <div class="form-group md-preview-container">
+      <div class="form-group">
         <label for="description">Description</label>
-        <button type="button" class="btn md-preview-btn md-preview-toggle" data-target="description">Preview</button>
-        <textarea
-          id="description"
-          name="description"
-          class="form-textarea"
-          placeholder="Markdown supported"
-        >{{ description }}</textarea>
-        <div id="description-preview" class="md-preview md-content"></div>
+        <textarea class="form-textarea" id="description" name="description" placeholder="Markdown supported..."></textarea>
       </div>
-
       <div class="form-group">
-        <label for="tags">Tags</label>
-        <input
-          type="text"
-          id="tags"
-          name="tags"
-          class="form-input"
-          value="{{ tags }}"
-          placeholder="Comma-separated tags"
-        >
+        <label for="priority">Priority (0=critical, 1=high, 2=medium, 3=low)</label>
+        <input class="form-input" type="number" id="priority" name="priority" min="0" max="4">
       </div>
-
-      <div class="form-group">
-        <label for="priority">Priority</label>
-        <select id="priority" name="priority" class="form-select">
-          <option value=""{% if priority.is_empty() %} selected{% endif %}>None</option>
-          <option value="0"{% if priority == "0" %} selected{% endif %}>0 (Highest)</option>
-          <option value="1"{% if priority == "1" %} selected{% endif %}>1</option>
-          <option value="2"{% if priority == "2" %} selected{% endif %}>2</option>
-          <option value="3"{% if priority == "3" %} selected{% endif %}>3</option>
-          <option value="4"{% if priority == "4" %} selected{% endif %}>4 (Lowest)</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <button type="button" id="rel-toggle" class="btn" aria-expanded="false" aria-controls="rel-modal">Relationships</button>
-        <div id="rel-modal" class="rel-modal" role="dialog" aria-label="Add relationship">
-          <div class="rel-types">
-            <button type="button" class="rel-type-btn" data-rel="relates-to">relates to</button>
-            <button type="button" class="rel-type-btn" data-rel="blocks">blocks</button>
-            <button type="button" class="rel-type-btn" data-rel="blocked-by">blocked by</button>
-            <button type="button" class="rel-type-btn" data-rel="parent-of">parent of</button>
-            <button type="button" class="rel-type-btn" data-rel="child-of">child of</button>
-          </div>
-          <input type="text" class="form-input rel-search-input" placeholder="Search tasks and artifacts…" aria-label="Search tasks and artifacts">
-          <div class="rel-results"></div>
-          <div class="rel-pending"></div>
-          <div class="rel-hidden-inputs"></div>
-        </div>
-      </div>
-
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Create Task</button>
-        <a href="/tasks" class="btn">Cancel</a>
+        <button class="btn btn-primary" type="submit">Create Task</button>
+        <a class="btn" href="/tasks">Cancel</a>
       </div>
     </form>
   </div>

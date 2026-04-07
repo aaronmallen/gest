@@ -2,188 +2,219 @@ use std::io::{BufRead, IsTerminal};
 
 use clap::Args;
 use serde::Deserialize;
+use serde_json::Value;
 
 use crate::{
-  cli::{self, AppContext},
-  model::NewArtifact,
-  store,
-  ui::views::artifact::ArtifactCreateView,
+  AppContext,
+  cli::Error,
+  store::{
+    model::{
+      artifact::New,
+      primitives::{EntityType, RelationshipType},
+    },
+    repo,
+  },
+  ui::{components::SuccessMessage, json},
 };
 
-/// Create a new artifact from inline text, a source file, an editor, or stdin.
-#[derive(Debug, Args)]
+/// Create a new artifact.
+///
+/// When stdin is piped, the first markdown heading (`# …`) is used as the title
+/// and the full input becomes the body. A title can also be given as a positional
+/// argument, in which case stdin (if piped) is used as the body only.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Read NDJSON from stdin (one artifact per line).
-  #[arg(long, conflicts_with_all = ["body", "iteration", "kind", "metadata", "source", "tag", "title"])]
-  pub batch: bool,
-  /// Body content as an inline string (skips editor and stdin).
-  #[arg(short, long)]
-  pub body: Option<String>,
-  /// Add the artifact to an iteration (ID or prefix).
-  #[arg(short, long)]
-  pub iteration: Option<String>,
-  /// Output the created artifact as JSON.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Artifact type (e.g. spec, adr, rfc, note).
-  #[arg(short = 'k', long = "type")]
-  pub kind: Option<String>,
-  /// Key=value metadata pairs (repeatable).
-  #[arg(short, long)]
-  pub metadata: Vec<String>,
-  /// Print only the artifact ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
-  /// Read body content from a file path.
-  #[arg(short, long)]
-  pub source: Option<String>,
-  /// Tag (repeatable, or comma-separated).
-  // TODO: deprecate --tags in favor of --tag
-  #[arg(long = "tag", value_delimiter = ',', alias = "tags")]
-  pub tag: Vec<String>,
-  /// Artifact title (auto-extracted from first # heading if omitted).
-  #[arg(short, long)]
-  pub title: Option<String>,
+  /// The artifact title (extracted from the first `# heading` when piping stdin).
+  title: Option<String>,
+  /// Read NDJSON artifacts from stdin (one JSON object per line).
+  #[arg(long, conflicts_with_all = ["title", "body", "iteration", "metadata", "source", "tag"])]
+  batch: bool,
+  /// The artifact body (markdown; opens `$EDITOR` if omitted and stdin is a terminal).
+  #[arg(long, short)]
+  body: Option<String>,
+  /// Link the artifact to an iteration by ID or prefix.
+  #[arg(long, short)]
+  iteration: Option<String>,
+  /// Set custom metadata as a JSON string (e.g. `--metadata '{"key":"value"}'`).
+  #[arg(long, short)]
+  metadata: Option<String>,
+  /// Read the body from a file path instead of stdin or `$EDITOR`.
+  #[arg(long, short, conflicts_with = "body")]
+  source: Option<String>,
+  /// Add a tag to the artifact (can be repeated).
+  #[arg(long, short)]
+  tag: Vec<String>,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
+/// A single artifact record in NDJSON batch mode.
 #[derive(Debug, Deserialize)]
-struct BatchArtifactInput {
-  title: String,
+struct BatchRecord {
   #[serde(default)]
   body: Option<String>,
   #[serde(default)]
   iteration: Option<String>,
   #[serde(default)]
-  metadata: std::collections::HashMap<String, String>,
+  metadata: Option<Value>,
   #[serde(default)]
-  tags: Vec<String>,
-  #[serde(default, rename = "type")]
-  kind: Option<String>,
+  tags: Option<Vec<String>>,
+  title: String,
 }
 
 impl Command {
-  /// Build a `NewArtifact`, persist it, and print the creation summary.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
     if self.batch {
-      return self.batch_call(ctx);
+      return self.call_batch(context).await;
     }
 
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let metadata = crate::cli::helpers::build_yaml_metadata(&self.metadata)?;
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
 
-    let tags = self.tag.clone();
+    let (title, body) = self.resolve_title_and_body()?;
+    let metadata = self.parse_metadata()?;
 
-    let body = if let Some(ref src) = self.source {
-      std::fs::read_to_string(src).map_err(cli::Error::from)?
-    } else {
-      crate::cli::helpers::read_from_editor(self.body.as_deref(), ".md", "Aborting: empty body")?
-    };
-
-    let title = if let Some(ref t) = self.title {
-      t.clone()
-    } else {
-      extract_title(&body).ok_or_else(|| {
-        cli::Error::InvalidInput("No title found: body has no `# ` heading and no --title provided".into())
-      })?
-    };
-
-    let new = NewArtifact {
+    let new = New {
       body,
-      kind: self.kind.clone(),
       metadata,
-      tags,
       title,
     };
 
-    let artifact = store::create_artifact(config, new)?;
+    let tx = repo::transaction::begin(&conn, project_id, "artifact create").await?;
+    let artifact = repo::artifact::create(&conn, project_id, &new).await?;
+    repo::transaction::record_event(&conn, tx.id(), "artifacts", &artifact.id().to_string(), "created", None).await?;
 
-    // Process --iteration flag
-    if let Some(ref iter_prefix) = self.iteration {
-      let iter_id = store::resolve_iteration_id(config, iter_prefix, false)?;
-      let artifact_ref = format!("artifacts/{}", artifact.id);
-      store::add_iteration_task(config, &iter_id, &artifact_ref)?;
+    for label in &self.tag {
+      let tag = repo::tag::attach(&conn, EntityType::Artifact, artifact.id(), label).await?;
+      repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
     }
 
-    if self.json {
-      let json = serde_json::to_string_pretty(&artifact)?;
-      println!("{json}");
-      return Ok(());
+    if let Some(iteration_ref) = &self.iteration {
+      let iteration_id = repo::resolve::resolve_id(&conn, "iterations", iteration_ref).await?;
+      let rel = repo::relationship::create(
+        &conn,
+        RelationshipType::RelatesTo,
+        EntityType::Artifact,
+        artifact.id(),
+        EntityType::Iteration,
+        &iteration_id,
+      )
+      .await?;
+      repo::transaction::record_event(&conn, tx.id(), "relationships", &rel.id().to_string(), "created", None).await?;
     }
 
-    if self.quiet {
-      println!("{}", artifact.id.short());
-      return Ok(());
-    }
-
-    let id_str = artifact.id.to_string();
-    let mut view = ArtifactCreateView::new(&id_str, &artifact.title, theme);
-    if let Some(ref src) = self.source {
-      view = view.source(src);
-    }
-    println!("{view}");
+    let short_id = artifact.id().short();
+    self.output.print_entity(&artifact, &short_id, || {
+      SuccessMessage::new("created artifact")
+        .id(artifact.id().short())
+        .field("title", artifact.title().to_string())
+        .to_string()
+    })?;
     Ok(())
   }
 
-  fn batch_call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let stdin = std::io::stdin();
+  async fn call_batch(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
+    let tx = repo::transaction::begin(&conn, project_id, "artifact batch create").await?;
 
-    if stdin.is_terminal() {
-      return Err(cli::Error::InvalidInput("--batch requires piped stdin".into()));
-    }
+    let stdin = std::io::stdin().lock();
+    let mut count = 0u32;
 
-    for (line_num, line) in stdin.lock().lines().enumerate() {
-      let line = line.map_err(|e| cli::Error::InvalidInput(format!("line {}: {e}", line_num + 1)))?;
-      if line.trim().is_empty() {
+    for line in stdin.lines() {
+      let line = line?;
+      let trimmed = line.trim();
+      if trimmed.is_empty() {
         continue;
       }
 
-      let input: BatchArtifactInput =
-        serde_json::from_str(&line).map_err(|e| cli::Error::InvalidInput(format!("line {}: {e}", line_num + 1)))?;
+      let record: BatchRecord =
+        serde_json::from_str(trimmed).map_err(|e| Error::Editor(format!("invalid NDJSON: {e}")))?;
 
-      let mut metadata = yaml_serde::Mapping::new();
-      for (k, v) in &input.metadata {
-        metadata.insert(
-          yaml_serde::Value::String(k.clone()),
-          yaml_serde::Value::String(v.clone()),
-        );
-      }
-
-      let new = NewArtifact {
-        body: input.body.unwrap_or_default(),
-        kind: input.kind,
-        metadata,
-        tags: input.tags,
-        title: input.title,
+      let new = New {
+        body: record.body.unwrap_or_default(),
+        metadata: record.metadata,
+        title: record.title,
       };
 
-      let artifact = store::create_artifact(config, new)?;
+      let artifact = repo::artifact::create(&conn, project_id, &new).await?;
+      repo::transaction::record_event(&conn, tx.id(), "artifacts", &artifact.id().to_string(), "created", None).await?;
 
-      if let Some(ref iter_prefix) = input.iteration {
-        let iter_id = store::resolve_iteration_id(config, iter_prefix, false)?;
-        let artifact_ref = format!("artifacts/{}", artifact.id);
-        store::add_iteration_task(config, &iter_id, &artifact_ref)?;
+      if let Some(tags) = &record.tags {
+        for label in tags {
+          let tag = repo::tag::attach(&conn, EntityType::Artifact, artifact.id(), label).await?;
+          repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None)
+            .await?;
+        }
       }
 
-      if self.quiet {
-        println!("{}", artifact.id.short());
-      } else {
-        let json = serde_json::to_string(&artifact)?;
-        println!("{json}");
+      if let Some(iteration_ref) = &record.iteration {
+        let iteration_id = repo::resolve::resolve_id(&conn, "iterations", iteration_ref).await?;
+        let rel = repo::relationship::create(
+          &conn,
+          RelationshipType::RelatesTo,
+          EntityType::Artifact,
+          artifact.id(),
+          EntityType::Iteration,
+          &iteration_id,
+        )
+        .await?;
+        repo::transaction::record_event(&conn, tx.id(), "relationships", &rel.id().to_string(), "created", None)
+          .await?;
       }
+
+      count += 1;
     }
 
+    let message = SuccessMessage::new("batch created artifacts").field("count", count.to_string());
+    println!("{message}");
     Ok(())
+  }
+
+  fn parse_metadata(&self) -> Result<Option<Value>, Error> {
+    match &self.metadata {
+      Some(json_str) => {
+        let value: Value =
+          serde_json::from_str(json_str).map_err(|e| Error::Editor(format!("invalid metadata JSON: {e}")))?;
+        Ok(Some(value))
+      }
+      None => Ok(None),
+    }
+  }
+
+  fn resolve_title_and_body(&self) -> Result<(String, String), Error> {
+    if let Some(title) = &self.title {
+      // Title given explicitly — body from --source, --body, stdin, or editor
+      let body = if let Some(path) = &self.source {
+        std::fs::read_to_string(path).map_err(|e| Error::Editor(format!("failed to read source file: {e}")))?
+      } else if let Some(b) = &self.body {
+        b.clone()
+      } else if std::io::stdin().is_terminal() {
+        crate::io::editor::edit_text_with_suffix("", ".md").map_err(|e| Error::Editor(e.to_string()))?
+      } else {
+        std::io::read_to_string(std::io::stdin()).unwrap_or_default()
+      };
+      Ok((title.clone(), body))
+    } else if !std::io::stdin().is_terminal() {
+      // No title arg, stdin is piped — parse title from first heading
+      let input = std::io::read_to_string(std::io::stdin()).unwrap_or_default();
+      let title = extract_heading(&input)
+        .ok_or_else(|| Error::Editor("no title provided and no # heading found in stdin".into()))?;
+      Ok((title, input))
+    } else {
+      Err(Error::Editor("artifact title is required".into()))
+    }
   }
 }
 
-fn extract_title(body: &str) -> Option<String> {
-  for line in body.lines() {
-    if let Some(rest) = line.strip_prefix("# ") {
-      let title = rest.trim();
-      if !title.is_empty() {
-        return Some(title.to_string());
+/// Extract the text of the first markdown `# heading` from the input.
+fn extract_heading(input: &str) -> Option<String> {
+  for line in input.lines() {
+    let trimmed = line.trim();
+    if let Some(heading) = trimmed.strip_prefix("# ") {
+      let heading = heading.trim();
+      if !heading.is_empty() {
+        return Some(heading.to_string());
       }
     }
   }
@@ -194,182 +225,24 @@ fn extract_title(body: &str) -> Option<String> {
 mod tests {
   use super::*;
 
-  mod call {
-    use pretty_assertions::assert_eq;
+  #[test]
+  fn it_extracts_heading_from_markdown() {
+    let input = "# This is a test\n\nthis is the body";
 
-    use super::*;
-    use crate::test_helpers::make_test_context;
-
-    #[test]
-    fn it_creates_an_artifact_from_source_file() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let source_path = dir.path().join("source.md");
-      std::fs::write(&source_path, "# From File\n\nFile content.").unwrap();
-
-      let cmd = Command {
-        batch: false,
-        body: None,
-        iteration: None,
-        json: false,
-        kind: None,
-        metadata: vec![],
-        quiet: false,
-        source: Some(source_path.to_string_lossy().to_string()),
-        tag: vec![],
-        title: Some("Sourced Artifact".to_string()),
-      };
-
-      cmd.call(&ctx).unwrap();
-
-      let filter = crate::model::ArtifactFilter::default();
-      let artifacts = store::list_artifacts(&ctx.settings, &filter).unwrap();
-      assert_eq!(artifacts.len(), 1);
-      assert_eq!(artifacts[0].body, "# From File\n\nFile content.");
-    }
-
-    #[test]
-    fn it_creates_an_artifact_with_all_flags() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let cmd = Command {
-        batch: false,
-        body: Some("# Content\n\nSome body text.".to_string()),
-        iteration: None,
-        json: false,
-        kind: Some("spec".to_string()),
-        metadata: vec!["version=1".to_string()],
-        quiet: false,
-        source: None,
-        tag: vec!["rust".to_string(), "cli".to_string()],
-        title: Some("Full Artifact".to_string()),
-      };
-
-      cmd.call(&ctx).unwrap();
-
-      let filter = crate::model::ArtifactFilter::default();
-      let artifacts = store::list_artifacts(&ctx.settings, &filter).unwrap();
-      assert_eq!(artifacts.len(), 1);
-
-      let artifact = &artifacts[0];
-      assert_eq!(artifact.title, "Full Artifact");
-      assert_eq!(artifact.body, "# Content\n\nSome body text.");
-      assert_eq!(artifact.kind.as_deref(), Some("spec"));
-      assert_eq!(artifact.tags, vec!["rust", "cli"]);
-    }
-
-    #[test]
-    fn it_creates_an_artifact_with_defaults() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let cmd = Command {
-        batch: false,
-        body: None,
-        iteration: None,
-        json: false,
-        kind: None,
-        metadata: vec![],
-        quiet: false,
-        source: None,
-        tag: vec![],
-        title: Some("My Artifact".to_string()),
-      };
-
-      cmd.call(&ctx).unwrap();
-
-      let filter = crate::model::ArtifactFilter::default();
-      let artifacts = store::list_artifacts(&ctx.settings, &filter).unwrap();
-      assert_eq!(artifacts.len(), 1);
-      assert_eq!(artifacts[0].title, "My Artifact");
-    }
-
-    #[test]
-    fn it_errors_when_no_title_and_no_heading() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let cmd = Command {
-        batch: false,
-        body: Some("No heading here".to_string()),
-        iteration: None,
-        json: false,
-        kind: None,
-        metadata: vec![],
-        quiet: false,
-        source: None,
-        tag: vec![],
-        title: None,
-      };
-
-      let result = cmd.call(&ctx);
-      assert!(result.is_err());
-      let err = result.unwrap_err().to_string();
-      assert!(err.contains("No title found"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn it_extracts_title_from_body_when_title_omitted() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let cmd = Command {
-        batch: false,
-        body: Some("# Auto Title\n\nBody text.".to_string()),
-        iteration: None,
-        json: false,
-        kind: None,
-        metadata: vec![],
-        quiet: false,
-        source: None,
-        tag: vec![],
-        title: None,
-      };
-
-      cmd.call(&ctx).unwrap();
-
-      let filter = crate::model::ArtifactFilter::default();
-      let artifacts = store::list_artifacts(&ctx.settings, &filter).unwrap();
-      assert_eq!(artifacts.len(), 1);
-      assert_eq!(artifacts[0].title, "Auto Title");
-    }
+    assert_eq!(extract_heading(input), Some("This is a test".into()));
   }
 
-  mod extract_title {
-    use pretty_assertions::assert_eq;
+  #[test]
+  fn it_returns_none_when_no_heading() {
+    let input = "just some text\nno heading here";
 
-    use super::*;
+    assert_eq!(extract_heading(input), None);
+  }
 
-    #[test]
-    fn it_extracts_first_h1_heading() {
-      let body = "Some preamble\n# My Title\n\nBody text";
-      assert_eq!(extract_title(body), Some("My Title".to_string()));
-    }
+  #[test]
+  fn it_skips_empty_headings() {
+    let input = "# \n# Real heading";
 
-    #[test]
-    fn it_ignores_h2_headings() {
-      let body = "## Not a title\n# Real Title";
-      assert_eq!(extract_title(body), Some("Real Title".to_string()));
-    }
-
-    #[test]
-    fn it_returns_none_when_no_heading() {
-      let body = "No heading here\nJust text";
-      assert_eq!(extract_title(body), None);
-    }
-
-    #[test]
-    fn it_skips_empty_h1() {
-      let body = "# \n# Actual Title";
-      assert_eq!(extract_title(body), Some("Actual Title".to_string()));
-    }
-
-    #[test]
-    fn it_trims_whitespace_from_title() {
-      let body = "#   Spaced Title  \n";
-      assert_eq!(extract_title(body), Some("Spaced Title".to_string()));
-    }
+    assert_eq!(extract_heading(input), Some("Real heading".into()));
   }
 }

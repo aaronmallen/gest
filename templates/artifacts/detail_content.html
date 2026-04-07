@@ -1,69 +1,113 @@
-<h1 class="section-heading">{{ artifact.title }}</h1>
+<h1 class="section-heading">{{ artifact.title() }}</h1>
 <div class="summary">
   <a href="/artifacts">&larr; artifacts</a>
-  &middot;
-  <a href="/artifacts/{{ artifact.id }}/edit">edit</a>
+  {% if !artifact.is_archived() %}
+  &middot; <a href="/artifacts/{{ artifact.id() }}/edit">edit</a>
+  {% endif %}
 </div>
 
 <div class="term">
   <div class="term-bar">
-<span class="term-title">gest artifact show {{ artifact.id.short() }}</span>
+    <span class="term-title">gest artifact show {{ artifact.id().short() }}</span>
   </div>
   <div class="term-body">
-    <div style="margin-bottom: 12px;">
-      <span class="id-prefix">{{ artifact.id.short() }}</span>
-    </div>
-
     <table>
       <tbody>
         <tr>
-          <td class="c-pewter" style="width:120px">title</td>
-          <td>{{ artifact.title }}</td>
+          <td class="c-pewter" style="width:120px">ID</td>
+          <td>
+            <span class="id-prefix">{{ artifact.id().short() }}</span>
+          </td>
         </tr>
-        {% match artifact.kind %}
-        {% when Some with (k) %}
         <tr>
-          <td class="c-pewter">type</td>
-          <td>{{ k }}</td>
+          <td class="c-pewter">Title</td>
+          <td>{{ artifact.title() }}</td>
         </tr>
-        {% when None %}
-        {% endmatch %}
-        {% if !artifact.tags.is_empty() %}
+        {% if !tags.is_empty() %}
         <tr>
-          <td class="c-pewter">tags</td>
-          <td>{% for t in artifact.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
+          <td class="c-pewter">Tags</td>
+          <td>
+            {% for tag in tags %}
+              <a href="/search?q=tag:{{ tag }}" class="tag">#{{ tag }}</a>{{ " " }}
+            {% endfor %}
+          </td>
         </tr>
         {% endif %}
         <tr>
-          <td class="c-pewter">created</td>
-          <td>{{ artifact.created_at.format("%Y-%m-%d %H:%M") }}</td>
+          <td class="c-pewter">Created</td>
+          <td class="c-dim">{{ artifact.created_at().format("%Y-%m-%d %H:%M UTC") }}</td>
         </tr>
         <tr>
-          <td class="c-pewter">updated</td>
-          <td>{{ artifact.updated_at.format("%Y-%m-%d %H:%M") }}</td>
+          <td class="c-pewter">Updated</td>
+          <td class="c-dim">{{ artifact.updated_at().format("%Y-%m-%d %H:%M UTC") }}</td>
         </tr>
-        {% if artifact.archived_at.is_some() %}
+        {% if artifact.is_archived() %}
         <tr>
-          <td class="c-pewter">archived</td>
-          <td class="c-dim">{% match artifact.archived_at %}{% when Some with (dt) %}{{ dt.format("%Y-%m-%d %H:%M") }}{% when None %}{% endmatch %}</td>
+          <td class="c-pewter">Archived</td>
+          <td class="c-dim">{% if let Some(dt) = artifact.archived_at() %}{{ dt.format("%Y-%m-%d %H:%M UTC") }}{% endif %}</td>
         </tr>
         {% endif %}
       </tbody>
     </table>
 
+    {% if !artifact.body().is_empty() %}
     <hr class="rule">
-
     <div class="md-content">
       {{ body_html|safe }}
     </div>
-
-    {% if artifact.archived_at.is_none() %}
-    <hr class="rule">
-    <div class="form-actions">
-      <form method="post" action="/artifacts/{{ artifact.id }}/archive" onsubmit="return confirm('Are you sure you want to archive this artifact?');">
-        <button type="submit" class="btn btn-danger">Archive</button>
-      </form>
-    </div>
     {% endif %}
   </div>
+</div>
+
+{% if !artifact.is_archived() %}
+<div style="margin-bottom: 16px;">
+  <form method="post" action="/artifacts/{{ artifact.id() }}/archive" style="display:inline;">
+    <button type="submit" class="btn btn-danger" onclick="return confirm('Archive this artifact?');">Archive</button>
+  </form>
+</div>
+{% endif %}
+
+{% if !notes.is_empty() %}
+<h2 class="section-heading" style="margin-top: 24px;">Notes</h2>
+{% for note in notes %}
+<div class="note-card">
+  <div class="note-header">
+    <div class="note-meta" style="display: flex; align-items: center; gap: 8px;">
+      {% if note.author_gravatar.is_some() %}
+      <img class="note-avatar" src="{{ note.author_gravatar.as_deref().unwrap() }}" alt="" />
+      {% endif %}
+      {% if note.author_name.is_some() %}
+      <span style="font-weight: 600;">{{ note.author_name.as_deref().unwrap() }}</span>
+      {% if note.author_is_agent %}<span class="note-agent-badge">agent</span>{% endif %}
+      {% endif %}
+      <span class="c-dim">{{ note.id_short }}</span>
+      <span class="c-dim">&middot; {{ note.created_at }}</span>
+    </div>
+  </div>
+  <div class="note-body md-content">
+    {{ note.body_html|safe }}
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="note-card">
+  <form method="post" action="/artifacts/{{ artifact.id() }}/notes">
+    <div class="form-group md-preview-container">
+      <label for="note-body">Add a note</label>
+      <button type="button" class="btn md-preview-btn md-preview-toggle" data-target="note-body">Preview</button>
+      <textarea
+        id="note-body"
+        name="body"
+        class="form-textarea"
+        placeholder="Write a note... (Markdown supported)"
+        rows="3"
+        style="min-height: 80px;"
+      ></textarea>
+      <div id="note-body-preview" class="md-preview md-content"></div>
+    </div>
+    <div class="form-actions" style="margin-top: 12px;">
+      <button type="submit" class="btn btn-primary">Add Note</button>
+    </div>
+  </form>
 </div>

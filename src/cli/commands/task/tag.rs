@@ -1,93 +1,40 @@
 use clap::Args;
 
 use crate::{
-  action,
-  cli::{self, AppContext},
-  model::Task,
-  ui::composites::success_message::SuccessMessage,
+  AppContext,
+  cli::Error,
+  store::{model::primitives::EntityType, repo},
+  ui::{components::SuccessMessage, json},
 };
 
-/// Add tags to a task, deduplicating with any existing tags.
-#[derive(Debug, Args)]
+/// Add a tag to a task.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Task ID or unique prefix.
-  pub id: String,
-  /// Output the task as JSON after tagging.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Output only the task ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
-  /// Tags to add (space or comma-separated).
-  #[arg(value_delimiter = ',')]
-  pub tags: Vec<String>,
+  /// The task ID or prefix.
+  id: String,
+  /// The tag label to add.
+  label: String,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Merge the given tags into the task and persist.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let task = action::tag::<Task>(&ctx.settings, &self.id, &self.tags)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
+    let id = repo::resolve::resolve_id(&conn, "tasks", &self.id).await?;
 
-    if self.json {
-      println!("{}", serde_json::to_string_pretty(&task)?);
-    } else if self.quiet {
-      println!("{}", task.id.short());
-    } else {
-      let msg = format!("Tagged task {} with {}", task.id, self.tags.join(", "));
-      println!("{}", SuccessMessage::new(&msg, &ctx.theme));
-    }
+    let tx = repo::transaction::begin(&conn, project_id, "task tag").await?;
+    let tag = repo::tag::attach(&conn, EntityType::Task, &id, &self.label).await?;
+    repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
+
+    let short_id = id.short();
+    self.output.print_entity(&tag, &short_id, || {
+      SuccessMessage::new("tagged task")
+        .id(id.short())
+        .field("tag", self.label.clone())
+        .to_string()
+    })?;
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::test_helpers::{make_test_context, make_test_task};
-
-  mod call {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-    use crate::store;
-
-    #[test]
-    fn it_adds_tags() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-        quiet: false,
-        tags: vec!["rust".to_string(), "cli".to_string()],
-      };
-      cmd.call(&ctx).unwrap();
-
-      let loaded = store::read_task(&ctx.settings, &task.id).unwrap();
-      assert_eq!(loaded.tags, vec!["rust".to_string(), "cli".to_string()]);
-    }
-
-    #[test]
-    fn it_deduplicates_tags() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      task.tags = vec!["rust".to_string()];
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-        quiet: false,
-        tags: vec!["rust".to_string(), "cli".to_string()],
-      };
-      cmd.call(&ctx).unwrap();
-
-      let loaded = store::read_task(&ctx.settings, &task.id).unwrap();
-      assert_eq!(loaded.tags, vec!["rust".to_string(), "cli".to_string()]);
-    }
   }
 }

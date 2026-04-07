@@ -1,229 +1,88 @@
 use clap::Args;
 
 use crate::{
-  cli::{self, AppContext},
-  model::{TaskFilter, task::Status},
-  store::{self, ResolvedBlocking},
+  AppContext,
+  cli::Error,
+  store::{
+    model::{
+      primitives::{EntityType, TaskStatus},
+      task::Filter,
+    },
+    repo,
+  },
   ui::{
-    composites::empty_list::EmptyList,
-    views::task::{TaskListView, TaskViewData},
+    components::{TaskEntry, TaskListView, min_unique_prefix},
+    json,
   },
 };
 
-/// List tasks, optionally filtered by status or tag.
-#[derive(Debug, Args)]
+/// List tasks in the current project.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Filter by assigned-to name.
+  /// Show all tasks, including resolved.
+  #[arg(long, short)]
+  all: bool,
+  /// Filter by assigned author name.
   #[arg(long)]
-  pub assigned_to: Option<String>,
-  /// Output task list as JSON.
-  #[arg(short, long)]
-  pub json: bool,
-  /// Include resolved (done/cancelled) tasks.
-  #[arg(short = 'a', long = "all")]
-  pub show_all: bool,
-  /// Filter by status: open, in-progress, done, or cancelled.
-  #[arg(short, long)]
-  pub status: Option<String>,
+  assigned_to: Option<String>,
+  /// Filter by status.
+  #[arg(long, short)]
+  status: Option<TaskStatus>,
   /// Filter by tag.
-  #[arg(long)]
-  pub tag: Option<String>,
+  #[arg(long, short)]
+  tag: Option<String>,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Fetch and display tasks, rendering as JSON or a themed list view.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let status = crate::cli::helpers::parse_optional_status::<Status>(self.status.as_deref())?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
 
-    let filter = TaskFilter {
-      all: self.show_all,
+    let filter = Filter {
+      all: self.all,
       assigned_to: self.assigned_to.clone(),
-      status,
+      status: self.status,
       tag: self.tag.clone(),
     };
 
-    let tasks = store::list_tasks(config, &filter)?;
+    let tasks = repo::task::all(&conn, project_id, &filter).await?;
 
-    if self.json {
+    let id_shorts: Vec<String> = tasks.iter().map(|t| t.id().short().to_string()).collect();
+
+    if self.output.json {
       let json = serde_json::to_string_pretty(&tasks)?;
       println!("{json}");
       return Ok(());
     }
 
-    if tasks.is_empty() {
-      println!("{}", EmptyList::new("tasks", theme));
+    if self.output.quiet {
+      for id in &id_shorts {
+        println!("{id}");
+      }
       return Ok(());
     }
 
-    let resolved: Vec<ResolvedBlocking> = store::resolve_blocking_batch(config, &tasks);
+    let id_refs: Vec<&str> = id_shorts.iter().map(|s| s.as_str()).collect();
+    let prefix_len = min_unique_prefix(&id_refs);
 
-    let view_data: Vec<TaskViewData> = tasks
-      .into_iter()
-      .enumerate()
-      .map(|(i, t)| TaskViewData {
-        blocked_by: resolved[i].blocked_by_ids.first().cloned(),
-        id: t.id.to_string(),
-        is_blocking: resolved[i].is_blocking,
-        priority: t.priority,
-        status: t.status.as_str().into(),
-        tags: t.tags,
-        title: t.title,
-      })
-      .collect();
+    let mut entries = Vec::new();
+    for (task, id_short) in tasks.iter().zip(id_shorts.iter()) {
+      let tags = repo::tag::for_entity(&conn, EntityType::Task, task.id()).await?;
+      entries.push(TaskEntry {
+        blocked_by: None,
+        blocking: false,
+        id: id_short.clone(),
+        priority: task.priority(),
+        status: task.status().to_string(),
+        tags,
+        title: task.title().to_string(),
+      });
+    }
 
-    println!("{}", TaskListView::new(view_data, theme));
+    println!("{}", TaskListView::new(entries, prefix_len));
 
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::{
-    model::{
-      link::{Link, RelationshipType},
-      task::Status,
-    },
-    store,
-    test_helpers::{make_test_context, make_test_task},
-  };
-
-  mod call {
-    use super::*;
-
-    #[test]
-    fn it_filters_by_status() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      store::write_task(
-        &ctx.settings,
-        &make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Open", Status::Open),
-      )
-      .unwrap();
-      store::write_task(
-        &ctx.settings,
-        &make_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "InProg", Status::InProgress),
-      )
-      .unwrap();
-
-      let cmd = Command {
-        assigned_to: None,
-        json: false,
-        show_all: false,
-        status: Some("in-progress".to_string()),
-        tag: None,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_handles_empty_list() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let cmd = Command {
-        assigned_to: None,
-        json: false,
-        show_all: false,
-        status: None,
-        tag: None,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_lists_tasks() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Task One", Status::Open);
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        assigned_to: None,
-        json: false,
-        show_all: false,
-        status: None,
-        tag: None,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_outputs_json() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "JSON Task", Status::Open);
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        assigned_to: None,
-        json: true,
-        show_all: false,
-        status: None,
-        tag: None,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_shows_blocked_indicator() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let mut task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocked task", Status::Open);
-      task.links = vec![Link {
-        ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string(),
-        rel: RelationshipType::BlockedBy,
-      }];
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        assigned_to: None,
-        json: false,
-        show_all: false,
-        status: None,
-        tag: None,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_shows_blocking_indicator() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let mut task = make_task("zyxwvutsrqponmlkzyxwvutsrqponmlk", "Blocking task", Status::Open);
-      task.links = vec![Link {
-        ref_: "tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string(),
-        rel: RelationshipType::Blocks,
-      }];
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        assigned_to: None,
-        json: false,
-        show_all: false,
-        status: None,
-        tag: None,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-  }
-
-  fn make_task(id: &str, title: &str, status: Status) -> crate::model::Task {
-    crate::model::Task {
-      title: title.to_string(),
-      status,
-      ..make_test_task(id)
-    }
   }
 }

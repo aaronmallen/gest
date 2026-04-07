@@ -1,63 +1,15 @@
 use clap::Args;
 
-use crate::{
-  cli::{self, AppContext},
-  ui::views::system::ConfigView,
-};
+use crate::{AppContext, cli::Error};
 
-/// Display the merged configuration and discovered config file sources.
-#[derive(Debug, Args)]
+/// Show the current configuration.
+#[derive(Args, Debug)]
 pub struct Command;
 
 impl Command {
-  /// Render active settings, data directory, log level, and config file locations.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let project_dir = ctx.settings.storage().project_dir().display().to_string();
-    let log_level = ctx.settings.log().level().unwrap_or("warn");
-
-    let colors = ctx.settings.colors();
-    let mut view = ConfigView::new(&project_dir, log_level, &ctx.theme)
-      .palette_count(colors.palette.len())
-      .overrides_count(colors.overrides.len());
-
-    if let Some(config_home) = dir_spec::config_home() {
-      let global = config_home.join("gest/config.toml");
-      if global.exists() {
-        let global_str = global.display().to_string();
-        view = view.global_config(Box::leak(global_str.into_boxed_str()));
-      }
-    }
-
-    if let Ok(cwd) = std::env::current_dir() {
-      for name in &[".gest/config.toml", ".gest.toml"] {
-        let path = cwd.join(name);
-        if path.exists() {
-          let path_str = path.display().to_string();
-          view = view.project_config(Box::leak(path_str.into_boxed_str()));
-          break;
-        }
-      }
-    }
-
-    println!("{view}");
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let toml = toml::to_string_pretty(context.settings()).map_err(std::io::Error::other)?;
+    println!("{toml}");
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  mod call {
-    use super::*;
-    use crate::test_helpers::make_test_context;
-
-    #[test]
-    fn it_succeeds_with_default_config() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let cmd = Command;
-      cmd.call(&ctx).unwrap();
-    }
   }
 }

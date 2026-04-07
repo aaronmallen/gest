@@ -1,13 +1,13 @@
-<h1 class="section-heading">{{ iteration.title }}</h1>
+<h1 class="section-heading">{{ iteration.title() }}</h1>
 <div class="summary">
-  <a href="/iterations">← iterations</a>
-  &nbsp;·&nbsp;
-  <a href="/iterations/{{ iteration.id }}/board">kanban board →</a>
+  <a href="/iterations">&larr; iterations</a>
+  &nbsp;&middot;&nbsp;
+  <a href="/iterations/{{ iteration.id() }}/board">kanban board &rarr;</a>
 </div>
 
 <div class="term">
   <div class="term-bar">
-<span class="term-title">gest iteration show {{ iteration.id.short() }}</span>
+    <span class="term-title">gest iteration show {{ iteration.id().short() }}</span>
   </div>
   <div class="term-body">
     <table>
@@ -15,118 +15,111 @@
         <tr>
           <td class="c-pewter" style="width:120px">ID</td>
           <td>
-            <span class="id-prefix">{{ iteration.id.short() }}</span>
+            <span class="id-prefix">{{ iteration.id().short() }}</span>
           </td>
         </tr>
         <tr>
           <td class="c-pewter">Title</td>
-          <td>{{ iteration.title }}</td>
+          <td>{{ iteration.title() }}</td>
         </tr>
         <tr>
           <td class="c-pewter">Status</td>
           <td>
-            {% match iteration.status %}
-              {% when IterationStatus::Active %}
-                <span class="status-in-progress">active</span>
-              {% when IterationStatus::Cancelled %}
-                <span class="status-cancelled">cancelled</span>
-              {% when IterationStatus::Completed %}
-                <span class="status-done">completed</span>
-              {% when IterationStatus::Failed %}
-                <span class="status-cancelled">failed</span>
-            {% endmatch %}
+            {% if iteration.status().to_string() == "active" %}
+              <span class="status-in-progress">active</span>
+            {% else if iteration.status().to_string() == "cancelled" %}
+              <span class="status-cancelled">cancelled</span>
+            {% else if iteration.status().to_string() == "completed" %}
+              <span class="status-done">completed</span>
+            {% endif %}
           </td>
         </tr>
         <tr>
           <td class="c-pewter">Tasks</td>
-          <td>{{ tasks.len() }}</td>
+          <td>
+            {{ task_count }} total
+            &nbsp;&middot;&nbsp;
+            <span class="status-open">{{ status_counts.open }} open</span>
+            &nbsp;&middot;&nbsp;
+            <span class="status-in-progress">{{ status_counts.in_progress }} in progress</span>
+            &nbsp;&middot;&nbsp;
+            <span class="status-done">{{ status_counts.done }} done</span>
+            {% if status_counts.cancelled > 0 %}
+            &nbsp;&middot;&nbsp;
+            <span class="status-cancelled">{{ status_counts.cancelled }} cancelled</span>
+            {% endif %}
+          </td>
         </tr>
-        {% match iteration.phase_count %}
-        {% when Some with (n) %}
-        <tr>
-          <td class="c-pewter">Phases</td>
-          <td>{{ n }}</td>
-        </tr>
-        {% when None %}
-        {% endmatch %}
-        {% if !iteration.tags.is_empty() %}
+        {% if !tags.is_empty() %}
         <tr>
           <td class="c-pewter">Tags</td>
-          <td>{% for t in iteration.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
+          <td>{% for tag in tags %}<span class="tag">{{ tag }}</span>{% if !loop.last %} {% endif %}{% endfor %}</td>
         </tr>
         {% endif %}
         <tr>
           <td class="c-pewter">Created</td>
-          <td class="c-dim">{{ iteration.created_at.format("%Y-%m-%d %H:%M UTC") }}</td>
+          <td class="c-dim">{{ iteration.created_at().format("%Y-%m-%d %H:%M UTC") }}</td>
         </tr>
         <tr>
           <td class="c-pewter">Updated</td>
-          <td class="c-dim">{{ iteration.updated_at.format("%Y-%m-%d %H:%M UTC") }}</td>
+          <td class="c-dim">{{ iteration.updated_at().format("%Y-%m-%d %H:%M UTC") }}</td>
         </tr>
       </tbody>
     </table>
 
-    {% if !iteration.description.is_empty() %}
+    {% if !iteration.description().is_empty() %}
     <hr class="rule">
     <h2 class="section-heading">Description</h2>
-    <div style="white-space: pre-wrap;">{{ iteration.description }}</div>
-    {% endif %}
-
-    {% if !tasks.is_empty() %}
-    <hr class="rule">
-    <h2 class="section-heading">Tasks by Phase</h2>
-    {% for phase in phases %}
-    <div style="margin-bottom: 16px;">
-      <div class="c-pewter bold" style="margin-bottom: 6px;">Phase {{ phase.number }}</div>
-      <table class="list-table">
-        <thead>
-          <tr>
-            <th style="width:30px"></th>
-            <th style="width:100px">ID</th>
-            <th style="width:auto">Title</th>
-            <th style="width:100px">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for task in phase.tasks %}
-          <tr>
-            <td>
-              {% match task.status %}
-                {% when TaskStatus::Open %}
-                  <span class="status-open">○</span>
-                {% when TaskStatus::InProgress %}
-                  <span class="status-in-progress">◐</span>
-                {% when TaskStatus::Done %}
-                  <span class="status-done">●</span>
-                {% when TaskStatus::Cancelled %}
-                  <span class="status-cancelled">✗</span>
-              {% endmatch %}
-            </td>
-            <td>
-              <a href="/tasks/{{ task.id }}">
-                <span class="id-prefix">{{ task.id.short() }}</span>
-              </a>
-            </td>
-            <td>
-              {% match task.priority %}
-                {% when Some with (p) %}<span class="priority">[P{{ p }}]</span> {% when None %}
-              {% endmatch %}
-              {{ task.title }}
-            </td>
-            <td>
-              {% match task.status %}
-                {% when TaskStatus::Open %}<span class="status-open">open</span>
-                {% when TaskStatus::InProgress %}<span class="status-in-progress">in-progress</span>
-                {% when TaskStatus::Done %}<span class="status-done">done</span>
-                {% when TaskStatus::Cancelled %}<span class="status-cancelled">cancelled</span>
-              {% endmatch %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="md-content">
+      {{ iteration.description() }}
     </div>
-    {% endfor %}
     {% endif %}
   </div>
 </div>
+
+{% if !phases.is_empty() %}
+<h2 class="section-heading">Tasks by Phase</h2>
+{% for phase in phases %}
+<div class="term">
+  <div class="term-bar">
+    <span class="term-title">Phase {{ phase.number }}</span>
+  </div>
+  <div class="term-body">
+    <table class="list-table">
+      <thead>
+        <tr>
+          <th style="width:90px">Status</th>
+          <th style="width:90px">ID</th>
+          <th style="width:auto">Title</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for task in phase.tasks %}
+        <tr{% if task.status == "done" || task.status == "cancelled" %} class="c-dim"{% endif %}>
+          <td>
+            {% if task.status == "open" %}
+              <span class="status-open">open</span>
+            {% else if task.status == "in_progress" %}
+              <span class="status-in-progress">in progress</span>
+            {% else if task.status == "done" %}
+              <span class="status-done">done</span>
+            {% else if task.status == "cancelled" %}
+              <span class="status-cancelled">cancelled</span>
+            {% else %}
+              <span>{{ task.status }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="/tasks/{{ task.id_short }}">
+              <span class="id-prefix">{{ task.id_short }}</span>
+            </a>
+          </td>
+          <td>{{ task.title }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% endif %}

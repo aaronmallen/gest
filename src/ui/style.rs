@@ -621,12 +621,12 @@ impl Theme {
   /// Palette values are color-only: they replace the fg color but preserve
   /// per-token modifiers (bold, italic, etc.) from defaults.
   fn apply_palette(&mut self, colors: &crate::config::colors::Settings) {
-    if colors.palette.is_empty() {
+    if colors.palette().is_empty() {
       return;
     }
     for key in ALL_TOKENS {
       if let Some(slot) = palette_for_token(key)
-        && let Some(&color) = colors.palette.get(slot.key())
+        && let Some(&color) = colors.palette().get(slot.key())
         && let Some(style) = self.style_mut(key)
       {
         *style = style.fg(color);

@@ -1,120 +1,71 @@
 use clap::Args;
 
 use crate::{
-  cli::{self, AppContext},
-  store,
-  ui::views::iteration::IterationStatusView,
+  AppContext,
+  cli::Error,
+  store::repo,
+  ui::{components::FieldList, json},
 };
 
-/// Display aggregated progress for an iteration.
-#[derive(Debug, Args)]
+/// Show iteration progress summary.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Iteration ID or unique prefix.
-  pub id: String,
-  /// Output iteration status as JSON.
-  #[arg(short, long)]
-  pub json: bool,
+  /// The iteration ID or prefix.
+  id: String,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Load the iteration, compute progress via `iteration_status`, and render.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let id = store::resolve_iteration_id(config, &self.id, true)?;
-    let iteration = store::read_iteration(config, &id)?;
-    let progress = store::iteration_status(config, &id)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let conn = context.store().connect().await?;
+    let id = repo::resolve::resolve_id(&conn, "iterations", &self.id).await?;
+    let iteration = repo::iteration::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
 
-    if self.json {
-      let json = serde_json::to_string_pretty(&progress)?;
-      println!("{json}");
+    let counts = repo::iteration::task_status_counts(&conn, &id).await?;
+    let max_phase = repo::iteration::max_phase(&conn, &id).await?;
+    let progress = if counts.total > 0 {
+      (counts.done * 100) / counts.total
+    } else {
+      0
+    };
+
+    if self.output.json {
+      let json = serde_json::json!({
+        "id": id.to_string(),
+        "title": iteration.title(),
+        "status": iteration.status().to_string(),
+        "phases": max_phase.unwrap_or(0),
+        "total_tasks": counts.total,
+        "open": counts.open,
+        "in_progress": counts.in_progress,
+        "done": counts.done,
+        "cancelled": counts.cancelled,
+        "progress": progress,
+      });
+      println!("{}", serde_json::to_string_pretty(&json)?);
       return Ok(());
     }
 
-    let id_str = iteration.id.to_string();
-    let view = IterationStatusView {
-      id: &id_str,
-      title: &iteration.title,
-      status: iteration.status.as_str(),
-      progress: &progress,
-      theme,
-    };
-    println!("{view}");
+    if self.output.quiet {
+      println!("{}", id.short());
+      return Ok(());
+    }
 
+    let fields = FieldList::new()
+      .field("iteration", iteration.title().to_string())
+      .field("status", iteration.status().to_string())
+      .field("phases", max_phase.unwrap_or(0).to_string())
+      .field("total tasks", counts.total.to_string())
+      .field("open", counts.open.to_string())
+      .field("in progress", counts.in_progress.to_string())
+      .field("done", counts.done.to_string())
+      .field("cancelled", counts.cancelled.to_string())
+      .field("progress", format!("{progress}%"));
+
+    println!("{fields}");
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::{
-    model::task::Status as TaskStatus,
-    store,
-    test_helpers::{make_test_context, make_test_iteration, make_test_task},
-  };
-
-  mod call {
-    use super::*;
-
-    #[test]
-    fn it_renders_empty_iteration_status() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_renders_status_as_json() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      task.phase = Some(1);
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks = vec!["tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string()];
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: true,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_renders_status_card() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      task.phase = Some(1);
-      task.status = TaskStatus::InProgress;
-      task.assigned_to = Some("agent-1".to_string());
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks = vec!["tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string()];
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
   }
 }

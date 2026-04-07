@@ -1,62 +1,21 @@
-pub(crate) mod capture;
-pub mod editor;
-pub mod git;
-pub mod helpers;
-pub mod pager;
+//! CLI entry point and command dispatch for `gest`.
 
 mod commands;
 
-use clap::{ArgAction, Parser, Subcommand};
-use yansi::hyperlink::HyperlinkExt;
+use clap::{ArgAction, CommandFactory, Parser, Subcommand};
+use getset::Getters;
+use yansi::Paint;
 
-use crate::{config, ui::theming::theme::Theme};
+use crate::{
+  AppContext,
+  ui::{components::Banner, style},
+};
 
-/// Bundles all runtime context that commands need: resolved settings and theme.
-pub(crate) struct AppContext {
-  pub(crate) settings: config::Settings,
-  pub(crate) theme: Theme,
-  pub(crate) verbosity: u8,
-}
-
-/// Unified error type for CLI operations, wrapping config, I/O, and store errors.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  #[error(transparent)]
-  Config(#[from] crate::config::Error),
-  #[error("{0}")]
-  Editor(String),
-  #[error("{0}")]
-  EventStore(String),
-  #[error("{0}")]
-  InvalidInput(String),
-  #[error(transparent)]
-  Io(#[from] std::io::Error),
-  #[error("{0}")]
-  NoResult(String),
-  #[error("{0}")]
-  NotFound(String),
-  #[error("{0}")]
-  Runtime(String),
-  #[error(transparent)]
-  SerdeJson(#[from] serde_json::Error),
-  #[error(transparent)]
-  Store(#[from] crate::store::Error),
-}
-
-impl Error {
-  /// Return the exit code for this error: 2 for no-result, 1 for everything else.
-  pub fn exit_code(&self) -> i32 {
-    match self {
-      Self::NoResult(_) => 2,
-      _ => 1,
-    }
-  }
-}
-
-/// Convenience alias used throughout the CLI layer.
-pub type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Debug, Parser)]
+/// Root CLI definition parsed by `clap`.
+///
+/// Metadata (description, author, version) is pulled from `Cargo.toml` at
+/// compile time so there is a single source of truth.
+#[derive(Debug, Getters, Parser)]
 #[command(
   about = env!("CARGO_PKG_DESCRIPTION"),
   author = "Aaron Allen <hello@aaronmallen.me>",
@@ -64,166 +23,198 @@ pub type Result<T> = std::result::Result<T, Error>;
   long_about = long_about(),
   name = "gest",
 )]
-pub(crate) struct Cli {
+pub struct App {
+  /// The subcommand to execute.
   #[command(subcommand)]
   command: Option<Command>,
   /// Disable ANSI color output.
-  #[arg(long = "no-color", global = true)]
+  #[arg(long, global = true)]
   no_color: bool,
-  /// Print version information and exit.
-  #[arg(short = 'V', long = "version")]
+  /// Print the current version, platform info, and check for available updates.
+  #[arg(long = "version", short = 'V')]
   print_version: bool,
-  /// Increase logging verbosity (repeat for more detail).
+  /// Increase log verbosity (`-v` = info, `-vv` = debug, `-vvv` = trace).
+  #[get = "pub"]
   #[arg(short = 'v', long = "verbose", action = ArgAction::Count, global = true)]
-  verbose: u8,
+  verbosity_level: u8,
 }
 
-impl Cli {
-  fn call(&self, settings: config::Settings) -> Result<()> {
+impl App {
+  /// Dispatch to the selected subcommand.
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
     if self.no_color {
       yansi::disable();
     }
 
     if self.print_version {
-      let theme = Theme::from_config(&settings);
-      let ctx = AppContext {
-        settings,
-        theme,
-        verbosity: self.verbose,
-      };
-      return commands::version::Command.call(&ctx);
+      return commands::version::Command.call(context).await;
     }
 
     let Some(command) = &self.command else {
-      use clap::CommandFactory;
       Self::command().print_long_help()?;
       return Ok(());
     };
 
-    let env_level = crate::config::env::GEST_LOG_LEVEL.value().ok();
-    let level = crate::logging::resolve_level(self.verbose, env_level.as_deref(), settings.log().level());
-    let theme = Theme::from_config(&settings);
-    crate::logging::init(level, &theme);
-
-    log::debug!("log level set to {level}");
-    log::debug!("project directory: {}", settings.storage().project_dir().display());
-
-    let ctx = AppContext {
-      settings,
-      theme,
-      verbosity: self.verbose,
-    };
-
-    if command.is_capturable() {
-      // Capture filesystem state before the command for the event store.
-      let snapshot = capture::Snapshot::capture(ctx.settings.storage().project_dir());
-      let result = command.call(&ctx);
-
-      // Record any file changes to the event store. Failures are logged but
-      // do not affect the command's exit status.
-      if let Err(e) = record_snapshot(&ctx.settings, &snapshot) {
-        log::warn!("event store: {e}");
-      }
-
-      result
-    } else {
-      command.call(&ctx)
+    if command.requires_project() && context.project_id().is_none() {
+      return Err(Error::UninitializedProject);
     }
+
+    command.call(context).await
   }
 }
 
+/// Top-level error type for the CLI layer.
+///
+/// Variants are added as new subsystems (config, storage, etc.) are wired in.
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+  /// An invalid command-line argument.
+  #[error("{0}")]
+  Argument(String),
+  /// An artifact repository error.
+  #[error(transparent)]
+  ArtifactRepo(#[from] crate::store::repo::artifact::Error),
+  /// An author repository error.
+  #[error(transparent)]
+  AuthorRepo(#[from] crate::store::repo::author::Error),
+  /// A configuration loading or validation error.
+  #[error(transparent)]
+  Config(#[from] crate::config::Error),
+  /// An editor launch error.
+  #[error("{0}")]
+  Editor(String),
+  /// An I/O error (e.g. writing to the filesystem).
+  #[error(transparent)]
+  Io(#[from] std::io::Error),
+  /// An iteration repository error.
+  #[error(transparent)]
+  IterationRepo(#[from] crate::store::repo::iteration::Error),
+  /// A metadata key was not found on the entity.
+  #[error("metadata key not found: {0}")]
+  MetaKeyNotFound(String),
+  /// A note repository error.
+  #[error(transparent)]
+  NoteRepo(#[from] crate::store::repo::note::Error),
+  /// A project repository error.
+  #[error(transparent)]
+  ProjectRepo(#[from] crate::store::repo::project::Error),
+  /// A relationship repository error.
+  #[error(transparent)]
+  RelationshipRepo(#[from] crate::store::repo::relationship::Error),
+  /// An ID prefix resolution error.
+  #[error(transparent)]
+  Resolve(#[from] crate::store::repo::resolve::Error),
+  /// A search error.
+  #[error(transparent)]
+  SearchRepo(#[from] crate::store::repo::search::Error),
+  /// A serialization error (e.g. snapshotting entity state for transactions).
+  #[error(transparent)]
+  Serialize(#[from] serde_json::Error),
+  /// An error opening or connecting to the store.
+  #[error(transparent)]
+  Store(#[from] crate::store::Error),
+  /// A tag repository error.
+  #[error(transparent)]
+  TagRepo(#[from] crate::store::repo::tag::Error),
+  /// A task repository error.
+  #[error(transparent)]
+  TaskRepo(#[from] crate::store::repo::task::Error),
+  /// A transaction repository error.
+  #[error(transparent)]
+  TransactionRepo(#[from] crate::store::repo::transaction::Error),
+  /// The current directory has not been initialized as a gest project.
+  #[error("not a gest project (run `gest init` to initialize)")]
+  UninitializedProject,
+}
+
+/// Enum of all available subcommands.
 #[derive(Debug, Subcommand)]
 enum Command {
+  /// Manage artifacts.
   #[command(alias = "a")]
   Artifact(commands::artifact::Command),
+  /// View or modify configuration.
   Config(commands::config::Command),
+  /// Generate shell completions and man pages.
   Generate(commands::generate::Command),
+  /// Initialize gest for the current directory.
   Init(commands::init::Command),
+  /// Manage iterations.
   #[command(alias = "i")]
   Iteration(commands::iteration::Command),
+  /// Import v0.4.x flat-file data into the current project store.
+  Migrate(commands::migrate::Command),
+  /// Show or manage the current project.
+  Project(commands::project::Command),
+  /// Search across all entity types.
   #[command(alias = "grep")]
   Search(commands::search::Command),
+  /// Download and install the latest release from GitHub.
+  #[command(name = "self-update")]
   SelfUpdate(commands::self_update::Command),
+  /// Start the web dashboard server.
   #[command(alias = "s")]
   Serve(commands::serve::Command),
+  /// List all tags.
   Tag(commands::tag::Command),
+  /// Manage tasks.
   #[command(alias = "t")]
   Task(commands::task::Command),
+  /// Undo the last command.
   #[command(alias = "u")]
   Undo(commands::undo::Command),
+  /// Print the current version, platform info, and check for available updates.
   Version(commands::version::Command),
 }
 
 impl Command {
-  fn call(&self, ctx: &AppContext) -> Result<()> {
+  /// Dispatch to the matched subcommand's handler.
+  async fn call(&self, context: &AppContext) -> Result<(), Error> {
     match self {
-      Self::Artifact(cmd) => cmd.call(ctx),
-      Self::Config(cmd) => cmd.call(ctx),
-      Self::Generate(cmd) => cmd.call(ctx),
-      Self::Init(cmd) => cmd.call(ctx),
-      Self::Iteration(cmd) => cmd.call(ctx),
-      Self::Search(cmd) => cmd.call(ctx),
-      Self::SelfUpdate(cmd) => cmd.call(ctx),
-      Self::Serve(cmd) => cmd.call(ctx),
-      Self::Tag(cmd) => cmd.call(ctx),
-      Self::Task(cmd) => cmd.call(ctx),
-      Self::Undo(cmd) => cmd.call(ctx),
-      Self::Version(cmd) => cmd.call(ctx),
+      Self::Artifact(command) => command.call(context).await,
+      Self::Config(command) => command.call(context).await,
+      Self::Generate(command) => command.call(context).await,
+      Self::Init(command) => command.call(context).await,
+      Self::Iteration(command) => command.call(context).await,
+      Self::Migrate(command) => command.call(context).await,
+      Self::Project(command) => command.call(context).await,
+      Self::Search(command) => command.call(context).await,
+      Self::SelfUpdate(command) => command.call(context).await,
+      Self::Serve(command) => command.call(context).await,
+      Self::Tag(command) => command.call(context).await,
+      Self::Task(command) => command.call(context).await,
+      Self::Undo(command) => command.call(context).await,
+      Self::Version(command) => command.call(context).await,
     }
   }
 
-  /// Whether this command's file changes should be captured in the event store.
-  ///
-  /// `Undo` is excluded to prevent infinite undo loops (each undo would
-  /// otherwise be recorded as a new undoable transaction).
-  fn is_capturable(&self) -> bool {
-    !matches!(self, Self::Undo(_))
-  }
-}
-
-/// Entry point for the CLI: loads configuration then parses and dispatches the command.
-pub fn run() -> Result<()> {
-  let verbosity = pre_parse_verbosity();
-  let early_level = crate::logging::resolve_level(verbosity, None, None);
-  crate::logging::init_early(early_level);
-
-  let cwd = std::env::current_dir()?;
-  let settings = crate::config::load(&cwd)?;
-  Cli::parse().call(settings)
-}
-
-/// Count `-v` / `--verbose` occurrences in an argument iterator, stopping at `--`.
-fn count_verbosity_flags(args: impl Iterator<Item = String>) -> u8 {
-  let mut count: u8 = 0;
-  for arg in args {
-    if arg == "--verbose" {
-      count = count.saturating_add(1);
-    } else if arg == "--" {
-      break;
-    } else if arg.starts_with('-') && !arg.starts_with("--") {
-      count = count.saturating_add(arg.chars().filter(|&c| c == 'v').count() as u8);
+  /// Whether this subcommand requires an initialized project.
+  fn requires_project(&self) -> bool {
+    match self {
+      Self::Config(_)
+      | Self::Generate(_)
+      | Self::Init(_)
+      | Self::Migrate(_)
+      | Self::Project(_)
+      | Self::SelfUpdate(_)
+      | Self::Undo(_)
+      | Self::Version(_) => false,
+      Self::Tag(cmd) => cmd.requires_project(),
+      Self::Artifact(_) | Self::Iteration(_) | Self::Search(_) | Self::Serve(_) | Self::Task(_) => true,
     }
   }
-  count
 }
 
-/// Build the `--help` long-about string including a styled banner.
+/// Build the `--help` long description: banner, one-liner, docs link, and extended blurb.
 fn long_about() -> String {
-  let theme = Theme::default();
-  let banner = crate::ui::composites::banner::Banner::new(
-    env!("CARGO_PKG_VERSION"),
-    std::env::consts::OS,
-    "",
-    "",
-    "aaronmallen",
-    &theme,
-  )
-  .hide_version();
-  let url = "https://gest.aaronmallen.dev";
-  let link = url.link(url).fg(crate::ui::theming::colors::AZURE).underline();
-  let desc = env!("CARGO_PKG_DESCRIPTION");
+  let theme = style::global();
+  let banner = Banner::new().with_author();
+  let description = env!("CARGO_PKG_DESCRIPTION");
+  let doc_site_url = "https://gest.aaronmallen.dev";
+  let painted_doc_site = doc_site_url.paint(*theme.markdown_link());
+  let doc_site_link = painted_doc_site.link(doc_site_url);
   format!(
-    "\n{banner}\n\n{desc}\n\n{link}\n\n\
+    "\n{banner}\n\n{description}\n\n{doc_site_link}\n\n\
     Gest provides a lightweight, file-based system for organizing the artifacts, specs, ADRs, \
     and task backlogs that AI coding agents produce. Instead of letting generated context scatter \
     across chat logs and throwaway files, gest stores it in a structured, version-controlled \
@@ -233,79 +224,71 @@ fn long_about() -> String {
   )
 }
 
-/// Quick pre-parse of verbosity from `std::env::args` so logging is active before full clap parse.
-fn pre_parse_verbosity() -> u8 {
-  count_verbosity_flags(std::env::args().skip(1))
-}
-
-/// Record filesystem changes to the event store after a command runs.
-///
-/// Opens the event store, begins a transaction, records any changed files,
-/// and rolls back the transaction if nothing actually changed.
-fn record_snapshot(
-  settings: &config::Settings,
-  snapshot: &capture::Snapshot,
-) -> std::result::Result<(), crate::event_store::Error> {
-  let store = crate::event_store::EventStore::open(settings.storage().state_dir())?;
-  let project_id = capture::project_id(settings);
-  let command = capture::command_string();
-  let tx_id = store.begin_transaction(&project_id, &command)?;
-
-  let had_changes = snapshot.record_changes(settings.storage().project_dir(), &store, &tx_id)?;
-  if !had_changes {
-    // No file changes — remove the empty transaction.
-    store.rollback_transaction(&tx_id)?;
-  }
-
-  Ok(())
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
 
-  mod count_verbosity_flags {
-    use pretty_assertions::assert_eq;
-
+  mod app_call {
     use super::*;
 
-    fn flags(args: &[&str]) -> u8 {
-      count_verbosity_flags(args.iter().map(|s| s.to_string()))
+    #[tokio::test]
+    async fn it_dispatches_version_flag() {
+      let app = App {
+        command: None,
+        no_color: false,
+        print_version: true,
+        verbosity_level: 0,
+      };
+      let context = AppContext {
+        gest_dir: None,
+        project_id: None,
+        settings: crate::config::Settings::default(),
+        store: crate::store::open_temp().await.unwrap().0,
+      };
+
+      let result = app.call(&context).await;
+
+      assert!(result.is_ok());
     }
 
-    #[test]
-    fn it_counts_clustered_v() {
-      assert_eq!(flags(&["-vvv"]), 3);
+    #[tokio::test]
+    async fn it_prints_long_help_when_no_command() {
+      let app = App {
+        command: None,
+        no_color: false,
+        print_version: false,
+        verbosity_level: 0,
+      };
+      let context = AppContext {
+        gest_dir: None,
+        project_id: None,
+        settings: crate::config::Settings::default(),
+        store: crate::store::open_temp().await.unwrap().0,
+      };
+
+      let result = app.call(&context).await;
+
+      assert!(result.is_ok());
     }
 
-    #[test]
-    fn it_counts_long_verbose() {
-      assert_eq!(flags(&["--verbose", "--verbose"]), 2);
-    }
+    #[tokio::test]
+    async fn it_dispatches_to_subcommand() {
+      let app = App {
+        command: Some(Command::Version(commands::version::Command)),
+        no_color: false,
+        print_version: false,
+        verbosity_level: 0,
+      };
+      let context = AppContext {
+        gest_dir: None,
+        project_id: None,
+        settings: crate::config::Settings::default(),
+        store: crate::store::open_temp().await.unwrap().0,
+      };
 
-    #[test]
-    fn it_counts_mixed_short_and_long() {
-      assert_eq!(flags(&["-vv", "--verbose"]), 3);
-    }
+      let result = app.call(&context).await;
 
-    #[test]
-    fn it_counts_single_v() {
-      assert_eq!(flags(&["-v"]), 1);
-    }
-
-    #[test]
-    fn it_ignores_long_flags_containing_v() {
-      assert_eq!(flags(&["--version"]), 0);
-    }
-
-    #[test]
-    fn it_returns_zero_with_no_flags() {
-      assert_eq!(flags(&["task", "show", "abc"]), 0);
-    }
-
-    #[test]
-    fn it_stops_at_double_dash() {
-      assert_eq!(flags(&["-v", "--", "-vv"]), 1);
+      assert!(result.is_ok());
     }
   }
 }

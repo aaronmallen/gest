@@ -1,9 +1,8 @@
-//! CLI commands for managing artifacts (specs, ADRs, RFCs, notes, and other documents).
-
 mod archive;
 mod create;
 mod list;
 mod meta;
+mod note;
 mod show;
 mod tag;
 mod untag;
@@ -11,43 +10,49 @@ mod update;
 
 use clap::{Args, Subcommand};
 
-use crate::cli::{self, AppContext};
+use crate::{AppContext, cli::Error};
 
-/// Top-level artifact command that dispatches to subcommands.
-#[derive(Debug, Args)]
+/// Manage artifacts.
+#[derive(Args, Debug)]
 pub struct Command {
   #[command(subcommand)]
-  command: ArtifactCommand,
+  subcommand: Sub,
 }
 
 #[derive(Debug, Subcommand)]
-enum ArtifactCommand {
+enum Sub {
+  /// Archive an artifact.
   Archive(archive::Command),
-  #[command(visible_alias = "new")]
+  /// Create a new artifact.
   Create(create::Command),
-  #[command(visible_alias = "ls")]
+  /// List artifacts.
   List(list::Command),
+  /// Get or set custom metadata.
   Meta(meta::Command),
-  #[command(visible_alias = "view")]
+  /// Manage notes on an artifact.
+  Note(note::Command),
+  /// Show an artifact.
   Show(show::Command),
+  /// Add a tag to an artifact.
   Tag(tag::Command),
+  /// Remove a tag from an artifact.
   Untag(untag::Command),
-  #[command(visible_alias = "edit")]
+  /// Update an artifact.
   Update(update::Command),
 }
 
 impl Command {
-  /// Dispatch to the appropriate artifact subcommand.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    match &self.command {
-      ArtifactCommand::Archive(cmd) => cmd.call(ctx),
-      ArtifactCommand::Create(cmd) => cmd.call(ctx),
-      ArtifactCommand::List(cmd) => cmd.call(ctx),
-      ArtifactCommand::Meta(cmd) => cmd.call(ctx),
-      ArtifactCommand::Show(cmd) => cmd.call(ctx),
-      ArtifactCommand::Tag(cmd) => cmd.call(ctx),
-      ArtifactCommand::Untag(cmd) => cmd.call(ctx),
-      ArtifactCommand::Update(cmd) => cmd.call(ctx),
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    match &self.subcommand {
+      Sub::Archive(cmd) => cmd.call(context).await,
+      Sub::Create(cmd) => cmd.call(context).await,
+      Sub::List(cmd) => cmd.call(context).await,
+      Sub::Meta(cmd) => cmd.call(context).await,
+      Sub::Note(cmd) => cmd.call(context).await,
+      Sub::Show(cmd) => cmd.call(context).await,
+      Sub::Tag(cmd) => cmd.call(context).await,
+      Sub::Untag(cmd) => cmd.call(context).await,
+      Sub::Update(cmd) => cmd.call(context).await,
     }
   }
 }

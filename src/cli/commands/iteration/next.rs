@@ -1,233 +1,185 @@
+use std::cmp::Ordering;
+
 use clap::Args;
+use serde_json::json;
 
 use crate::{
-  cli::{self, AppContext},
-  model::Task,
-  store,
-  ui::{theming::theme::Theme, views::task::TaskDetailView},
+  AppContext,
+  cli::Error,
+  store::{
+    model::primitives::{AuthorType, EntityType, IterationStatus, RelationshipType, TaskStatus},
+    repo,
+  },
+  ui::components::FieldList,
 };
 
-/// Find (or claim) the next available task in an iteration.
-#[derive(Debug, Args)]
+/// Return the next available task in an iteration.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Iteration ID or unique prefix.
-  pub id: String,
-  /// Agent name for assignment (required with --claim).
+  /// The iteration ID or prefix.
+  id: String,
+  /// Agent name for assignment (requires --claim).
   #[arg(long)]
-  pub agent: Option<String>,
+  agent: Option<String>,
   /// Claim the task (set to in-progress).
   #[arg(long)]
-  pub claim: bool,
+  claim: bool,
   /// Output as JSON.
   #[arg(short, long)]
-  pub json: bool,
+  json: bool,
+  /// Print only the task ID.
+  #[arg(short, long)]
+  quiet: bool,
 }
 
 impl Command {
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    if self.claim && self.agent.is_none() {
-      return Err(cli::Error::InvalidInput(
-        "--agent is required when --claim is used".into(),
-      ));
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    if self.agent.is_some() && !self.claim {
+      eprintln!("--agent requires --claim");
+      std::process::exit(1);
     }
 
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let id = store::resolve_iteration_id(config, &self.id, true)?;
+    let conn = context.store().connect().await?;
 
-    let task = match store::next_available_task(config, &id)? {
-      Some(t) => t,
-      None => return Err(cli::Error::NoResult("no available tasks".into())),
+    let id = repo::resolve::resolve_id(&conn, "iterations", &self.id).await?;
+    let iteration = repo::iteration::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+
+    if iteration.status() != IterationStatus::Active {
+      eprintln!("iteration is not active");
+      std::process::exit(1);
+    }
+
+    let rows = repo::iteration::tasks_with_phase(&conn, &id).await?;
+
+    // Filter to open tasks only
+    let open_rows: Vec<_> = rows.iter().filter(|r| r.status == "open").collect();
+
+    // Check which open tasks are blocked
+    struct Candidate {
+      full_id: String,
+      phase: u32,
+      priority: Option<u8>,
+    }
+
+    let mut candidates = Vec::new();
+    for row in &open_rows {
+      // Resolve full task ID from short prefix
+      let full_id = repo::resolve::resolve_id(&conn, "tasks", &row.id_short).await?;
+      let task = repo::task::find_by_id(&conn, full_id.clone())
+        .await?
+        .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(row.id_short.clone())))?;
+
+      // Check if task is blocked
+      let rels = repo::relationship::for_entity(&conn, EntityType::Task, &full_id).await?;
+      let mut blocked = false;
+      for rel in &rels {
+        // Task is blocked if it's the target of a "blocks" relationship
+        // or the source of a "blocked-by" relationship
+        let blocker_id = if rel.rel_type() == RelationshipType::Blocks && rel.target_id() == &full_id {
+          Some(rel.source_id())
+        } else if rel.rel_type() == RelationshipType::BlockedBy && rel.source_id() == &full_id {
+          Some(rel.target_id())
+        } else {
+          None
+        };
+
+        if let Some(blocker_id) = blocker_id
+          && let Some(blocker) = repo::task::find_by_id(&conn, blocker_id.clone()).await?
+          && !blocker.status().is_terminal()
+        {
+          blocked = true;
+          break;
+        }
+      }
+
+      if !blocked {
+        candidates.push(Candidate {
+          full_id: full_id.to_string(),
+          phase: row.phase,
+          priority: task.priority(),
+        });
+      }
+    }
+
+    // Sort by phase ascending, then priority ascending (lower number = higher priority)
+    candidates.sort_by(|a, b| {
+      a.phase.cmp(&b.phase).then_with(|| match (a.priority, b.priority) {
+        (Some(ap), Some(bp)) => ap.cmp(&bp),
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => Ordering::Equal,
+      })
+    });
+
+    let Some(next) = candidates.first() else {
+      eprintln!("no available tasks");
+      std::process::exit(2);
     };
 
+    let task_id: crate::store::model::primitives::Id = next
+      .full_id
+      .parse()
+      .map_err(|e: String| Error::Resolve(repo::resolve::Error::NotFound(e)))?;
+
+    // If --claim, update the task
     let task = if self.claim {
-      let agent = self.agent.as_deref().unwrap();
-      store::claim_task(config, &task.id, agent)?
+      let mut patch = crate::store::model::task::Patch {
+        status: Some(TaskStatus::InProgress),
+        ..Default::default()
+      };
+
+      if let Some(agent_name) = &self.agent {
+        let author = repo::author::find_or_create(&conn, agent_name, None, AuthorType::Agent).await?;
+        patch.assigned_to = Some(Some(author.id().clone()));
+      }
+
+      repo::task::update(&conn, &task_id, &patch).await?
     } else {
-      task
+      repo::task::find_by_id(&conn, task_id.clone())
+        .await?
+        .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(next.full_id.clone())))?
     };
+
+    let phase = next.phase;
 
     if self.json {
-      let json = serde_json::to_string_pretty(&task)?;
-      println!("{json}");
+      let json_out = json!({
+        "assigned_to": task.assigned_to().map(|a| a.to_string()),
+        "id": task.id().to_string(),
+        "phase": phase,
+        "priority": task.priority(),
+        "status": task.status().to_string(),
+        "title": task.title(),
+      });
+      println!("{}", serde_json::to_string_pretty(&json_out)?);
       return Ok(());
     }
 
-    print_task_detail(&task, theme);
+    if self.quiet {
+      println!("{}", task.id().short());
+      return Ok(());
+    }
+
+    let fields = FieldList::new()
+      .field("id", task.id().short())
+      .field("title", task.title().to_string())
+      .field("status", task.status().to_string())
+      .field("phase", phase.to_string())
+      .field(
+        "priority",
+        task
+          .priority()
+          .map(|p| p.to_string())
+          .unwrap_or_else(|| "-".to_string()),
+      )
+      .field(
+        "assigned to",
+        task.assigned_to().map(|a| a.short()).unwrap_or_else(|| "-".to_string()),
+      );
+
+    println!("{fields}");
     Ok(())
-  }
-}
-
-fn print_task_detail(task: &Task, theme: &Theme) {
-  let id_str = task.id.to_string();
-  let status_str = task.status.as_str();
-
-  let link_strings: Vec<(String, String)> = task
-    .links
-    .iter()
-    .map(|l| {
-      let rel = l.rel.to_string();
-      let full = l.ref_.rsplit('/').next().unwrap_or(&l.ref_);
-      let target = if full.len() > 8 {
-        full[..8].to_string()
-      } else {
-        full.to_string()
-      };
-      (rel, target)
-    })
-    .collect();
-
-  let links: Vec<(&str, &str)> = link_strings.iter().map(|(r, t)| (r.as_str(), t.as_str())).collect();
-
-  let body = if task.description.is_empty() {
-    None
-  } else {
-    Some(task.description.as_str())
-  };
-
-  let view = TaskDetailView {
-    id: &id_str,
-    title: &task.title,
-    status: status_str,
-    priority: task.priority,
-    phase: task.phase.map(|p| (p as u32, None)),
-    assigned: task.assigned_to.as_deref(),
-    tags: &task.tags,
-    links,
-    events: &task.events,
-    notes: &task.notes,
-    body,
-    theme,
-  };
-  println!("{view}");
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::{
-    model::task::Status as TaskStatus,
-    store,
-    test_helpers::{make_test_context, make_test_iteration, make_test_task},
-  };
-
-  mod call {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_claims_next_task() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      task.phase = Some(1);
-      task.priority = Some(1);
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks.push(task.id.to_string());
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        claim: true,
-        agent: Some("test-agent".to_string()),
-        json: false,
-      };
-
-      cmd.call(&ctx).unwrap();
-
-      let updated = store::read_task(&ctx.settings, &task.id).unwrap();
-      assert_eq!(updated.status, TaskStatus::InProgress);
-      assert_eq!(updated.assigned_to, Some("test-agent".to_string()));
-    }
-
-    #[test]
-    fn it_errors_when_claim_without_agent() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        claim: true,
-        agent: None,
-        json: false,
-      };
-
-      let err = cmd.call(&ctx).unwrap_err();
-      assert_eq!(err.exit_code(), 1);
-      assert!(err.to_string().contains("--agent is required"));
-    }
-
-    #[test]
-    fn it_outputs_json() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      task.phase = Some(1);
-      task.priority = Some(1);
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks.push(task.id.to_string());
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        claim: false,
-        agent: None,
-        json: true,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_peeks_at_next_task() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let mut task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      task.phase = Some(1);
-      task.priority = Some(1);
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks.push(task.id.to_string());
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        agent: None,
-        claim: false,
-        json: false,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_returns_no_result_when_no_tasks() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        agent: None,
-        claim: false,
-        json: false,
-      };
-
-      let err = cmd.call(&ctx).unwrap_err();
-      assert_eq!(err.exit_code(), 2);
-      assert_eq!(err.to_string(), "no available tasks");
-    }
   }
 }

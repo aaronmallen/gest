@@ -1,80 +1,53 @@
 use clap::Args;
 
 use crate::{
-  cli::{self, AppContext},
-  store,
-  ui::composites::success_message::SuccessMessage,
+  AppContext,
+  cli::Error,
+  store::repo,
+  ui::{components::SuccessMessage, json},
 };
 
 /// Remove a task from an iteration.
-#[derive(Debug, Args)]
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Iteration ID or unique prefix.
-  pub id: String,
-  /// Output the iteration as JSON after removing the task.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Output only the iteration ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
-  /// Task ID or unique prefix to remove.
-  pub task_id: String,
+  /// The iteration ID or prefix.
+  iteration: String,
+  /// The task ID or prefix.
+  task: String,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Resolve both IDs, then drop the task reference from the iteration.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let iteration_id = store::resolve_iteration_id(config, &self.id, false)?;
-    let task_id = store::resolve_task_id(config, &self.task_id, true)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
 
-    let task_ref = format!("tasks/{task_id}");
-    store::remove_iteration_task(config, &iteration_id, &task_ref)?;
+    let iteration_id = repo::resolve::resolve_id(&conn, "iterations", &self.iteration).await?;
+    let task_id = repo::resolve::resolve_id(&conn, "tasks", &self.task).await?;
 
-    if self.json {
-      let iteration = store::read_iteration(config, &iteration_id)?;
-      println!("{}", serde_json::to_string_pretty(&iteration)?);
-    } else if self.quiet {
-      println!("{}", iteration_id.short());
-    } else {
-      let msg = format!("Removed task {} from iteration {}", task_id, iteration_id);
-      println!("{}", SuccessMessage::new(&msg, theme));
-    }
+    let before = serde_json::json!({
+      "iteration_id": iteration_id.to_string(),
+      "task_id": task_id.to_string(),
+    });
+    let tx = repo::transaction::begin(&conn, project_id, "iteration remove").await?;
+    repo::iteration::remove_task(&conn, &iteration_id, &task_id).await?;
+    repo::transaction::record_event(
+      &conn,
+      tx.id(),
+      "iteration_tasks",
+      &task_id.to_string(),
+      "deleted",
+      Some(&before),
+    )
+    .await?;
+
+    self.output.print_delete(|| {
+      SuccessMessage::new("removed task from iteration")
+        .field("task", task_id.short())
+        .field("iteration", iteration_id.short())
+        .to_string()
+    })?;
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::test_helpers::{make_test_context, make_test_iteration, make_test_task};
-
-  mod call {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_removes_a_task_from_iteration() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks = vec!["tasks/kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk".to_string()];
-      let task = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-        quiet: false,
-        task_id: "kkkk".to_string(),
-      };
-      cmd.call(&ctx).unwrap();
-
-      let loaded = store::read_iteration(&ctx.settings, &iteration.id).unwrap();
-      assert_eq!(loaded.tasks.len(), 0);
-    }
   }
 }

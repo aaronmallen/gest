@@ -1,90 +1,42 @@
 use clap::Args;
 
 use crate::{
-  cli::{self, AppContext},
-  store,
-  ui::composites::success_message::SuccessMessage,
+  AppContext,
+  cli::Error,
+  store::repo,
+  ui::{components::SuccessMessage, json},
 };
 
-/// Move an artifact to the archive by setting its `archived_at` timestamp.
-#[derive(Debug, Args)]
+/// Archive an artifact.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Artifact ID or unique prefix.
-  pub id: String,
-  /// Output as JSON.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Print only the artifact ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
+  /// The artifact ID or prefix.
+  id: String,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Archive the artifact matching `self.id` and print a confirmation.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let id = store::resolve_artifact_id(config, &self.id, false)?;
-    store::archive_artifact(config, &id)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
 
-    if self.json {
-      let artifact = store::read_artifact(config, &id)?;
-      let json = serde_json::to_string_pretty(&artifact)?;
-      println!("{json}");
-      return Ok(());
-    }
+    let id = repo::resolve::resolve_id(&conn, "artifacts", &self.id).await?;
+    let before_artifact = repo::artifact::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or(Error::UninitializedProject)?;
+    let before = serde_json::to_value(&before_artifact)?;
+    let tx = repo::transaction::begin(&conn, project_id, "artifact archive").await?;
+    let artifact = repo::artifact::archive(&conn, &id).await?;
+    repo::transaction::record_event(&conn, tx.id(), "artifacts", &id.to_string(), "modified", Some(&before)).await?;
 
-    if self.quiet {
-      println!("{}", id.short());
-      return Ok(());
-    }
-
-    let msg = format!("Archived artifact {id}");
-    println!("{}", SuccessMessage::new(&msg, theme));
+    let short_id = artifact.id().short();
+    self.output.print_entity(&artifact, &short_id, || {
+      SuccessMessage::new("archived artifact")
+        .id(artifact.id().short())
+        .field("title", artifact.title().to_string())
+        .to_string()
+    })?;
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::{
-    model::ArtifactFilter,
-    store,
-    test_helpers::{make_test_artifact, make_test_context},
-  };
-
-  mod call {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_archives_an_artifact() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.settings, &artifact).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-        quiet: false,
-      };
-      cmd.call(&ctx).unwrap();
-
-      let filter = ArtifactFilter::default();
-      let artifacts = store::list_artifacts(&ctx.settings, &filter).unwrap();
-
-      assert_eq!(artifacts.len(), 0);
-
-      let filter = ArtifactFilter {
-        all: true,
-        ..Default::default()
-      };
-      let artifacts = store::list_artifacts(&ctx.settings, &filter).unwrap();
-      assert_eq!(artifacts.len(), 1);
-      assert!(artifacts[0].archived_at.is_some());
-    }
   }
 }

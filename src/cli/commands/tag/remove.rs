@@ -1,63 +1,55 @@
 use clap::Args;
 
 use crate::{
-  cli::{self, AppContext},
-  store,
-  ui::composites::success_message::SuccessMessage,
+  AppContext,
+  cli::Error,
+  store::{model::entity_tag, repo},
+  ui::{components::SuccessMessage, json},
 };
 
-/// Remove tags from any entity (task, artifact, or iteration) by ID prefix.
-#[derive(Debug, Args)]
+/// Remove tags from any entity (task, artifact, or iteration).
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Entity ID or unique prefix.
-  pub id: String,
-  /// Tags to remove (space or comma-separated).
-  #[arg(value_delimiter = ',')]
-  pub tags: Vec<String>,
+  /// The entity ID or prefix.
+  id: String,
+  /// One or more tag labels to remove.
+  #[arg(required = true)]
+  tags: Vec<String>,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let resolved = store::resolve_any_id(&ctx.settings, &self.id)?;
-    let params = store::TagParams {
-      entity_type: resolved.entity_type,
-      id_prefix: &self.id,
-      tags: &self.tags,
-    };
-    let result = store::untag_entity(&ctx.settings, &params)?;
-    let noun = resolved.entity_type;
-    let msg = format!("Untagged {noun} {} from {}", result.id, self.tags.join(", "));
-    println!("{}", SuccessMessage::new(&msg, &ctx.theme));
-    Ok(())
-  }
-}
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
+    let (entity_type, id) = repo::resolve::resolve_entity(&conn, &self.id).await?;
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::test_helpers::{make_test_context, make_test_task};
-
-  mod call {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_removes_tags_from_a_task() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let mut task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      task.tags = vec!["rust".to_string(), "cli".to_string(), "keep".to_string()];
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        tags: vec!["rust".to_string(), "cli".to_string()],
-      };
-      cmd.call(&ctx).unwrap();
-
-      let loaded = store::read_task(&ctx.settings, &task.id).unwrap();
-      assert_eq!(loaded.tags, vec!["keep".to_string()]);
+    let tx = repo::transaction::begin(&conn, project_id, &format!("{entity_type} untag")).await?;
+    for label in &self.tags {
+      let before_tag = repo::tag::find_by_label(&conn, label).await?;
+      repo::tag::detach(&conn, entity_type, &id, label).await?;
+      if let Some(tag) = &before_tag {
+        let before = serde_json::to_value(entity_tag::Model::new(entity_type, id.clone(), tag.id().clone()))?;
+        repo::transaction::record_event(
+          &conn,
+          tx.id(),
+          "entity_tags",
+          &tag.id().to_string(),
+          "deleted",
+          Some(&before),
+        )
+        .await?;
+      }
     }
+
+    let short_id = id.short();
+    self.output.print_delete(|| {
+      SuccessMessage::new(format!("untagged {entity_type}"))
+        .id(short_id.clone())
+        .field("tags", self.tags.join(", "))
+        .to_string()
+    })?;
+    Ok(())
   }
 }

@@ -1,87 +1,50 @@
 use clap::Args;
 
 use crate::{
-  action,
-  cli::{self, AppContext},
-  model::{Task, task::Status},
-  store,
-  ui::views::task::TaskUpdateView,
+  AppContext,
+  cli::Error,
+  store::{
+    model::{primitives::TaskStatus, task::Patch},
+    repo,
+  },
+  ui::{components::SuccessMessage, json},
 };
 
 /// Mark a task as done.
-#[derive(Debug, Args)]
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Task ID or unique prefix.
-  pub id: String,
-  /// Output as JSON.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Print only the task ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
+  /// The task ID or prefix.
+  id: String,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Set the task's status to done and print the confirmation view.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let id = store::resolve_task_id(config, &self.id, true)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
 
-    let author = action::resolve_author(false)?;
-    let task = action::set_status::<Task>(config, &id, Status::Done, Some(&author))?;
-
-    if self.json {
-      let json = serde_json::to_string_pretty(&task)?;
-      println!("{json}");
-      return Ok(());
-    }
-
-    if self.quiet {
-      println!("{}", task.id.short());
-      return Ok(());
-    }
-
-    let id_str = task.id.to_string();
-
-    let view = TaskUpdateView {
-      id: &id_str,
-      fields: Vec::new(),
-      status: Some(task.status.as_str()),
-      theme,
+    let id = repo::resolve::resolve_id(&conn, "tasks", &self.id).await?;
+    let before_task = repo::task::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or(Error::UninitializedProject)?;
+    let before = serde_json::to_value(&before_task)?;
+    let tx = repo::transaction::begin(&conn, project_id, "task complete").await?;
+    let patch = Patch {
+      status: Some(TaskStatus::Done),
+      ..Default::default()
     };
-    println!("{view}");
+
+    let task = repo::task::update(&conn, &id, &patch).await?;
+    repo::transaction::record_event(&conn, tx.id(), "tasks", &id.to_string(), "modified", Some(&before)).await?;
+
+    let short_id = task.id().short();
+    self.output.print_entity(&task, &short_id, || {
+      SuccessMessage::new("completed task")
+        .id(task.id().short())
+        .field("title", task.title().to_string())
+        .to_string()
+    })?;
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::test_helpers::{make_test_context, make_test_task};
-
-  mod call {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_marks_task_as_done() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-        quiet: false,
-      };
-      cmd.call(&ctx).unwrap();
-
-      let updated = store::read_task(&ctx.settings, &task.id).unwrap();
-
-      assert_eq!(updated.status, Status::Done);
-    }
   }
 }

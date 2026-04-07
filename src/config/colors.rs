@@ -5,105 +5,31 @@
 
 use std::collections::{HashMap, HashSet};
 
-use serde::{Deserialize, Deserializer, Serialize};
+use getset::Getters;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use yansi::{Color, Style};
 
-/// Two-tier color configuration: semantic palette slots and per-token overrides.
-///
-/// The `palette` map accepts the 11 [`PaletteColor`] keys with color-only values.
-/// The `overrides` map accepts the ~95 theme token keys with full [`ColorValue`] format.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Settings {
-  /// Per-token style overrides keyed by dot-separated token name.
-  pub overrides: HashMap<String, ColorValue>,
-  /// Semantic palette color overrides keyed by palette slot name.
-  pub palette: HashMap<String, Color>,
-}
-
-impl Settings {
-  /// Iterates over all configured token override entries.
-  pub fn iter(&self) -> impl Iterator<Item = (&String, &ColorValue)> {
-    self.overrides.iter()
-  }
-}
-
-impl<'de> Deserialize<'de> for Settings {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-  where
-    D: Deserializer<'de>,
-  {
-    #[derive(Deserialize)]
-    #[serde(default)]
-    #[derive(Default)]
-    struct RawSettings {
-      #[serde(default)]
-      overrides: HashMap<String, ColorValue>,
-      #[serde(default)]
-      palette: HashMap<String, String>,
-    }
-
-    let raw = RawSettings::deserialize(deserializer)?;
-
-    let valid_keys: HashSet<&str> = crate::ui::theming::palette::PaletteColor::ALL
-      .iter()
-      .map(|p| p.key())
-      .collect();
-
-    let mut palette = HashMap::new();
-    for (key, value) in raw.palette {
-      if !valid_keys.contains(key.as_str()) {
-        log::warn!("unknown palette key  key={key:?}");
-        continue;
-      }
-      let color = parse_color(&value).map_err(serde::de::Error::custom)?;
-      palette.insert(key, color);
-    }
-
-    Ok(Settings {
-      overrides: raw.overrides,
-      palette,
-    })
-  }
-}
-
-impl Serialize for Settings {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    use serde::ser::SerializeMap;
-
-    let mut map = serializer.serialize_map(None)?;
-    if !self.overrides.is_empty() {
-      map.serialize_entry("overrides", &self.overrides)?;
-    }
-    if !self.palette.is_empty() {
-      let palette_strings: HashMap<&str, String> = self
-        .palette
-        .iter()
-        .map(|(k, c)| (k.as_str(), color_to_string(*c)))
-        .collect();
-      map.serialize_entry("palette", &palette_strings)?;
-    }
-    map.end()
-  }
-}
-
 /// A resolved color and text modifier specification.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Getters, PartialEq)]
 pub struct ColorValue {
   /// Background color, if set.
-  pub bg: Option<Color>,
+  #[get = "pub"]
+  bg: Option<Color>,
   /// Whether bold weight is enabled.
-  pub bold: bool,
+  #[get = "pub"]
+  bold: bool,
   /// Whether dim/faint rendering is enabled.
-  pub dim: bool,
+  #[get = "pub"]
+  dim: bool,
   /// Foreground color, if set.
-  pub fg: Option<Color>,
+  #[get = "pub"]
+  fg: Option<Color>,
   /// Whether italic style is enabled.
-  pub italic: bool,
+  #[get = "pub"]
+  italic: bool,
   /// Whether underline decoration is enabled.
-  pub underline: bool,
+  #[get = "pub"]
+  underline: bool,
 }
 
 impl ColorValue {
@@ -201,7 +127,7 @@ impl<'de> Deserialize<'de> for ColorValue {
 impl Serialize for ColorValue {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
   where
-    S: serde::Serializer,
+    S: Serializer,
   {
     use serde::ser::SerializeMap;
 
@@ -238,19 +164,98 @@ impl Serialize for ColorValue {
   }
 }
 
+/// Two-tier color configuration: semantic palette slots and per-token overrides.
+///
+/// The `palette` map accepts [`Palette`](crate::ui::style::Palette) keys with color-only values.
+/// The `overrides` map accepts theme token keys with full [`ColorValue`] format.
+#[derive(Clone, Debug, Default, Getters, PartialEq)]
+pub struct Settings {
+  /// Per-token style overrides keyed by dot-separated token name.
+  #[get = "pub"]
+  overrides: HashMap<String, ColorValue>,
+  /// Palette-level color overrides keyed by slot name (e.g. `"primary"`).
+  #[get = "pub"]
+  palette: HashMap<String, Color>,
+}
+
+impl Settings {
+  /// Iterates over all configured token override entries.
+  pub fn iter(&self) -> impl Iterator<Item = (&String, &ColorValue)> {
+    self.overrides.iter()
+  }
+}
+
+impl<'de> Deserialize<'de> for Settings {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: Deserializer<'de>,
+  {
+    #[derive(Default, Deserialize)]
+    #[serde(default)]
+    struct RawSettings {
+      #[serde(default)]
+      overrides: HashMap<String, ColorValue>,
+      #[serde(default)]
+      palette: HashMap<String, String>,
+    }
+
+    let raw = RawSettings::deserialize(deserializer)?;
+
+    let valid_keys: HashSet<&str> = crate::ui::style::Palette::ALL.iter().map(|p| p.key()).collect();
+
+    let mut palette = HashMap::new();
+    for (key, value) in raw.palette {
+      if !valid_keys.contains(key.as_str()) {
+        eprintln!("warning: unknown palette key {key:?}");
+        continue;
+      }
+      let color = parse_color(&value).map_err(serde::de::Error::custom)?;
+      palette.insert(key, color);
+    }
+
+    Ok(Settings {
+      overrides: raw.overrides,
+      palette,
+    })
+  }
+}
+
+impl Serialize for Settings {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    use serde::ser::SerializeMap;
+
+    let mut map = serializer.serialize_map(None)?;
+    if !self.overrides.is_empty() {
+      map.serialize_entry("overrides", &self.overrides)?;
+    }
+    if !self.palette.is_empty() {
+      let palette_strings: HashMap<&str, String> = self
+        .palette
+        .iter()
+        .map(|(k, c)| (k.as_str(), color_to_string(*c)))
+        .collect();
+      map.serialize_entry("palette", &palette_strings)?;
+    }
+    map.end()
+  }
+}
+
 /// Converts a [`Color`] back to its canonical string representation.
 fn color_to_string(color: Color) -> String {
   match color {
     Color::Black => "black".to_string(),
     Color::Blue => "blue".to_string(),
-    Color::BrightBlack => "bright black".to_string(),
-    Color::BrightBlue => "bright blue".to_string(),
-    Color::BrightCyan => "bright cyan".to_string(),
-    Color::BrightGreen => "bright green".to_string(),
-    Color::BrightMagenta => "bright magenta".to_string(),
-    Color::BrightRed => "bright red".to_string(),
-    Color::BrightWhite => "bright white".to_string(),
-    Color::BrightYellow => "bright yellow".to_string(),
+    Color::BrightBlack => "bright_black".to_string(),
+    Color::BrightBlue => "bright_blue".to_string(),
+    Color::BrightCyan => "bright_cyan".to_string(),
+    Color::BrightGreen => "bright_green".to_string(),
+    Color::BrightMagenta => "bright_magenta".to_string(),
+    Color::BrightRed => "bright_red".to_string(),
+    Color::BrightWhite => "bright_white".to_string(),
+    Color::BrightYellow => "bright_yellow".to_string(),
     Color::Cyan => "cyan".to_string(),
     Color::Green => "green".to_string(),
     Color::Magenta => "magenta".to_string(),
@@ -282,19 +287,19 @@ fn parse_hex_color(hex: &str) -> Result<Color, String> {
   Ok(Color::Rgb(r, g, b))
 }
 
-/// Maps a case-insensitive color name (e.g. `"bright cyan"`) to a [`Color`].
+/// Maps a case-insensitive color name (e.g. `"bright_cyan"`) to a [`Color`].
 fn parse_named_color(name: &str) -> Result<Color, String> {
   match name.to_lowercase().as_str() {
     "black" => Ok(Color::Black),
     "blue" => Ok(Color::Blue),
-    "bright black" => Ok(Color::BrightBlack),
-    "bright blue" => Ok(Color::BrightBlue),
-    "bright cyan" => Ok(Color::BrightCyan),
-    "bright green" => Ok(Color::BrightGreen),
-    "bright magenta" => Ok(Color::BrightMagenta),
-    "bright red" => Ok(Color::BrightRed),
-    "bright white" => Ok(Color::BrightWhite),
-    "bright yellow" => Ok(Color::BrightYellow),
+    "bright_black" => Ok(Color::BrightBlack),
+    "bright_blue" => Ok(Color::BrightBlue),
+    "bright_cyan" => Ok(Color::BrightCyan),
+    "bright_green" => Ok(Color::BrightGreen),
+    "bright_magenta" => Ok(Color::BrightMagenta),
+    "bright_red" => Ok(Color::BrightRed),
+    "bright_white" => Ok(Color::BrightWhite),
+    "bright_yellow" => Ok(Color::BrightYellow),
     "cyan" => Ok(Color::Cyan),
     "green" => Ok(Color::Green),
     "magenta" => Ok(Color::Magenta),
@@ -307,313 +312,324 @@ fn parse_named_color(name: &str) -> Result<Color, String> {
 
 #[cfg(test)]
 mod tests {
+  use toml::Value;
+  use yansi::{Color, Style};
+
   use super::*;
 
-  mod color_value {
+  mod color_to_string {
+    use pretty_assertions::assert_eq;
+
     use super::*;
 
-    mod apply_to {
-      use pretty_assertions::assert_eq;
+    #[test]
+    fn it_converts_named_colors() {
+      assert_eq!(color_to_string(Color::Black), "black");
+      assert_eq!(color_to_string(Color::Blue), "blue");
+      assert_eq!(color_to_string(Color::BrightBlack), "bright_black");
+      assert_eq!(color_to_string(Color::BrightBlue), "bright_blue");
+      assert_eq!(color_to_string(Color::BrightCyan), "bright_cyan");
+      assert_eq!(color_to_string(Color::BrightGreen), "bright_green");
+      assert_eq!(color_to_string(Color::BrightMagenta), "bright_magenta");
+      assert_eq!(color_to_string(Color::BrightRed), "bright_red");
+      assert_eq!(color_to_string(Color::BrightWhite), "bright_white");
+      assert_eq!(color_to_string(Color::BrightYellow), "bright_yellow");
+      assert_eq!(color_to_string(Color::Cyan), "cyan");
+      assert_eq!(color_to_string(Color::Green), "green");
+      assert_eq!(color_to_string(Color::Magenta), "magenta");
+      assert_eq!(color_to_string(Color::Red), "red");
+      assert_eq!(color_to_string(Color::White), "white");
+      assert_eq!(color_to_string(Color::Yellow), "yellow");
+    }
 
-      use super::*;
+    #[test]
+    fn it_converts_rgb_to_uppercase_hex() {
+      assert_eq!(color_to_string(Color::Rgb(255, 128, 0)), "#FF8000");
+      assert_eq!(color_to_string(Color::Rgb(0, 0, 0)), "#000000");
+      assert_eq!(color_to_string(Color::Rgb(255, 255, 255)), "#FFFFFF");
+    }
 
-      #[test]
-      fn it_applies_all_modifiers() {
-        let value = ColorValue {
-          bg: Some(Color::Black),
-          bold: true,
-          dim: true,
-          fg: Some(Color::White),
-          italic: true,
-          underline: true,
-        };
-        let style = value.apply_to(Style::new());
+    #[test]
+    fn it_falls_back_to_white_for_unknown_variants() {
+      assert_eq!(color_to_string(Color::Fixed(42)), "white");
+    }
+  }
 
-        assert_eq!(
-          style,
-          Style::new()
-            .fg(Color::White)
-            .bg(Color::Black)
-            .bold()
-            .dim()
-            .italic()
-            .underline()
-        );
-      }
+  mod color_value_apply_to {
+    use pretty_assertions::assert_eq;
 
-      #[test]
-      fn it_applies_bold_and_fg() {
-        let value = ColorValue {
-          bg: None,
-          bold: true,
-          dim: false,
-          fg: Some(Color::Rgb(148, 72, 199)),
-          italic: false,
-          underline: false,
-        };
-        let style = value.apply_to(Style::new());
+    use super::*;
 
-        assert_eq!(style, Style::new().fg(Color::Rgb(148, 72, 199)).bold());
-      }
+    #[test]
+    fn it_applies_foreground_color() {
+      let value = ColorValue {
+        bg: None,
+        bold: false,
+        dim: false,
+        fg: Some(Color::Red),
+        italic: false,
+        underline: false,
+      };
 
-      #[test]
-      fn it_applies_fg_color() {
-        let value = ColorValue {
+      let style = value.apply_to(Style::new());
+
+      assert_eq!(style, Style::new().fg(Color::Red));
+    }
+
+    #[test]
+    fn it_applies_background_color() {
+      let value = ColorValue {
+        bg: Some(Color::Blue),
+        bold: false,
+        dim: false,
+        fg: None,
+        italic: false,
+        underline: false,
+      };
+
+      let style = value.apply_to(Style::new());
+
+      assert_eq!(style, Style::new().bg(Color::Blue));
+    }
+
+    #[test]
+    fn it_applies_all_modifiers() {
+      let value = ColorValue {
+        bg: None,
+        bold: true,
+        dim: true,
+        fg: None,
+        italic: true,
+        underline: true,
+      };
+
+      let style = value.apply_to(Style::new());
+
+      assert_eq!(style, Style::new().bold().dim().italic().underline());
+    }
+
+    #[test]
+    fn it_applies_everything_together() {
+      let value = ColorValue {
+        bg: Some(Color::Black),
+        bold: true,
+        dim: false,
+        fg: Some(Color::White),
+        italic: true,
+        underline: false,
+      };
+
+      let style = value.apply_to(Style::new());
+
+      assert_eq!(style, Style::new().fg(Color::White).bg(Color::Black).bold().italic());
+    }
+
+    #[test]
+    fn it_preserves_existing_style_properties() {
+      let value = ColorValue {
+        bg: None,
+        bold: true,
+        dim: false,
+        fg: None,
+        italic: false,
+        underline: false,
+      };
+
+      let style = value.apply_to(Style::new().fg(Color::Green));
+
+      assert_eq!(style, Style::new().fg(Color::Green).bold());
+    }
+  }
+
+  mod color_value_deserialize {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn it_deserializes_a_string_as_fg_only() {
+      let value: ColorValue = toml::from_str::<Value>("color = \"red\"")
+        .unwrap()
+        .get("color")
+        .unwrap()
+        .clone()
+        .try_into()
+        .unwrap();
+
+      assert_eq!(value.fg, Some(Color::Red));
+      assert_eq!(value.bg, None);
+      assert!(!value.bold);
+      assert!(!value.dim);
+      assert!(!value.italic);
+      assert!(!value.underline);
+    }
+
+    #[test]
+    fn it_deserializes_a_hex_string() {
+      let value: ColorValue = toml::from_str::<Value>("color = \"#FF8000\"")
+        .unwrap()
+        .get("color")
+        .unwrap()
+        .clone()
+        .try_into()
+        .unwrap();
+
+      assert_eq!(value.fg, Some(Color::Rgb(255, 128, 0)));
+    }
+
+    #[test]
+    fn it_deserializes_a_full_table() {
+      let toml_str = r#"
+        [color]
+        fg = "green"
+        bg = "black"
+        bold = true
+        italic = true
+      "#;
+
+      let value: ColorValue = toml::from_str::<Value>(toml_str)
+        .unwrap()
+        .get("color")
+        .unwrap()
+        .clone()
+        .try_into()
+        .unwrap();
+
+      assert_eq!(value.fg, Some(Color::Green));
+      assert_eq!(value.bg, Some(Color::Black));
+      assert!(value.bold);
+      assert!(!value.dim);
+      assert!(value.italic);
+      assert!(!value.underline);
+    }
+
+    #[test]
+    fn it_defaults_missing_table_fields() {
+      let toml_str = r#"
+        [color]
+        fg = "cyan"
+      "#;
+
+      let value: ColorValue = toml::from_str::<Value>(toml_str)
+        .unwrap()
+        .get("color")
+        .unwrap()
+        .clone()
+        .try_into()
+        .unwrap();
+
+      assert_eq!(value.fg, Some(Color::Cyan));
+      assert_eq!(value.bg, None);
+      assert!(!value.bold);
+      assert!(!value.dim);
+      assert!(!value.italic);
+      assert!(!value.underline);
+    }
+
+    #[test]
+    fn it_rejects_invalid_color_names() {
+      let result: Result<ColorValue, _> = toml::from_str::<Value>("color = \"nope\"")
+        .unwrap()
+        .get("color")
+        .unwrap()
+        .clone()
+        .try_into();
+
+      assert!(result.is_err());
+    }
+  }
+
+  mod color_value_serialize {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[derive(Serialize, Deserialize)]
+    struct Wrapper {
+      color: ColorValue,
+    }
+
+    #[test]
+    fn it_serializes_fg_only_as_string() {
+      let wrapper = Wrapper {
+        color: ColorValue {
           bg: None,
           bold: false,
           dim: false,
           fg: Some(Color::Red),
           italic: false,
           underline: false,
-        };
-        let style = value.apply_to(Style::new());
+        },
+      };
 
-        assert_eq!(style, Style::new().fg(Color::Red));
-      }
-    }
+      let serialized = toml::to_string(&wrapper).unwrap();
 
-    mod deserialize {
-      use pretty_assertions::assert_eq;
-
-      use super::*;
-
-      #[test]
-      fn it_deserializes_full_colors_section() {
-        let toml_str = r##"
-[colors]
-"log.error" = "#D23434"
-"log.warn" = "yellow"
-emphasis = { fg = "#9448C7", bold = true }
-"##;
-
-        #[derive(Deserialize)]
-        struct TestConfig {
-          #[serde(default)]
-          colors: std::collections::HashMap<String, ColorValue>,
-        }
-
-        let config: TestConfig = toml::from_str(toml_str).unwrap();
-
-        assert_eq!(config.colors.len(), 3);
-        assert_eq!(config.colors["log.error"].fg, Some(Color::Rgb(210, 52, 52)));
-        assert_eq!(config.colors["log.warn"].fg, Some(Color::Yellow));
-        assert_eq!(config.colors["emphasis"].fg, Some(Color::Rgb(148, 72, 199)));
-        assert!(config.colors["emphasis"].bold);
-      }
-
-      #[test]
-      fn it_deserializes_hex_string() {
-        let value: ColorValue = toml::from_str::<toml::Table>(r##"color = "#D23434""##).unwrap()["color"]
-          .clone()
-          .try_into()
-          .unwrap();
-
-        assert_eq!(value.fg, Some(Color::Rgb(210, 52, 52)));
-        assert!(!value.bold);
-      }
-
-      #[test]
-      fn it_deserializes_inline_table() {
-        let toml_str = r##"
-[color]
-fg = "#9448C7"
-bold = true
-"##;
-        let table: toml::Table = toml::from_str(toml_str).unwrap();
-        let value: ColorValue = table["color"].clone().try_into().unwrap();
-
-        assert_eq!(value.fg, Some(Color::Rgb(148, 72, 199)));
-        assert!(value.bold);
-        assert!(!value.dim);
-        assert!(!value.italic);
-        assert!(!value.underline);
-        assert_eq!(value.bg, None);
-      }
-
-      #[test]
-      fn it_deserializes_inline_table_with_bg() {
-        let toml_str = r##"
-[color]
-fg = "red"
-bg = "#000000"
-underline = true
-"##;
-        let table: toml::Table = toml::from_str(toml_str).unwrap();
-        let value: ColorValue = table["color"].clone().try_into().unwrap();
-
-        assert_eq!(value.fg, Some(Color::Red));
-        assert_eq!(value.bg, Some(Color::Rgb(0, 0, 0)));
-        assert!(value.underline);
-      }
-
-      #[test]
-      fn it_deserializes_named_color() {
-        let value: ColorValue = toml::from_str::<toml::Table>("color = \"yellow\"").unwrap()["color"]
-          .clone()
-          .try_into()
-          .unwrap();
-
-        assert_eq!(value.fg, Some(Color::Yellow));
-      }
-    }
-  }
-
-  mod settings {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_accepts_all_11_palette_keys() {
-      let toml_str = r##"
-[colors.palette]
-accent = "#FF0000"
-border = "#FF0000"
-error = "#FF0000"
-primary = "#FF0000"
-"primary.dark" = "#FF0000"
-"primary.light" = "#FF0000"
-success = "#FF0000"
-text = "#FF0000"
-"text.dim" = "#FF0000"
-"text.muted" = "#FF0000"
-warning = "#FF0000"
-"##;
-
-      #[derive(Deserialize)]
-      struct TestConfig {
-        #[serde(default)]
-        colors: Settings,
-      }
-
-      let config: TestConfig = toml::from_str(toml_str).unwrap();
-
-      assert_eq!(config.colors.palette.len(), 11);
+      assert!(
+        serialized.contains("\"red\""),
+        "expected string form, got: {serialized}"
+      );
     }
 
     #[test]
-    fn it_defaults_to_empty() {
-      let settings = Settings::default();
-
-      assert!(settings.palette.is_empty());
-      assert!(settings.overrides.is_empty());
-    }
-
-    #[test]
-    fn it_deserializes_both_sections() {
-      let toml_str = r##"
-[colors.palette]
-primary = "#9448C7"
-
-[colors.overrides]
-"status.done" = { fg = "#AABBCC", bold = true }
-"##;
-
-      #[derive(Deserialize)]
-      struct TestConfig {
-        #[serde(default)]
-        colors: Settings,
-      }
-
-      let config: TestConfig = toml::from_str(toml_str).unwrap();
-
-      assert_eq!(config.colors.palette.len(), 1);
-      assert_eq!(config.colors.overrides.len(), 1);
-      assert_eq!(config.colors.palette["primary"], Color::Rgb(148, 72, 199));
-      assert!(config.colors.overrides["status.done"].bold);
-    }
-
-    #[test]
-    fn it_deserializes_overrides_section() {
-      let toml_str = r##"
-[colors.overrides]
-emphasis = "#9448C7"
-"log.error" = "red"
-"##;
-
-      #[derive(Deserialize)]
-      struct TestConfig {
-        #[serde(default)]
-        colors: Settings,
-      }
-
-      let config: TestConfig = toml::from_str(toml_str).unwrap();
-
-      let entries: Vec<_> = config.colors.iter().collect();
-      assert_eq!(entries.len(), 2);
-    }
-
-    #[test]
-    fn it_deserializes_palette_section() {
-      let toml_str = r##"
-[colors.palette]
-primary = "#9448C7"
-success = "#00FF88"
-"##;
-
-      #[derive(Deserialize)]
-      struct TestConfig {
-        #[serde(default)]
-        colors: Settings,
-      }
-
-      let config: TestConfig = toml::from_str(toml_str).unwrap();
-
-      assert_eq!(config.colors.palette.len(), 2);
-      assert_eq!(config.colors.palette["primary"], Color::Rgb(148, 72, 199));
-      assert_eq!(config.colors.palette["success"], Color::Rgb(0, 255, 136));
-    }
-
-    #[test]
-    fn it_is_empty_when_no_palette_or_overrides() {
-      let settings = Settings::default();
-
-      assert!(settings.palette.is_empty());
-      assert!(settings.overrides.is_empty());
-    }
-
-    #[test]
-    fn it_roundtrips_through_serialization() {
-      let mut settings = Settings::default();
-      settings.palette.insert("primary".to_string(), Color::Rgb(148, 72, 199));
-      settings.overrides.insert(
-        "emphasis".to_string(),
-        ColorValue {
+    fn it_serializes_as_table_when_modifiers_present() {
+      let wrapper = Wrapper {
+        color: ColorValue {
           bg: None,
           bold: true,
           dim: false,
-          fg: Some(Color::Rgb(148, 72, 199)),
+          fg: Some(Color::Green),
           italic: false,
           underline: false,
         },
-      );
+      };
 
-      let toml_str = toml::to_string(&settings).unwrap();
-      let deserialized: Settings = toml::from_str(&toml_str).unwrap();
+      let serialized = toml::to_string(&wrapper).unwrap();
 
-      assert_eq!(deserialized.palette["primary"], Color::Rgb(148, 72, 199));
-      assert_eq!(deserialized.overrides["emphasis"].fg, Some(Color::Rgb(148, 72, 199)));
-      assert!(deserialized.overrides["emphasis"].bold);
+      assert!(serialized.contains("fg"), "expected table form, got: {serialized}");
+      assert!(serialized.contains("bold"), "expected bold key, got: {serialized}");
     }
 
     #[test]
-    fn it_skips_unknown_palette_keys() {
-      let toml_str = r##"
-[colors.palette]
-primary = "#9448C7"
-nonexistent = "#FF0000"
-"##;
+    fn it_serializes_as_table_when_bg_present() {
+      let wrapper = Wrapper {
+        color: ColorValue {
+          bg: Some(Color::Black),
+          bold: false,
+          dim: false,
+          fg: Some(Color::White),
+          italic: false,
+          underline: false,
+        },
+      };
 
-      #[derive(Deserialize)]
-      struct TestConfig {
-        #[serde(default)]
-        colors: Settings,
+      let serialized = toml::to_string(&wrapper).unwrap();
+
+      assert!(serialized.contains("bg"), "expected bg key, got: {serialized}");
+    }
+
+    #[test]
+    fn it_roundtrips_through_serialize_deserialize() {
+      let original = ColorValue {
+        bg: Some(Color::Rgb(10, 20, 30)),
+        bold: true,
+        dim: false,
+        fg: Some(Color::Rgb(255, 128, 0)),
+        italic: true,
+        underline: false,
+      };
+
+      #[derive(Serialize, Deserialize)]
+      struct Wrapper {
+        color: ColorValue,
       }
 
-      let config: TestConfig = toml::from_str(toml_str).unwrap();
+      let serialized = toml::to_string(&Wrapper {
+        color: original.clone(),
+      })
+      .unwrap();
+      let deserialized: Wrapper = toml::from_str(&serialized).unwrap();
 
-      assert_eq!(config.colors.palette.len(), 1);
-      assert!(config.colors.palette.contains_key("primary"));
+      assert_eq!(deserialized.color, original);
     }
   }
 
@@ -623,59 +639,279 @@ nonexistent = "#FF0000"
     use super::*;
 
     #[test]
-    fn it_parses_bright_named_color() {
-      let color = parse_color("bright cyan").unwrap();
+    fn it_dispatches_hex_strings_to_hex_parser() {
+      let result = parse_color("#FF0000").unwrap();
 
-      assert_eq!(color, Color::BrightCyan);
+      assert_eq!(result, Color::Rgb(255, 0, 0));
     }
 
     #[test]
-    fn it_parses_hex_color() {
-      let color = parse_color("#D23434").unwrap();
+    fn it_dispatches_bare_names_to_named_parser() {
+      let result = parse_color("red").unwrap();
 
-      assert_eq!(color, Color::Rgb(210, 52, 52));
+      assert_eq!(result, Color::Red);
+    }
+  }
+
+  mod parse_hex_color {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn it_parses_a_valid_hex_string() {
+      let result = parse_hex_color("4EA8E0").unwrap();
+
+      assert_eq!(result, Color::Rgb(78, 168, 224));
     }
 
     #[test]
-    fn it_parses_hex_color_lowercase() {
-      let color = parse_color("#9448c7").unwrap();
+    fn it_parses_lowercase_hex() {
+      let result = parse_hex_color("ff8000").unwrap();
 
-      assert_eq!(color, Color::Rgb(148, 72, 199));
+      assert_eq!(result, Color::Rgb(255, 128, 0));
     }
 
     #[test]
-    fn it_parses_named_color() {
-      let color = parse_color("red").unwrap();
+    fn it_rejects_too_short_hex() {
+      let result = parse_hex_color("FFF");
 
-      assert_eq!(color, Color::Red);
+      assert!(result.is_err());
+      assert!(result.unwrap_err().contains("expected 6 hex digits"));
     }
 
     #[test]
-    fn it_parses_named_color_case_insensitive() {
-      let color = parse_color("Yellow").unwrap();
-
-      assert_eq!(color, Color::Yellow);
-    }
-
-    #[test]
-    fn it_returns_error_for_invalid_hex() {
-      let result = parse_color("#GG0000");
+    fn it_rejects_too_long_hex() {
+      let result = parse_hex_color("FF00FF00");
 
       assert!(result.is_err());
     }
 
     #[test]
-    fn it_returns_error_for_short_hex() {
-      let result = parse_color("#FFF");
+    fn it_rejects_invalid_hex_characters() {
+      let result = parse_hex_color("GGHHII");
 
       assert!(result.is_err());
+      assert!(result.unwrap_err().contains("invalid hex color"));
+    }
+  }
+
+  mod parse_named_color {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn it_parses_all_standard_colors() {
+      let cases = [
+        ("black", Color::Black),
+        ("blue", Color::Blue),
+        ("cyan", Color::Cyan),
+        ("green", Color::Green),
+        ("magenta", Color::Magenta),
+        ("red", Color::Red),
+        ("white", Color::White),
+        ("yellow", Color::Yellow),
+      ];
+
+      for (name, expected) in cases {
+        assert_eq!(parse_named_color(name).unwrap(), expected, "failed for {name}");
+      }
     }
 
     #[test]
-    fn it_returns_error_for_unknown_name() {
-      let result = parse_color("chartreuse");
+    fn it_parses_all_bright_colors() {
+      let cases = [
+        ("bright_black", Color::BrightBlack),
+        ("bright_blue", Color::BrightBlue),
+        ("bright_cyan", Color::BrightCyan),
+        ("bright_green", Color::BrightGreen),
+        ("bright_magenta", Color::BrightMagenta),
+        ("bright_red", Color::BrightRed),
+        ("bright_white", Color::BrightWhite),
+        ("bright_yellow", Color::BrightYellow),
+      ];
+
+      for (name, expected) in cases {
+        assert_eq!(parse_named_color(name).unwrap(), expected, "failed for {name}");
+      }
+    }
+
+    #[test]
+    fn it_is_case_insensitive() {
+      assert_eq!(parse_named_color("RED").unwrap(), Color::Red);
+      assert_eq!(parse_named_color("Bright_Cyan").unwrap(), Color::BrightCyan);
+    }
+
+    #[test]
+    fn it_rejects_unknown_names() {
+      let result = parse_named_color("chartreuse");
 
       assert!(result.is_err());
+      assert!(result.unwrap_err().contains("unknown color name"));
+    }
+  }
+
+  mod settings_deserialize {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn it_deserializes_empty_table() {
+      let settings: Settings = toml::from_str("").unwrap();
+
+      assert!(settings.palette.is_empty());
+      assert!(settings.overrides.is_empty());
+    }
+
+    #[test]
+    fn it_deserializes_palette_entries() {
+      let toml_str = r##"
+        [palette]
+        primary = "blue"
+        error = "#D03838"
+      "##;
+
+      let settings: Settings = toml::from_str(toml_str).unwrap();
+
+      assert_eq!(*settings.palette.get("primary").unwrap(), Color::Blue);
+      assert_eq!(*settings.palette.get("error").unwrap(), Color::Rgb(208, 56, 56));
+    }
+
+    #[test]
+    fn it_warns_on_unknown_palette_keys() {
+      let toml_str = r#"
+        [palette]
+        primary = "blue"
+        nonexistent = "red"
+      "#;
+
+      let settings: Settings = toml::from_str(toml_str).unwrap();
+
+      assert!(settings.palette.contains_key("primary"));
+      assert!(!settings.palette.contains_key("nonexistent"));
+    }
+
+    #[test]
+    fn it_deserializes_overrides() {
+      let toml_str = r#"
+        [overrides.some_token]
+        fg = "yellow"
+        bold = true
+      "#;
+
+      let settings: Settings = toml::from_str(toml_str).unwrap();
+      let token = settings.overrides.get("some_token").unwrap();
+
+      assert_eq!(token.fg, Some(Color::Yellow));
+      assert!(token.bold);
+    }
+
+    #[test]
+    fn it_rejects_invalid_palette_colors() {
+      let toml_str = r#"
+        [palette]
+        primary = "invalid_color"
+      "#;
+
+      let result: Result<Settings, _> = toml::from_str(toml_str);
+
+      assert!(result.is_err());
+    }
+  }
+
+  mod settings_iter {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn it_iterates_over_overrides() {
+      let mut overrides = HashMap::new();
+      overrides.insert(
+        "a".to_string(),
+        ColorValue {
+          bg: None,
+          bold: false,
+          dim: false,
+          fg: Some(Color::Red),
+          italic: false,
+          underline: false,
+        },
+      );
+
+      let settings = Settings {
+        overrides,
+        palette: HashMap::new(),
+      };
+      let entries: Vec<_> = settings.iter().collect();
+
+      assert_eq!(entries.len(), 1);
+      assert_eq!(entries[0].0, "a");
+    }
+  }
+
+  mod settings_serialize {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn it_omits_empty_sections() {
+      let settings = Settings::default();
+
+      let serialized = toml::to_string(&settings).unwrap();
+
+      assert!(serialized.trim().is_empty());
+    }
+
+    #[test]
+    fn it_serializes_palette_as_string_values() {
+      let mut palette = HashMap::new();
+      palette.insert("primary".to_string(), Color::Blue);
+
+      let settings = Settings {
+        overrides: HashMap::new(),
+        palette,
+      };
+
+      let serialized = toml::to_string(&settings).unwrap();
+
+      assert!(
+        serialized.contains("primary"),
+        "expected palette key, got: {serialized}"
+      );
+      assert!(serialized.contains("blue"), "expected color string, got: {serialized}");
+    }
+
+    #[test]
+    fn it_roundtrips_through_serialize_deserialize() {
+      let mut palette = HashMap::new();
+      palette.insert("primary".to_string(), Color::Rgb(100, 150, 200));
+
+      let mut overrides = HashMap::new();
+      overrides.insert(
+        "test.token".to_string(),
+        ColorValue {
+          bg: None,
+          bold: true,
+          dim: false,
+          fg: Some(Color::Green),
+          italic: false,
+          underline: false,
+        },
+      );
+
+      let original = Settings {
+        overrides,
+        palette,
+      };
+
+      let serialized = toml::to_string(&original).unwrap();
+      let deserialized: Settings = toml::from_str(&serialized).unwrap();
+
+      assert_eq!(deserialized, original);
     }
   }
 }

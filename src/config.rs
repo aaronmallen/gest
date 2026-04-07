@@ -1,73 +1,50 @@
-//! Application configuration loading and settings.
-//!
-//! Configuration is loaded hierarchically: global config is merged with
-//! per-project TOML files discovered by walking up from the working directory.
-
+/// User-configurable color and text style definitions.
 pub mod colors;
-pub mod database;
+/// Database connection settings (URL or individual components).
+mod database;
+/// Environment variable definitions used by the config system.
 pub mod env;
 mod loader;
+/// Log-related configuration (level filtering).
 mod log;
-pub mod serve;
-pub(crate) mod storage;
+/// Storage-related configuration (data directory resolution).
+mod storage;
 
+use std::io::Error as IoError;
+
+use getset::Getters;
+pub use loader::load;
 use serde::{Deserialize, Serialize};
+use toml::de::Error as TomlDeError;
 
-pub use self::loader::load;
-
-/// Errors that can occur during configuration loading or resolution.
+/// Errors that can occur when loading configuration.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-  #[error("invalid config: {0}")]
-  Config(String),
-  #[error("failed to resolve user's {0} directory")]
-  DirectoryNotFound(&'static str),
+  /// A config file contained invalid TOML.
   #[error(transparent)]
-  Io(#[from] std::io::Error),
-  #[error("{0} is not a directory.")]
-  NotADirectory(std::path::PathBuf),
+  Parse(#[from] TomlDeError),
+  /// An I/O error occurred while reading a config file.
+  #[error(transparent)]
+  Read(#[from] IoError),
+  /// The XDG base directory could not be resolved (e.g. `$HOME` is unset).
+  #[error("could not resolve user's {0} directory")]
+  XDGDirNotFound(&'static str),
 }
 
-/// Top-level configuration, composed of color, log, serve, and storage sections.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+/// Gest configuration settings, merged from global and per-directory config files.
+#[derive(Clone, Debug, Default, Deserialize, Getters, PartialEq, Serialize)]
 #[serde(default)]
 pub struct Settings {
+  /// Settings for color and style customization (`[colors]` table).
+  #[get = "pub"]
   colors: colors::Settings,
+  /// Settings for database connectivity (`[database]` table).
+  #[get = "pub"]
   database: database::Settings,
+  /// Settings for log output (`[log]` table).
+  #[get = "pub"]
   log: log::Settings,
-  serve: serve::Settings,
+  /// Settings for data storage locations (`[storage]` table).
+  #[get = "pub"]
   storage: storage::Settings,
-}
-
-impl Settings {
-  /// Returns the color customization settings.
-  pub fn colors(&self) -> &colors::Settings {
-    &self.colors
-  }
-
-  /// Returns the database connection settings.
-  pub fn database(&self) -> &database::Settings {
-    &self.database
-  }
-
-  /// Returns the logging settings.
-  pub fn log(&self) -> &log::Settings {
-    &self.log
-  }
-
-  /// Returns the web server settings.
-  pub fn serve(&self) -> &serve::Settings {
-    &self.serve
-  }
-
-  /// Returns the data storage settings.
-  pub fn storage(&self) -> &storage::Settings {
-    &self.storage
-  }
-
-  /// Returns a mutable reference to the storage settings (test only).
-  #[cfg(test)]
-  pub fn storage_mut(&mut self) -> &mut storage::Settings {
-    &mut self.storage
-  }
 }

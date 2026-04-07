@@ -1,419 +1,318 @@
-use std::io::{BufRead, IsTerminal};
+use std::io::IsTerminal;
 
 use clap::Args;
-use serde::Deserialize;
+use libsql::Connection;
+use serde_json::Value;
 
 use crate::{
-  action,
-  cli::{self, AppContext},
-  model::{NewTask, Task, link::RelationshipType, task::Status},
-  store,
-  ui::views::task::TaskCreateView,
+  AppContext,
+  cli::Error,
+  store::{
+    model::{
+      primitives::{AuthorType, EntityType, Id, RelationshipType, TaskStatus},
+      task::New,
+    },
+    repo,
+  },
+  ui::{components::SuccessMessage, json},
 };
 
-/// Create a new task with optional metadata, tags, and status.
-#[derive(Debug, Args)]
+/// Create a new task.
+///
+/// When stdin is piped, the first markdown heading (`# …`) is used as the title
+/// and the full input becomes the description. A title can also be given as a
+/// positional argument, in which case stdin (if piped) is used as the description only.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Task title.
-  #[arg(required_unless_present = "batch")]
-  pub title: Option<String>,
-  /// Actor assigned to this task.
+  /// The task title (extracted from the first `# heading` when piping stdin).
+  title: Option<String>,
+  /// Assign the task to an author by name.
   #[arg(long)]
-  pub assigned_to: Option<String>,
-  /// Read NDJSON from stdin (one task per line).
-  #[arg(long, conflicts_with_all = ["title", "assigned_to", "description", "iteration", "link", "metadata", "phase", "priority", "status", "tag"])]
-  pub batch: bool,
-  /// Description text (opens `$EDITOR` if omitted and stdin is a terminal).
-  #[arg(short, long)]
-  pub description: Option<String>,
-  /// Add the task to an iteration (ID or prefix).
-  #[arg(short, long)]
-  pub iteration: Option<String>,
-  /// Output the created task as JSON.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Create a link on the new task (repeatable, format: `<rel>:<target_id>`).
-  #[arg(short, long)]
-  pub link: Vec<String>,
-  /// Key=value metadata pair (repeatable, e.g. `-m key=value`).
-  #[arg(short, long)]
-  pub metadata: Vec<String>,
-  /// Execution phase for parallel grouping.
+  assign: Option<String>,
+  /// Read NDJSON task objects from stdin (one per line).
   #[arg(long)]
-  pub phase: Option<u16>,
-  /// Priority level (0-4, where 0 is highest).
-  #[arg(short, long)]
-  pub priority: Option<u8>,
-  /// Print only the task ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
-  /// Initial status: open, in-progress, done, or cancelled (default: open).
-  #[arg(short, long)]
-  pub status: Option<String>,
-  /// Tag (repeatable, or comma-separated).
-  // TODO: deprecate --tags in favor of --tag
-  #[arg(long = "tag", value_delimiter = ',', alias = "tags")]
-  pub tag: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct BatchTaskInput {
-  title: String,
-  #[serde(default)]
-  assigned_to: Option<String>,
-  #[serde(default)]
+  batch: bool,
+  /// The task description (opens `$EDITOR` if omitted and stdin is a terminal).
+  #[arg(long, short)]
   description: Option<String>,
-  #[serde(default)]
+  /// Add the task to an iteration (ID or prefix).
+  #[arg(long, short)]
   iteration: Option<String>,
-  #[serde(default)]
-  links: Vec<String>,
-  #[serde(default)]
-  metadata: std::collections::HashMap<String, serde_json::Value>,
-  #[serde(default)]
-  phase: Option<u16>,
-  #[serde(default)]
+  /// Link the task to another entity (format: `rel:target`). Repeatable.
+  #[arg(long, short)]
+  link: Vec<String>,
+  /// Set a metadata key=value pair. Repeatable.
+  #[arg(long, short)]
+  metadata: Vec<String>,
+  /// The phase within the iteration (defaults to 1 or max existing + 1).
+  #[arg(long)]
+  phase: Option<u32>,
+  /// The task priority (0-4, lower is higher).
+  #[arg(long, short)]
   priority: Option<u8>,
-  #[serde(default)]
-  status: Option<String>,
-  #[serde(default)]
-  tags: Vec<String>,
+  /// The initial task status.
+  #[arg(long, short)]
+  status: Option<TaskStatus>,
+  /// Add a tag to the task. Repeatable.
+  #[arg(long)]
+  tag: Vec<String>,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Persist a new task and print a confirmation view.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
+
     if self.batch {
-      return self.batch_call(ctx);
+      return self.batch_create(context, project_id, &conn).await;
     }
 
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let title = self.title.clone().unwrap_or_default();
-    let status = match &self.status {
-      Some(s) => s.parse::<Status>().map_err(cli::Error::InvalidInput)?,
-      None => Status::Open,
+    let assigned_to = if let Some(name) = &self.assign {
+      let author = repo::author::find_or_create(&conn, name, None, AuthorType::Human).await?;
+      Some(author.id().clone())
+    } else {
+      None
     };
 
-    let metadata = crate::cli::helpers::build_toml_metadata(&self.metadata)?;
+    let (title, description) = self.resolve_title_and_description()?;
+    let metadata = parse_metadata_pairs(&self.metadata)?;
 
-    let tags = self.tag.clone();
-
-    let description =
-      crate::cli::helpers::read_from_editor(self.description.as_deref(), ".md", "Aborting: empty description")?;
-
-    let new = NewTask {
-      assigned_to: self.assigned_to.clone(),
+    let new = New {
+      assigned_to,
       description,
-      links: vec![],
       metadata,
-      phase: self.phase,
       priority: self.priority,
-      status,
-      tags,
+      status: self.status,
       title,
     };
 
-    let task = store::create_task(config, new)?;
-    let task_id_str = task.id.to_string();
+    let tx = repo::transaction::begin(&conn, project_id, "task create").await?;
+    let task = repo::task::create(&conn, project_id, &new).await?;
+    repo::transaction::record_event(&conn, tx.id(), "tasks", &task.id().to_string(), "created", None).await?;
 
-    // Process --link flags
-    for link_arg in &self.link {
-      process_link(config, &task_id_str, link_arg)?;
+    // Apply tags
+    for label in &self.tag {
+      let tag = repo::tag::attach(&conn, EntityType::Task, task.id(), label).await?;
+      repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
     }
 
-    // Process --iteration flag
-    if let Some(ref iter_prefix) = self.iteration {
-      let iter_id = store::resolve_iteration_id(config, iter_prefix, false)?;
-      let task_ref = format!("tasks/{}", task.id);
-      store::add_iteration_task(config, &iter_id, &task_ref)?;
+    // Apply links
+    for link_spec in &self.link {
+      let (rel_type, target_id) = parse_link_spec(link_spec)?;
+      let target_table = resolve_entity_table(&conn, &target_id).await;
+      let target = repo::resolve::resolve_id(&conn, &target_table, &target_id).await?;
+      let target_type = table_to_entity_type(&target_table);
+      let rel = repo::relationship::create(&conn, rel_type, EntityType::Task, task.id(), target_type, &target).await?;
+      repo::transaction::record_event(&conn, tx.id(), "relationships", &rel.id().to_string(), "created", None).await?;
     }
 
-    // Re-read task if links were added (so JSON output includes them)
-    let task = if !self.link.is_empty() {
-      store::read_task(config, &task.id)?
-    } else {
-      task
-    };
-
-    if self.json {
-      let json = serde_json::to_string_pretty(&task)?;
-      println!("{json}");
-      return Ok(());
+    // Add to iteration
+    if let Some(iter_ref) = &self.iteration {
+      let iter_id = repo::resolve::resolve_id(&conn, "iterations", iter_ref).await?;
+      let phase = match self.phase {
+        Some(p) => p,
+        None => {
+          let max = repo::iteration::max_phase(&conn, &iter_id).await?;
+          max.map(|m| m + 1).unwrap_or(1)
+        }
+      };
+      repo::iteration::add_task(&conn, &iter_id, task.id(), phase).await?;
     }
 
-    if self.quiet {
-      println!("{}", task.id.short());
-      return Ok(());
-    }
-
-    let status_str = task.status.as_str();
-    let fields = vec![("title", task.title.clone())];
-
-    let view = TaskCreateView {
-      id: &task.id.to_string(),
-      fields,
-      status: status_str,
-      theme,
-    };
-    println!("{view}");
+    let short_id = task.id().short();
+    self.output.print_entity(&task, &short_id, || {
+      let mut message = SuccessMessage::new("created task").id(task.id().short());
+      message = message.field("title", task.title().to_string());
+      message.to_string()
+    })?;
     Ok(())
   }
 
-  fn batch_call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let stdin = std::io::stdin();
+  async fn batch_create(&self, _context: &AppContext, project_id: &Id, conn: &Connection) -> Result<(), Error> {
+    let input = std::io::read_to_string(std::io::stdin()).unwrap_or_default();
+    let mut count = 0u64;
 
-    if stdin.is_terminal() {
-      return Err(cli::Error::InvalidInput("--batch requires piped stdin".into()));
-    }
-
-    for (line_num, line) in stdin.lock().lines().enumerate() {
-      let line = line.map_err(|e| cli::Error::InvalidInput(format!("line {}: {e}", line_num + 1)))?;
-      if line.trim().is_empty() {
+    for line in input.lines() {
+      let line = line.trim();
+      if line.is_empty() {
         continue;
       }
 
-      let input: BatchTaskInput =
-        serde_json::from_str(&line).map_err(|e| cli::Error::InvalidInput(format!("line {}: {e}", line_num + 1)))?;
-
-      let status = match &input.status {
-        Some(s) => s.parse::<Status>().map_err(cli::Error::InvalidInput)?,
-        None => Status::Open,
-      };
-
-      let mut metadata = toml::Table::new();
-      for (k, v) in &input.metadata {
-        metadata.insert(k.clone(), json_value_to_toml(v));
-      }
-
-      let new = NewTask {
-        assigned_to: input.assigned_to,
-        description: input.description.unwrap_or_default(),
-        links: vec![],
-        metadata,
-        phase: input.phase,
-        priority: input.priority,
-        status,
-        tags: input.tags,
-        title: input.title,
-      };
-
-      let task = store::create_task(config, new)?;
-      let task_id_str = task.id.to_string();
-
-      for link_arg in &input.links {
-        process_link(config, &task_id_str, link_arg)?;
-      }
-
-      if let Some(ref iter_prefix) = input.iteration {
-        let iter_id = store::resolve_iteration_id(config, iter_prefix, false)?;
-        let task_ref = format!("tasks/{}", task.id);
-        store::add_iteration_task(config, &iter_id, &task_ref)?;
-      }
-
-      let task = if !input.links.is_empty() {
-        store::read_task(config, &task.id)?
-      } else {
-        task
-      };
-
-      if self.quiet {
-        println!("{}", task.id.short());
-      } else {
-        let json = serde_json::to_string(&task)?;
-        println!("{json}");
-      }
+      let new: New = serde_json::from_str(line).map_err(|e| Error::Editor(format!("invalid NDJSON: {e}")))?;
+      let tx = repo::transaction::begin(conn, project_id, "task create").await?;
+      let task = repo::task::create(conn, project_id, &new).await?;
+      repo::transaction::record_event(conn, tx.id(), "tasks", &task.id().to_string(), "created", None).await?;
+      count += 1;
     }
 
+    let message = SuccessMessage::new("batch created").field("count", count.to_string());
+    println!("{message}");
     Ok(())
   }
-}
 
-fn json_value_to_toml(v: &serde_json::Value) -> toml::Value {
-  match v {
-    serde_json::Value::Bool(b) => toml::Value::Boolean(*b),
-    serde_json::Value::Number(n) => {
-      if let Some(i) = n.as_i64() {
-        toml::Value::Integer(i)
-      } else if let Some(f) = n.as_f64() {
-        toml::Value::Float(f)
+  fn resolve_title_and_description(&self) -> Result<(String, String), Error> {
+    if let Some(title) = &self.title {
+      // Title given explicitly — description from --description, stdin, or editor
+      let description = if let Some(desc) = &self.description {
+        desc.clone()
+      } else if std::io::stdin().is_terminal() {
+        crate::io::editor::edit_text_with_suffix("", ".md").map_err(|e| Error::Editor(e.to_string()))?
       } else {
-        toml::Value::String(n.to_string())
-      }
+        std::io::read_to_string(std::io::stdin()).unwrap_or_default()
+      };
+      Ok((title.clone(), description))
+    } else if !std::io::stdin().is_terminal() {
+      // No title arg, stdin is piped — parse title from first heading
+      let input = std::io::read_to_string(std::io::stdin()).unwrap_or_default();
+      let title = extract_heading(&input)
+        .ok_or_else(|| Error::Editor("no title provided and no # heading found in stdin".into()))?;
+      Ok((title, input))
+    } else {
+      Err(Error::Editor("task title is required".into()))
     }
-    serde_json::Value::String(s) => toml::Value::String(s.clone()),
-    _ => toml::Value::String(v.to_string()),
   }
 }
 
-fn process_link(config: &crate::config::Settings, task_id_str: &str, link_arg: &str) -> cli::Result<()> {
-  let (rel_str, target_id) = link_arg.split_once(':').ok_or_else(|| {
-    cli::Error::InvalidInput(format!(
-      "Invalid --link format '{link_arg}', expected <rel>:<target_id>"
-    ))
-  })?;
-  let rel: RelationshipType = rel_str.parse().map_err(|e: String| cli::Error::InvalidInput(e))?;
-  let is_artifact = store::resolve_artifact_id(config, target_id, true).is_ok()
-    && store::resolve_task_id(config, target_id, true).is_err();
-  action::link::link::<Task>(config, task_id_str, target_id, &rel, is_artifact)?;
-  Ok(())
+/// Extract the text of the first markdown `# heading` from the input.
+fn extract_heading(input: &str) -> Option<String> {
+  for line in input.lines() {
+    let trimmed = line.trim();
+    if let Some(heading) = trimmed.strip_prefix("# ") {
+      let heading = heading.trim();
+      if !heading.is_empty() {
+        return Some(heading.to_string());
+      }
+    }
+  }
+  None
+}
+
+/// Parse a link spec in the format `rel:target` or just `target` (defaults to relates-to).
+fn parse_link_spec(spec: &str) -> Result<(RelationshipType, String), Error> {
+  if let Some((rel_str, target)) = spec.split_once(':') {
+    let rel_type: RelationshipType = rel_str.parse().map_err(|e: String| Error::Editor(e))?;
+    Ok((rel_type, target.to_string()))
+  } else {
+    Ok((RelationshipType::RelatesTo, spec.to_string()))
+  }
+}
+
+/// Parse repeated key=value metadata pairs into a JSON object.
+fn parse_metadata_pairs(pairs: &[String]) -> Result<Option<Value>, Error> {
+  if pairs.is_empty() {
+    return Ok(None);
+  }
+  let mut map = serde_json::Map::new();
+  for pair in pairs {
+    let (key, value) = pair
+      .split_once('=')
+      .ok_or_else(|| Error::Editor(format!("invalid metadata format (expected key=value): {pair}")))?;
+    let parsed: Value = serde_json::from_str(value).unwrap_or_else(|_| Value::String(value.to_string()));
+    map.insert(key.to_string(), parsed);
+  }
+  Ok(Some(Value::Object(map)))
+}
+
+/// Try to resolve the table for a target entity ID by checking multiple tables.
+async fn resolve_entity_table(conn: &Connection, id: &str) -> String {
+  // Try tasks first, then artifacts, then iterations
+  for table in &["tasks", "artifacts", "iterations"] {
+    if repo::resolve::resolve_id(conn, table, id).await.is_ok() {
+      return table.to_string();
+    }
+  }
+  "tasks".to_string()
+}
+
+/// Map a table name to its EntityType.
+fn table_to_entity_type(table: &str) -> EntityType {
+  match table {
+    "artifacts" => EntityType::Artifact,
+    "iterations" => EntityType::Iteration,
+    _ => EntityType::Task,
+  }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
 
-  mod call {
+  mod extract_heading_fn {
+    use super::*;
+
+    #[test]
+    fn it_extracts_heading_from_markdown() {
+      let input = "# Fix the bug\n\ndetails here";
+      assert_eq!(extract_heading(input), Some("Fix the bug".into()));
+    }
+
+    #[test]
+    fn it_returns_none_when_no_heading() {
+      let input = "just text";
+      assert_eq!(extract_heading(input), None);
+    }
+  }
+
+  mod parse_link_spec_fn {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::test_helpers::make_test_context;
 
     #[test]
-    fn it_creates_a_task_with_all_flags() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
+    fn it_parses_rel_and_target() {
+      let (rel, target) = parse_link_spec("blocks:abc123").unwrap();
 
-      let cmd = Command {
-        title: Some("Full Task".to_string()),
-        assigned_to: Some("agent-1".to_string()),
-        batch: false,
-        description: Some("A description".to_string()),
-        iteration: None,
-        json: false,
-        link: vec![],
-        metadata: vec!["custom=high".to_string()],
-        phase: Some(1),
-        priority: Some(2),
-        quiet: false,
-        status: Some("in-progress".to_string()),
-        tag: vec!["rust".to_string(), "cli".to_string()],
-      };
-
-      cmd.call(&ctx).unwrap();
-
-      let filter = crate::model::TaskFilter::default();
-      let tasks = store::list_tasks(&ctx.settings, &filter).unwrap();
-
-      assert_eq!(tasks.len(), 1);
-
-      let task = &tasks[0];
-      assert_eq!(task.title, "Full Task");
-      assert_eq!(task.description, "A description");
-      assert_eq!(task.status, Status::InProgress);
-      assert_eq!(task.tags, vec!["rust", "cli"]);
-      assert_eq!(task.assigned_to.as_deref(), Some("agent-1"));
-      assert_eq!(task.phase, Some(1));
-      assert_eq!(task.priority, Some(2));
-      assert_eq!(task.links.len(), 0);
-      assert_eq!(task.metadata.get("custom").unwrap().as_str().unwrap(), "high");
+      assert_eq!(rel, RelationshipType::Blocks);
+      assert_eq!(target, "abc123");
     }
 
     #[test]
-    fn it_creates_a_task_with_defaults() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
+    fn it_defaults_to_relates_to() {
+      let (rel, target) = parse_link_spec("abc123").unwrap();
 
-      let cmd = Command {
-        title: Some("My Task".to_string()),
-        assigned_to: None,
-        batch: false,
-        description: None,
-        iteration: None,
-        json: false,
-        link: vec![],
-        metadata: vec![],
-        phase: None,
-        priority: None,
-        quiet: false,
-        status: None,
-        tag: vec![],
-      };
-
-      cmd.call(&ctx).unwrap();
-
-      let filter = crate::model::TaskFilter::default();
-      let tasks = store::list_tasks(&ctx.settings, &filter).unwrap();
-
-      assert_eq!(tasks.len(), 1);
-      assert_eq!(tasks[0].title, "My Task");
-      assert_eq!(tasks[0].status, Status::Open);
-      assert!(tasks[0].description.is_empty());
+      assert_eq!(rel, RelationshipType::RelatesTo);
+      assert_eq!(target, "abc123");
     }
 
     #[test]
-    fn it_resolves_task_created_with_cancelled_status() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
+    fn it_rejects_invalid_rel_type() {
+      let result = parse_link_spec("invalid:abc123");
 
-      let cmd = Command {
-        title: Some("Cancelled Task".to_string()),
-        assigned_to: None,
-        batch: false,
-        description: Some("Cancelled".to_string()),
-        iteration: None,
-        json: false,
-        link: vec![],
-        metadata: vec![],
-        phase: None,
-        priority: None,
-        quiet: false,
-        status: Some("cancelled".to_string()),
-        tag: vec![],
-      };
+      assert!(result.is_err());
+    }
+  }
 
-      cmd.call(&ctx).unwrap();
+  mod parse_metadata_pairs_fn {
+    use super::*;
 
-      let filter = crate::model::TaskFilter::default();
-      let tasks = store::list_tasks(&ctx.settings, &filter).unwrap();
-      assert_eq!(tasks.len(), 0);
-
-      let filter = crate::model::TaskFilter {
-        all: true,
-        ..Default::default()
-      };
-      let tasks = store::list_tasks(&ctx.settings, &filter).unwrap();
-      assert_eq!(tasks.len(), 1);
-      assert_eq!(tasks[0].status, Status::Cancelled);
-      assert!(tasks[0].resolved_at.is_some());
+    #[test]
+    fn it_returns_none_for_empty() {
+      assert_eq!(parse_metadata_pairs(&[]).unwrap(), None);
     }
 
     #[test]
-    fn it_resolves_task_created_with_done_status() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
+    fn it_parses_string_values() {
+      let pairs = vec!["env=prod".to_string()];
+      let result = parse_metadata_pairs(&pairs).unwrap().unwrap();
 
-      let cmd = Command {
-        title: Some("Done Task".to_string()),
-        assigned_to: None,
-        batch: false,
-        description: Some("Already done".to_string()),
-        iteration: None,
-        json: false,
-        link: vec![],
-        metadata: vec![],
-        phase: None,
-        priority: None,
-        quiet: false,
-        status: Some("done".to_string()),
-        tag: vec![],
-      };
+      assert_eq!(result["env"], "prod");
+    }
 
-      cmd.call(&ctx).unwrap();
+    #[test]
+    fn it_parses_json_values() {
+      let pairs = vec!["count=42".to_string()];
+      let result = parse_metadata_pairs(&pairs).unwrap().unwrap();
 
-      let filter = crate::model::TaskFilter::default();
-      let tasks = store::list_tasks(&ctx.settings, &filter).unwrap();
-      assert_eq!(tasks.len(), 0);
+      assert_eq!(result["count"], 42);
+    }
 
-      let filter = crate::model::TaskFilter {
-        all: true,
-        ..Default::default()
-      };
-      let tasks = store::list_tasks(&ctx.settings, &filter).unwrap();
-      assert_eq!(tasks.len(), 1);
-      assert_eq!(tasks[0].title, "Done Task");
-      assert_eq!(tasks[0].status, Status::Done);
-      assert!(tasks[0].resolved_at.is_some());
+    #[test]
+    fn it_rejects_missing_equals() {
+      let pairs = vec!["noequals".to_string()];
+
+      assert!(parse_metadata_pairs(&pairs).is_err());
     }
   }
 }

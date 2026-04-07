@@ -1,111 +1,55 @@
 use clap::Args;
 
 use crate::{
-  cli::{self, AppContext},
-  store,
-  ui::{composites::artifact_detail::ArtifactDetail, views::artifact::ArtifactDetailView},
+  AppContext,
+  cli::Error,
+  store::{model::primitives::EntityType, repo},
+  ui::{components::ArtifactDetail, json},
 };
 
-/// Display an artifact's full details and rendered body.
-#[derive(Debug, Args)]
+/// Show an artifact by ID or prefix.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Artifact ID or unique prefix.
-  pub id: String,
-  /// Output as JSON instead of formatted detail.
-  #[arg(short, long)]
-  pub json: bool,
+  /// The artifact ID or prefix.
+  id: String,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Resolve the artifact and print its detail view or JSON representation.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let id = store::resolve_artifact_id(config, &self.id, true)?;
-    let artifact = store::read_artifact(config, &id)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let conn = context.store().connect().await?;
 
-    if self.json {
-      let json = serde_json::to_string_pretty(&artifact)?;
-      println!("{json}");
+    let id = repo::resolve::resolve_id(&conn, "artifacts", &self.id).await?;
+    let artifact = repo::artifact::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+
+    let short_id = artifact.id().short();
+    if self.output.json || self.output.quiet {
+      self.output.print_entity(&artifact, &short_id, String::new)?;
       return Ok(());
     }
 
-    let id_str = artifact.id.to_string();
-    let created = artifact.created_at.format("%Y-%m-%d").to_string();
-    let updated = artifact.updated_at.format("%Y-%m-%d").to_string();
+    let tags = repo::tag::for_entity(&conn, EntityType::Artifact, artifact.id()).await?;
+    let notes = repo::note::for_entity(&conn, EntityType::Artifact, artifact.id()).await?;
 
-    let body = if artifact.body.is_empty() {
-      None
-    } else {
-      Some(artifact.body.as_str())
-    };
+    let mut view = ArtifactDetail::new(artifact.id().short(), artifact.title().to_string());
 
-    let detail = ArtifactDetail::new(&id_str, &artifact.title, &artifact.tags, &created, &updated, theme).body(body);
-    let view = ArtifactDetailView::new(detail);
-    println!("{view}");
+    if artifact.is_archived() {
+      view = view.archived();
+    }
+    if !tags.is_empty() {
+      view = view.tags(tags);
+    }
+    if !artifact.body().is_empty() {
+      view = view.body(artifact.body());
+    }
+    for note in &notes {
+      view = view.note(note.id().short(), note.body());
+    }
 
+    print!("{view}");
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::{
-    store,
-    test_helpers::{make_test_artifact, make_test_context},
-  };
-
-  mod call {
-    use super::*;
-
-    #[test]
-    fn it_shows_archived_artifact() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.settings, &artifact).unwrap();
-      store::archive_artifact(&ctx.settings, &artifact.id).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_shows_artifact_as_json() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.settings, &artifact).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: true,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
-
-    #[test]
-    fn it_shows_artifact_detail() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      artifact.title = "Test Artifact".to_string();
-      artifact.body = "# Hello\n\nSome content.".to_string();
-      artifact.tags = vec!["spec".to_string()];
-      store::write_artifact(&ctx.settings, &artifact).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-      };
-
-      cmd.call(&ctx).unwrap();
-    }
   }
 }

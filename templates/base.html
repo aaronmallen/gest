@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}gest{% endblock %}</title>
   <style>
-    /* ── reset ─────────────────────────────────────────────────────────── */
+    /* -- reset ---------------------------------------------------------- */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ── palette ──────────────────────────────────────────────────────── */
+    /* -- palette -------------------------------------------------------- */
     :root {
       /* core neutrals */
       --obsidian:    #0D0E12;
@@ -36,10 +36,10 @@
       --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
 
-    /* ── root font size ──────────────────────────────────────────────── */
+    /* -- root font size ------------------------------------------------- */
     html { font-size: 100%; }
 
-    /* ── base ─────────────────────────────────────────────────────────── */
+    /* -- base ----------------------------------------------------------- */
     body {
       font-family: var(--font-mono);
       font-size: 1rem;
@@ -52,14 +52,14 @@
     a { color: var(--azure); text-decoration: none; }
     a:hover { text-decoration: underline; }
 
-    /* ── layout ───────────────────────────────────────────────────────── */
+    /* -- layout --------------------------------------------------------- */
     .shell {
       max-width: 1024px;
       margin: 0 auto;
       padding: 24px 20px;
     }
 
-    /* ── nav ──────────────────────────────────────────────────────────── */
+    /* -- nav ------------------------------------------------------------ */
     .nav {
       display: flex;
       align-items: center;
@@ -90,7 +90,7 @@
     .nav a:hover { color: var(--silver); text-decoration: none; }
     .nav a.active { color: var(--silver); border-bottom-color: var(--azure); font-weight: 500; }
 
-    /* ── terminal card ────────────────────────────────────────────────── */
+    /* -- terminal card -------------------------------------------------- */
     .term {
       background: var(--obsidian);
       border-radius: 10px;
@@ -125,7 +125,7 @@
       overflow-x: auto;
     }
 
-    /* ── color utilities ──────────────────────────────────────────────── */
+    /* -- color utilities ------------------------------------------------ */
     .c-azure      { color: var(--azure); }
     .c-azure-lt   { color: var(--azure-light); }
     .c-azure-dk   { color: var(--azure-dark); }
@@ -141,7 +141,7 @@
     .bold         { font-weight: 700; }
     .italic       { font-style: italic; }
 
-    /* ── status badges ────────────────────────────────────────────────── */
+    /* -- status badges -------------------------------------------------- */
     .status-open        { color: var(--silver); }
     .status-in-progress { color: var(--amber); }
     .status-done        { color: var(--jade); }
@@ -149,7 +149,7 @@
     .status-blocked     { color: var(--error); font-weight: 700; }
     .status-blocking    { color: var(--amber); font-weight: 700; }
 
-    /* ── tables ───────────────────────────────────────────────────────── */
+    /* -- tables --------------------------------------------------------- */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -176,14 +176,14 @@
     .list-table { table-layout: fixed; }
     .list-table td { overflow-wrap: break-word; word-break: break-word; }
 
-    /* ── separator ────────────────────────────────────────────────────── */
+    /* -- separator ------------------------------------------------------ */
     .rule {
       border: none;
       border-top: 1px solid var(--border);
       margin: 16px 0;
     }
 
-    /* ── section heading ──────────────────────────────────────────────── */
+    /* -- section heading ------------------------------------------------ */
     .section-heading {
       font-size: 1.0625rem;
       font-weight: 700;
@@ -193,24 +193,24 @@
       line-height: 1.7;
     }
 
-    /* ── summary line ─────────────────────────────────────────────────── */
+    /* -- summary line --------------------------------------------------- */
     .summary {
       font-size: 0.875rem;
       color: var(--pewter);
       margin-bottom: 16px;
     }
 
-    /* ── id display ───────────────────────────────────────────────────── */
+    /* -- id display ----------------------------------------------------- */
     .id-prefix { color: var(--azure); font-weight: 700; }
     .id-rest   { color: var(--pewter); }
 
-    /* ── tags ─────────────────────────────────────────────────────────── */
+    /* -- tags ----------------------------------------------------------- */
     .tag { color: var(--azure); font-style: italic; }
 
-    /* ── priority badge ───────────────────────────────────────────────── */
+    /* -- priority badge ------------------------------------------------- */
     .priority { color: var(--pewter); }
 
-    /* ── markdown rendered content ────────────────────────────────────── */
+    /* -- markdown rendered content -------------------------------------- */
     .md-content h1,
     .md-content h2,
     .md-content h3,
@@ -266,7 +266,7 @@
       margin-right: 6px;
     }
 
-    /* ── search form ──────────────────────────────────────────────────── */
+    /* -- search form ---------------------------------------------------- */
     .search-input {
       background: var(--obsidian);
       border: 1px solid var(--border);
@@ -289,7 +289,7 @@
       color: var(--dim);
     }
 
-    /* ── kanban board ─────────────────────────────────────────────────── */
+    /* -- kanban board --------------------------------------------------- */
     .kanban {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -335,7 +335,7 @@
       color: var(--dim);
     }
 
-    /* ── dashboard cards ──────────────────────────────────────────────── */
+    /* -- dashboard cards ------------------------------------------------ */
     .dash-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -370,14 +370,14 @@
       letter-spacing: .04em;
     }
 
-    /* ── empty state ──────────────────────────────────────────────────── */
+    /* -- empty state ---------------------------------------------------- */
     .empty {
       color: var(--dim);
       font-style: italic;
       padding: 24px 0;
     }
 
-    /* ── forms ────────────────────────────────────────────────────────── */
+    /* -- forms ---------------------------------------------------------- */
     .form-group {
       margin-bottom: 16px;
     }
@@ -490,7 +490,7 @@
       color: #fff;
     }
 
-    /* ── relationships modal ─────────────────────────────────────────── */
+    /* -- relationships modal -------------------------------------------- */
     .rel-modal {
       display: none;
       background: var(--obsidian);
@@ -563,7 +563,7 @@
 
     .rel-pending-item .rel-remove:hover { text-decoration: underline; }
 
-    /* ── markdown preview ─────────────────────────────────────────────── */
+    /* -- markdown preview ----------------------------------------------- */
     .md-preview-container {
       display: flex;
       flex-wrap: wrap;
@@ -592,7 +592,7 @@
 
     .md-preview.active { display: block; }
 
-    /* ── note cards ──────────────────────────────────────────────────── */
+    /* -- note cards ------------------------------------------------------ */
     .note-card {
       background: var(--obsidian);
       border: 1px solid #1C1E26;
@@ -647,7 +647,7 @@
       padding-left: 42px;
     }
 
-    /* ── visually hidden (accessible to screen readers) ────────────── */
+    /* -- visually hidden (accessible to screen readers) ----------------- */
     .visually-hidden {
       position: absolute;
       width: 1px;
@@ -660,7 +660,7 @@
       border: 0;
     }
 
-    /* ── skip navigation ─────────────────────────────────────────────── */
+    /* -- skip navigation ------------------------------------------------ */
     .skip-link {
       position: absolute;
       left: -9999px;
@@ -687,7 +687,7 @@
       overflow: visible;
     }
 
-    /* ── focus-visible ───────────────────────────────────────────────── */
+    /* -- focus-visible -------------------------------------------------- */
     .btn:focus-visible,
     .nav a:focus-visible,
     .dash-card:focus-visible,
@@ -721,15 +721,13 @@
   </div>
   <script src="/static/forms.js"></script>
   <script>
+    // -- SSE live reload --
     (function() {
       if (!document.body.hasAttribute('data-live-reload')) return;
 
       var fragmentUrl = (function() {
         var path = window.location.pathname;
         if (path === '/') return '/_dashboard';
-        // Detail pages: /tasks/{id} -> /tasks/{id}/_detail
-        // List pages: /tasks -> /tasks/_list
-        // Board pages: /iterations/{id}/board -> /iterations/{id}/_board
         var boardMatch = path.match(/^(\/iterations\/[^/]+)\/board$/);
         if (boardMatch) return boardMatch[1] + '/_board';
         var detailMatch = path.match(/^\/(tasks|artifacts|iterations)\/([^/]+)$/);
@@ -759,9 +757,6 @@
           .catch(function() { fetching = false; });
       });
 
-      // Close the SSE connection on navigation to free the browser's
-      // per-domain connection slot immediately rather than waiting for
-      // the server to notice the dropped TCP connection.
       window.addEventListener('beforeunload', function() {
         source.close();
       });

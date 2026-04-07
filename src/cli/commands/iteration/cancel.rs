@@ -1,49 +1,50 @@
 use clap::Args;
 
 use crate::{
-  action,
-  cli::{self, AppContext},
-  model::{Iteration, iteration::Status},
-  store,
-  ui::composites::success_message::SuccessMessage,
+  AppContext,
+  cli::Error,
+  store::{
+    model::{iteration::Patch, primitives::IterationStatus},
+    repo,
+  },
+  ui::{components::SuccessMessage, json},
 };
 
-/// Cancel an iteration and all its non-terminal tasks (shortcut for `iteration update <id> --status cancelled`).
-#[derive(Debug, Args)]
+/// Cancel an iteration.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Iteration ID or unique prefix.
-  pub id: String,
-  /// Output as JSON.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Print only the iteration ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
+  /// The iteration ID or prefix.
+  id: String,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Mark the iteration as cancelled, cascading to all non-terminal tasks.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let id = store::resolve_iteration_id(config, &self.id, false)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
 
-    let author = action::resolve_author(false)?;
-    let iteration = action::set_status::<Iteration>(config, &id, Status::Cancelled, Some(&author))?;
+    let id = repo::resolve::resolve_id(&conn, "iterations", &self.id).await?;
+    let before_iter = repo::iteration::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or(Error::UninitializedProject)?;
+    let before = serde_json::to_value(&before_iter)?;
+    let tx = repo::transaction::begin(&conn, project_id, "iteration cancel").await?;
+    let patch = Patch {
+      status: Some(IterationStatus::Cancelled),
+      ..Default::default()
+    };
 
-    if self.json {
-      let json = serde_json::to_string_pretty(&iteration)?;
-      println!("{json}");
-      return Ok(());
-    }
+    let iteration = repo::iteration::update(&conn, &id, &patch).await?;
+    repo::transaction::record_event(&conn, tx.id(), "iterations", &id.to_string(), "modified", Some(&before)).await?;
 
-    if self.quiet {
-      println!("{}", iteration.id.short());
-      return Ok(());
-    }
-
-    let msg = format!("Cancelled iteration {}", iteration.id);
-    println!("{}", SuccessMessage::new(&msg, theme));
+    let short_id = iteration.id().short();
+    self.output.print_entity(&iteration, &short_id, || {
+      SuccessMessage::new("cancelled iteration")
+        .id(iteration.id().short())
+        .field("title", iteration.title().to_string())
+        .to_string()
+    })?;
     Ok(())
   }
 }

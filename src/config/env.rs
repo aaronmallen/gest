@@ -1,38 +1,20 @@
-//! Typed environment variable definitions used across the application.
-
 use std::path::PathBuf;
 
 use typed_env::{Envar, EnvarDef};
 
-/// The user's preferred text editor (`$EDITOR`).
-pub static EDITOR: Envar<String> = Envar::on_demand("EDITOR", || EnvarDef::Unset);
+use crate::logging::LevelFilter;
 
-/// Override path for the artifact storage directory.
-pub static GEST_ARTIFACT_DIR: Envar<PathBuf> = Envar::on_demand("GEST_ARTIFACT_DIR", || EnvarDef::Unset);
-
-/// Override path for the global configuration file.
+/// Path to the global gest configuration file. When set, this overrides the default XDG config location
+/// (`$XDG_CONFIG_HOME/gest/config.toml`).
 pub static GEST_CONFIG: Envar<PathBuf> = Envar::on_demand("GEST_CONFIG", || EnvarDef::Unset);
 
-/// Override path for the data storage directory.
-pub static GEST_DATA_DIR: Envar<PathBuf> = Envar::on_demand("GEST_DATA_DIR", || EnvarDef::Unset);
+/// Log level override. Accepts level names (`debug`, `info`, …) or numeric values (`0`–`5`).
+/// When set, this takes precedence over the `[log].level` config-file value.
+pub static GEST_LOG__LEVEL: Envar<LevelFilter> = Envar::on_demand("GEST_LOG__LEVEL", || EnvarDef::Unset);
 
-/// Override path for the iteration storage directory.
-pub static GEST_ITERATION_DIR: Envar<PathBuf> = Envar::on_demand("GEST_ITERATION_DIR", || EnvarDef::Unset);
+/// Path to the gest data directory. When set, this overrides the default XDG data location (`$XDG_DATA_HOME/gest`).
+pub static GEST_STORAGE__DATA_DIR: Envar<PathBuf> = Envar::on_demand("GEST_STORAGE__DATA_DIR", || EnvarDef::Unset);
 
-/// Override for the log level filter (e.g. `"debug"`, `"trace"`).
-pub static GEST_LOG_LEVEL: Envar<String> = Envar::on_demand("GEST_LOG_LEVEL", || EnvarDef::Unset);
-
-/// Override path for the project-specific data directory.
-pub static GEST_PROJECT_DIR: Envar<PathBuf> = Envar::on_demand("GEST_PROJECT_DIR", || EnvarDef::Unset);
-
-/// The user's preferred pager program (`$PAGER`), falling back to `less`.
-pub static PAGER: Envar<String> = Envar::on_demand("PAGER", || EnvarDef::Unset);
-
-/// Override path for the state storage directory.
-pub static GEST_STATE_DIR: Envar<PathBuf> = Envar::on_demand("GEST_STATE_DIR", || EnvarDef::Unset);
-
-/// Override path for the task storage directory.
-pub static GEST_TASK_DIR: Envar<PathBuf> = Envar::on_demand("GEST_TASK_DIR", || EnvarDef::Unset);
-
-/// The user's preferred visual editor (`$VISUAL`), checked before `$EDITOR`.
-pub static VISUAL: Envar<String> = Envar::on_demand("VISUAL", || EnvarDef::Unset);
+/// Enable or disable local file sync. Set to `false` to skip import/export of `.gest/` files.
+/// Defaults to enabled when unset.
+pub static GEST_STORAGE__SYNC: Envar<bool> = Envar::on_demand("GEST_STORAGE__SYNC", || EnvarDef::Unset);

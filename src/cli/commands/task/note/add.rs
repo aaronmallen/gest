@@ -1,120 +1,79 @@
 use clap::Args;
 
 use crate::{
-  cli::{self, AppContext},
-  model::{NewNote, note::AuthorType},
-  store,
-  ui::composites::success_message::SuccessMessage,
+  AppContext,
+  cli::Error,
+  io::git,
+  store::{
+    model::{
+      note::New,
+      primitives::{AuthorType, EntityType},
+    },
+    repo,
+  },
+  ui::{components::SuccessMessage, json},
 };
 
 /// Add a note to a task.
-#[derive(Debug, Args)]
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Task ID or unique prefix.
-  pub id: String,
-  /// Agent name for attribution (mutually exclusive with git-derived authorship).
+  /// The task ID or prefix.
+  id: String,
+  /// The note body (use `-` to open `$EDITOR`).
+  body: String,
+  /// Set the author (agent) identifier for this note.
   #[arg(long)]
-  pub agent: Option<String>,
-  /// Note body text (opens `$EDITOR` if omitted and stdin is a terminal).
-  #[arg(short, long)]
-  pub body: Option<String>,
-  /// Output as JSON.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Print only the note ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
+  agent: Option<String>,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Create a note on the task and print a confirmation.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let task_id = store::resolve_task_id(config, &self.id, true)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
+    let task_id = repo::resolve::resolve_id(&conn, "tasks", &self.id).await?;
 
-    let body = crate::cli::helpers::read_from_editor(self.body.as_deref(), ".md", "Aborting: empty note body")?;
-    if body.trim().is_empty() {
-      return Err(cli::Error::InvalidInput("Aborting: empty note body".into()));
-    }
-
-    let (author, author_email, author_type) = if let Some(agent_name) = &self.agent {
-      (agent_name.clone(), None, AuthorType::Agent)
+    let body = if self.body == "-" {
+      crate::io::editor::edit_text_with_suffix("", ".md").map_err(|e| Error::Editor(e.to_string()))?
     } else {
-      let git_author = crate::cli::git::resolve_author().ok_or_else(|| {
-        cli::Error::InvalidInput("Could not resolve git user.name; use --agent for agent attribution".into())
-      })?;
-      (git_author.name, git_author.email, AuthorType::Human)
+      self.body.clone()
     };
 
-    let new = NewNote {
-      author,
-      author_email,
-      author_type,
+    if body.trim().is_empty() {
+      return Err(Error::Editor("Aborting: empty note body".into()));
+    }
+
+    let author_id = match &self.agent {
+      Some(name) => {
+        let author = repo::author::find_or_create(&conn, name, None, AuthorType::Agent).await?;
+        Some(author.id().clone())
+      }
+      None => {
+        if let Some(ga) = git::resolve_author_or_env() {
+          let author = repo::author::find_or_create(&conn, &ga.name, ga.email.as_deref(), AuthorType::Human).await?;
+          Some(author.id().clone())
+        } else {
+          None
+        }
+      }
+    };
+
+    let new = New {
+      author_id,
       body,
     };
+    let tx = repo::transaction::begin(&conn, project_id, "task note add").await?;
+    let note = repo::note::create(&conn, EntityType::Task, &task_id, &new).await?;
+    repo::transaction::record_event(&conn, tx.id(), "notes", &note.id().to_string(), "created", None).await?;
 
-    let note = store::note::add_note(config, &task_id, new)?;
-
-    if self.json {
-      println!("{}", serde_json::to_string_pretty(&note)?);
-    } else if self.quiet {
-      println!("{}", note.id.short());
-    } else {
-      let msg = format!("added note {} to task {}", note.id.short(), task_id.short());
-      println!("{}", SuccessMessage::new(&msg, theme));
-    }
-
+    let short_id = note.id().short();
+    self.output.print_entity(&note, &short_id, || {
+      SuccessMessage::new("added note")
+        .id(note.id().short())
+        .field("task", task_id.short())
+        .to_string()
+    })?;
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  mod call {
-    use super::*;
-    use crate::test_helpers::{make_test_context, make_test_task};
-
-    #[test]
-    fn it_adds_agent_note() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        agent: Some("claude".to_string()),
-        body: Some("Found the root cause".to_string()),
-        json: false,
-        quiet: false,
-      };
-      cmd.call(&ctx).unwrap();
-
-      let notes = store::note::list_notes(&ctx.settings, &task.id).unwrap();
-      assert_eq!(notes.len(), 1);
-      assert_eq!(notes[0].author, "claude");
-      assert_eq!(notes[0].author_type, AuthorType::Agent);
-      assert_eq!(notes[0].body, "Found the root cause");
-    }
-
-    #[test]
-    fn it_rejects_empty_body() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        agent: Some("claude".to_string()),
-        body: Some("".to_string()),
-        json: false,
-        quiet: false,
-      };
-      assert!(cmd.call(&ctx).is_err());
-    }
   }
 }

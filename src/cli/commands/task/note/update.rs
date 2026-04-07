@@ -1,109 +1,60 @@
 use clap::Args;
 
 use crate::{
-  action,
-  cli::{self, AppContext},
-  model::NotePatch,
-  store,
-  ui::composites::success_message::SuccessMessage,
+  AppContext,
+  cli::Error,
+  store::{model::note::Patch, repo},
+  ui::{components::SuccessMessage, json},
 };
 
-/// Update a note on a task.
-#[derive(Debug, Args)]
+/// Update a note's body.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Task ID or unique prefix.
-  pub task_id: String,
-  /// Note ID or unique prefix.
-  pub note_id: String,
-  /// New body text (opens `$EDITOR` pre-filled if omitted and stdin is a terminal).
-  #[arg(short, long)]
-  pub body: Option<String>,
-  /// Output as JSON.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Print only the note ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
+  /// The note ID or prefix.
+  id: String,
+  /// The new body text (use `-` to open `$EDITOR`).
+  #[arg(long, short)]
+  body: Option<String>,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Edit the note body and persist.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let task_id = store::resolve_task_id(config, &self.task_id, true)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
+    let note_id = repo::resolve::resolve_id(&conn, "notes", &self.id).await?;
 
-    let note = action::resolve_note_prefix(config, &task_id, &self.note_id)?;
-    let note_id = note.id;
+    let existing = repo::note::find_by_id(&conn, note_id.clone())
+      .await?
+      .ok_or_else(|| repo::note::Error::NotFound(self.id.clone()))?;
 
-    let body = if let Some(body) = &self.body {
-      body.clone()
-    } else {
-      crate::cli::helpers::read_from_editor(None, ".md", "Aborting: empty note body")?
+    let body = match &self.body {
+      Some(b) if b == "-" => {
+        crate::io::editor::edit_text_with_suffix(existing.body(), ".md").map_err(|e| Error::Editor(e.to_string()))?
+      }
+      Some(b) => b.clone(),
+      None => {
+        crate::io::editor::edit_text_with_suffix(existing.body(), ".md").map_err(|e| Error::Editor(e.to_string()))?
+      }
     };
 
     if body.trim().is_empty() {
-      return Err(cli::Error::InvalidInput("Aborting: empty note body".into()));
+      return Err(Error::Editor("Aborting: empty note body".into()));
     }
 
-    let patch = NotePatch {
+    let before = serde_json::to_value(&existing)?;
+    let tx = repo::transaction::begin(&conn, project_id, "task note update").await?;
+    let patch = Patch {
       body: Some(body),
     };
+    let note = repo::note::update(&conn, &note_id, &patch).await?;
+    repo::transaction::record_event(&conn, tx.id(), "notes", &note_id.to_string(), "modified", Some(&before)).await?;
 
-    let updated_note = store::note::update_note(config, &task_id, &note_id, patch)?;
-
-    if self.json {
-      println!("{}", serde_json::to_string_pretty(&updated_note)?);
-    } else if self.quiet {
-      println!("{}", updated_note.id.short());
-    } else {
-      let msg = format!("updated note {} on task {}", note_id.short(), task_id.short());
-      println!("{}", SuccessMessage::new(&msg, theme));
-    }
-
+    let short_id = note.id().short();
+    self.output.print_entity(&note, &short_id, || {
+      SuccessMessage::new("updated note").id(note.id().short()).to_string()
+    })?;
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  mod call {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-    use crate::{
-      model::{NewNote, note::AuthorType},
-      test_helpers::{make_test_context, make_test_task},
-    };
-
-    #[test]
-    fn it_updates_a_note_body() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let new = NewNote {
-        author: "claude".to_string(),
-        author_email: None,
-        author_type: AuthorType::Agent,
-        body: "Original body".to_string(),
-      };
-      let note = store::note::add_note(&ctx.settings, &task.id, new).unwrap();
-
-      let cmd = Command {
-        task_id: "zyxw".to_string(),
-        note_id: note.id.short(),
-        body: Some("Updated body".to_string()),
-        json: false,
-        quiet: false,
-      };
-      cmd.call(&ctx).unwrap();
-
-      let updated = store::note::read_note(&ctx.settings, &task.id, &note.id).unwrap();
-      assert_eq!(updated.body, "Updated body");
-    }
   }
 }

@@ -1,71 +1,51 @@
 {% extends "base.html" %}
 
-{% block title %}Edit {{ task.title }} — gest{% endblock %}
+{% block title %}Edit {{ task.title() }} -- gest{% endblock %}
 {% block nav_tasks %}class="active"{% endblock %}
 
 {% block content %}
 <h1 class="section-heading">Edit Task</h1>
-<div class="summary"><a href="/tasks/{{ task.id }}">&larr; {{ task.title }}</a></div>
+<div class="summary">
+  <a href="/tasks/{{ task.id() }}">&larr; back to task</a>
+</div>
+
+{% if let Some(err) = error %}
+<div class="term" style="border-color: var(--error); margin-bottom: 16px;">
+  <div class="term-body">
+    <span class="c-error">{{ err }}</span>
+  </div>
+</div>
+{% endif %}
 
 <div class="term">
-  <div class="term-bar">
-    <span class="term-title">gest task edit {{ task.id.short() }}</span>
-  </div>
+  <div class="term-bar"><span class="term-title">edit task {{ task.id().short() }}</span></div>
   <div class="term-body">
-    <form method="post" action="/tasks/{{ task.id }}">
-      <p class="visually-hidden">Fields marked with * are required.</p>
+    <form method="post" action="/tasks/{{ task.id() }}">
       <div class="form-group">
-        <label for="title">Title <span class="c-error" aria-hidden="true">*</span></label>
-        <input
-          type="text"
-          id="title"
-          name="title"
-          class="form-input{% if error.is_some() %} input-error{% endif %}"
-          value="{{ title }}"
-          placeholder="Task title"
-          aria-required="true"
-        >
-        {% if let Some(msg) = error %}
-          <div class="form-error">{{ msg }}</div>
-        {% endif %}
+        <label for="title">Title</label>
+        <input class="form-input" type="text" id="title" name="title" required autofocus value="{{ title }}">
       </div>
-
-      <div class="form-group md-preview-container">
+      <div class="form-group">
         <label for="description">Description</label>
-        <button type="button" class="btn md-preview-btn md-preview-toggle" data-target="description">Preview</button>
-        <textarea
-          id="description"
-          name="description"
-          class="form-textarea"
-          placeholder="Markdown supported"
-        >{{ description }}</textarea>
-        <div id="description-preview" class="md-preview md-content"></div>
+        <textarea class="form-textarea" id="description" name="description" placeholder="Markdown supported...">{{ description }}</textarea>
       </div>
-
       <div class="form-group">
-        <label for="tags">Tags</label>
-        <input
-          type="text"
-          id="tags"
-          name="tags"
-          class="form-input"
-          value="{{ tags }}"
-          placeholder="Comma-separated tags"
-        >
-      </div>
-
-      <div class="form-group">
-        <label for="priority">Priority</label>
-        <select id="priority" name="priority" class="form-select">
-          <option value=""{% if priority.is_empty() %} selected{% endif %}>None</option>
-          <option value="0"{% if priority == "0" %} selected{% endif %}>0 (Highest)</option>
-          <option value="1"{% if priority == "1" %} selected{% endif %}>1</option>
-          <option value="2"{% if priority == "2" %} selected{% endif %}>2</option>
-          <option value="3"{% if priority == "3" %} selected{% endif %}>3</option>
-          <option value="4"{% if priority == "4" %} selected{% endif %}>4 (Lowest)</option>
+        <label for="status">Status</label>
+        <select class="form-select" id="status" name="status">
+          <option value="open"{% if task.status().to_string() == "open" %} selected{% endif %}>Open</option>
+          <option value="in-progress"{% if task.status().to_string() == "in-progress" %} selected{% endif %}>In Progress</option>
+          <option value="done"{% if task.status().to_string() == "done" %} selected{% endif %}>Done</option>
+          <option value="cancelled"{% if task.status().to_string() == "cancelled" %} selected{% endif %}>Cancelled</option>
         </select>
       </div>
-
+      <div class="form-group">
+        <label for="priority">Priority (0=critical, 1=high, 2=medium, 3=low)</label>
+        <input class="form-input" type="number" id="priority" name="priority" min="0" max="4" value="{{ priority }}">
+      </div>
+      <div class="form-group">
+        <label for="tags">Tags (comma-separated)</label>
+        <input class="form-input" type="text" id="tags" name="tags" placeholder="e.g. backend, urgent, bug" value="{{ tags }}">
+      </div>
       <div class="form-group">
         <button type="button" id="rel-toggle" class="btn" aria-expanded="false" aria-controls="rel-modal">Relationships</button>
         <div id="rel-modal" class="rel-modal" role="dialog" aria-label="Add relationship">
@@ -76,10 +56,10 @@
             <button type="button" class="rel-type-btn" data-rel="parent-of">parent of</button>
             <button type="button" class="rel-type-btn" data-rel="child-of">child of</button>
           </div>
-          <input type="text" class="form-input rel-search-input" placeholder="Search tasks and artifacts…" aria-label="Search tasks and artifacts">
+          <input type="text" class="form-input rel-search-input" placeholder="Search tasks and artifacts..." aria-label="Search tasks and artifacts">
           <div class="rel-results"></div>
           <div class="rel-pending">
-            {% for link in task.links.iter() %}
+            {% for link in existing_links.iter() %}
             <div class="rel-pending-item">
               <span class="c-pewter">{{ link.rel }}</span>
               <span class="c-azure">{{ link.ref_ }}</span>
@@ -92,10 +72,9 @@
           <div class="rel-hidden-inputs"></div>
         </div>
       </div>
-
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Changes</button>
-        <a href="/tasks/{{ task.id }}" class="btn">Cancel</a>
+        <button class="btn btn-primary" type="submit">Save Changes</button>
+        <a class="btn" href="/tasks/{{ task.id() }}">Cancel</a>
       </div>
     </form>
   </div>

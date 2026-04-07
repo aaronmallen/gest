@@ -1,117 +1,59 @@
-use chrono::Utc;
 use clap::Args;
+use serde_json::Value;
 
 use crate::{
-  cli::{self, AppContext},
-  store,
-  ui::composites::success_message::SuccessMessage,
+  AppContext,
+  cli::Error,
+  store::{model::artifact::Patch, repo},
+  ui::{components::SuccessMessage, json},
 };
 
-/// Set a metadata value on an artifact using a dot-delimited key path.
-#[derive(Debug, Args)]
+/// Set a metadata value on an artifact.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Artifact ID or unique prefix.
-  pub id: String,
-  /// Output as JSON.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Dot-delimited key path (e.g. `config.timeout`).
-  pub path: String,
-  /// Print only the entity ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
-  /// Value to set (strings, numbers, booleans, and null are auto-detected).
-  pub value: String,
+  /// The artifact ID or prefix.
+  id: String,
+  /// The metadata key.
+  key: String,
+  /// The metadata value.
+  value: String,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Resolve the artifact, set the metadata key to the given value, and persist.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let id = store::resolve_artifact_id(config, &self.id, false)?;
-    let mut artifact = store::read_artifact(config, &id)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
+    let id = repo::resolve::resolve_id(&conn, "artifacts", &self.id).await?;
+    let artifact = repo::artifact::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
 
-    store::artifact_meta::set_dot_path(&mut artifact.metadata, &self.path, &self.value)?;
+    let before = serde_json::to_value(&artifact)?;
+    let tx = repo::transaction::begin(&conn, project_id, "artifact meta set").await?;
 
-    artifact.updated_at = Utc::now();
-    store::write_artifact(config, &artifact)?;
+    let mut metadata = artifact.metadata().clone();
+    let value: Value = serde_json::from_str(&self.value).unwrap_or_else(|_| Value::String(self.value.clone()));
+    metadata[&self.key] = value;
 
-    if self.json {
-      println!("{}", serde_json::to_string_pretty(&artifact)?);
-    } else if self.quiet {
-      println!("{}", artifact.id.short());
-    } else {
-      let msg = format!("Set {}.{} = {}", id, self.path, self.value);
-      println!("{}", SuccessMessage::new(&msg, &ctx.theme));
-    }
+    let patch = Patch {
+      metadata: Some(metadata),
+      ..Default::default()
+    };
+    repo::artifact::update(&conn, &id, &patch).await?;
+    repo::transaction::record_event(&conn, tx.id(), "artifacts", &id.to_string(), "modified", Some(&before)).await?;
 
+    let updated = repo::artifact::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let short_id = id.short();
+    self.output.print_entity(&updated, &short_id, || {
+      SuccessMessage::new("set metadata")
+        .id(id.short())
+        .field("key", self.key.clone())
+        .to_string()
+    })?;
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  mod call {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-    use crate::test_helpers::{make_test_artifact, make_test_context};
-
-    #[test]
-    fn it_sets_metadata_value() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.settings, &artifact).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-        path: "priority".to_string(),
-        quiet: false,
-        value: "high".to_string(),
-      };
-      cmd.call(&ctx).unwrap();
-
-      let loaded = store::read_artifact(&ctx.settings, &artifact.id).unwrap();
-
-      assert_eq!(
-        loaded.metadata.get(yaml_serde::Value::String("priority".to_string())),
-        Some(&yaml_serde::Value::String("high".to_string()))
-      );
-    }
-
-    #[test]
-    fn it_sets_nested_metadata_value() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_artifact(&ctx.settings, &artifact).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-        path: "config.timeout".to_string(),
-        quiet: false,
-        value: "30".to_string(),
-      };
-      cmd.call(&ctx).unwrap();
-
-      let loaded = store::read_artifact(&ctx.settings, &artifact.id).unwrap();
-      let config_key = yaml_serde::Value::String("config".to_string());
-      let config_val = loaded.metadata.get(config_key).unwrap();
-
-      if let yaml_serde::Value::Mapping(m) = config_val {
-        let timeout_key = yaml_serde::Value::String("timeout".to_string());
-        assert_eq!(
-          m.get(timeout_key),
-          Some(&yaml_serde::Value::Number(yaml_serde::Number::from(30)))
-        );
-      } else {
-        panic!("Expected mapping for config key");
-      }
-    }
   }
 }

@@ -1,7 +1,7 @@
 // gest — form interaction helpers
 "use strict";
 
-// ── Markdown Preview Toggle ─────────────────────────────────────────
+// -- Markdown Preview Toggle --
 (function () {
   document.querySelectorAll(".md-preview-btn").forEach(function (btn) {
     var targetId = btn.dataset.target;
@@ -33,7 +33,7 @@
   });
 })();
 
-// ── Relationships Modal ─────────────────────────────────────────────
+// -- Relationships Modal --
 (function () {
   var modal = document.getElementById("rel-modal");
   if (!modal) return;
@@ -47,7 +47,6 @@
   var selectedType = "relates-to";
   var debounceTimer = null;
 
-  // ── ARIA: set up trigger attributes ───────────────────────────────
   toggleBtn.setAttribute("aria-expanded", "false");
   toggleBtn.setAttribute("aria-controls", "rel-modal");
   modal.setAttribute("role", "dialog");

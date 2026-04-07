@@ -1,61 +1,65 @@
 {% extends "base.html" %}
 
-{% block title %}edit {{ artifact.title }} — gest{% endblock %}
+{% block title %}Edit {{ artifact.title() }} - gest{% endblock %}
 {% block nav_artifacts %}class="active"{% endblock %}
 
 {% block content %}
-<div class="summary"><a href="/artifacts/{{ artifact.id }}">&larr; {{ artifact.title }}</a></div>
-
 <h1 class="section-heading">Edit Artifact</h1>
-
-<form method="post" action="/artifacts/{{ artifact.id }}">
-  <p class="visually-hidden">Fields marked with * are required.</p>
-  <div class="form-group">
-    <label for="title">Title <span class="c-error" aria-hidden="true">*</span></label>
-    <input type="text" id="title" name="title" class="form-input{% match error %}{% when Some with (_) %} input-error{% when None %}{% endmatch %}" value="{{ title }}" aria-required="true" />
-    {% match error %}
-    {% when Some with (msg) %}
-    <span class="form-error">{{ msg }}</span>
-    {% when None %}
-    {% endmatch %}
-  </div>
-
-  <div class="form-group">
-    <label for="kind">Type</label>
-    <input type="text" id="kind" name="kind" class="form-input" value="{{ kind }}" />
-  </div>
-
-  <div class="form-group">
-    <label for="tags">Tags <span class="c-pewter">(comma-separated)</span></label>
-    <input type="text" id="tags" name="tags" class="form-input" value="{{ tags }}" />
-  </div>
-
-  <div class="form-group md-preview-container">
-    <label for="body">Body</label>
-    <button type="button" class="btn md-preview-btn md-preview-toggle" data-target="body">Preview</button>
-    <textarea id="body" name="body" class="form-textarea" rows="12">{{ body }}</textarea>
-    <div id="body-preview" class="md-preview md-content"></div>
-  </div>
-
-  <div class="form-group">
-    <button type="button" id="rel-toggle" class="btn" aria-expanded="false" aria-controls="rel-modal">Relationships</button>
-    <div id="rel-modal" class="rel-modal" role="dialog" aria-label="Add relationship">
-      <div class="rel-types">
-        <button type="button" class="rel-type-btn" data-rel="relates-to">relates to</button>
-        <button type="button" class="rel-type-btn" data-rel="blocks">blocks</button>
-        <button type="button" class="rel-type-btn" data-rel="blocked-by">blocked by</button>
-        <button type="button" class="rel-type-btn" data-rel="parent-of">parent of</button>
-        <button type="button" class="rel-type-btn" data-rel="child-of">child of</button>
+<div class="summary">
+  <a href="/artifacts/{{ artifact.id() }}">&larr; back to artifact</a>
+</div>
+<div class="term">
+  <div class="term-bar"><span class="term-title">edit artifact {{ artifact.id().short() }}</span></div>
+  <div class="term-body">
+    {% if let Some(err) = error %}
+    <div class="form-error" style="margin-bottom: 12px;">{{ err }}</div>
+    {% endif %}
+    <form method="post" action="/artifacts/{{ artifact.id() }}">
+      <div class="form-group">
+        <label for="title">Title</label>
+        <input class="form-input" type="text" id="title" name="title" required autofocus value="{{ title }}">
       </div>
-      <input type="text" class="form-input rel-search-input" placeholder="Search tasks and artifacts…" aria-label="Search tasks and artifacts">
-      <div class="rel-results"></div>
-      <div class="rel-pending"></div>
-      <div class="rel-hidden-inputs"></div>
-    </div>
+      <div class="form-group md-preview-container">
+        <label for="body">Body</label>
+        <button type="button" class="btn md-preview-btn md-preview-toggle" data-target="body">Preview</button>
+        <textarea class="form-textarea" id="body" name="body" placeholder="Markdown supported...">{{ body }}</textarea>
+        <div id="body-preview" class="md-preview md-content"></div>
+      </div>
+      <div class="form-group">
+        <label for="tags">Tags (comma-separated)</label>
+        <input class="form-input" type="text" id="tags" name="tags" value="{{ tags }}">
+      </div>
+      <div class="form-group">
+        <button type="button" id="rel-toggle" class="btn" aria-expanded="false" aria-controls="rel-modal">Relationships</button>
+        <div id="rel-modal" class="rel-modal" role="dialog" aria-label="Add relationship">
+          <div class="rel-types">
+            <button type="button" class="rel-type-btn" data-rel="relates-to">relates to</button>
+            <button type="button" class="rel-type-btn" data-rel="blocks">blocks</button>
+            <button type="button" class="rel-type-btn" data-rel="blocked-by">blocked by</button>
+            <button type="button" class="rel-type-btn" data-rel="parent-of">parent of</button>
+            <button type="button" class="rel-type-btn" data-rel="child-of">child of</button>
+          </div>
+          <input type="text" class="form-input rel-search-input" placeholder="Search tasks and artifacts..." aria-label="Search tasks and artifacts">
+          <div class="rel-results"></div>
+          <div class="rel-pending">
+            {% for link in existing_links.iter() %}
+            <div class="rel-pending-item">
+              <span class="c-pewter">{{ link.rel }}</span>
+              <span class="c-azure">{{ link.ref_ }}</span>
+              <button type="button" class="rel-remove">&times;</button>
+              <input type="hidden" name="link_rel[]" value="{{ link.rel }}">
+              <input type="hidden" name="link_ref[]" value="{{ link.ref_ }}">
+            </div>
+            {% endfor %}
+          </div>
+          <div class="rel-hidden-inputs"></div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Save Changes</button>
+        <a class="btn" href="/artifacts/{{ artifact.id() }}">Cancel</a>
+      </div>
+    </form>
   </div>
-
-  <div class="form-actions">
-    <button type="submit" class="btn btn-primary">Save Changes</button>
-  </div>
-</form>
+</div>
 {% endblock %}

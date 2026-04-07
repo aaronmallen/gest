@@ -1,31 +1,30 @@
-//! Subcommands for generating shell completions and man pages.
-
 mod completions;
 mod man_pages;
 
 use clap::{Args, Subcommand};
 
-use crate::cli::{self, AppContext};
+use crate::{AppContext, cli::Error};
 
-/// Entry point for the `generate` subcommand tree.
-#[derive(Debug, Args)]
+/// Generate shell completions and man pages.
+#[derive(Args, Debug)]
 pub struct Command {
   #[command(subcommand)]
-  command: GenerateCommand,
+  subcommand: Sub,
 }
 
 #[derive(Debug, Subcommand)]
-enum GenerateCommand {
+enum Sub {
+  /// Generate shell completions.
   Completions(completions::Command),
+  /// Generate man pages.
   ManPages(man_pages::Command),
 }
 
 impl Command {
-  /// Dispatch to the appropriate generate subcommand.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    match &self.command {
-      GenerateCommand::Completions(cmd) => cmd.call(),
-      GenerateCommand::ManPages(cmd) => cmd.call(ctx),
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    match &self.subcommand {
+      Sub::Completions(cmd) => cmd.call(context).await,
+      Sub::ManPages(cmd) => cmd.call(context).await,
     }
   }
 }

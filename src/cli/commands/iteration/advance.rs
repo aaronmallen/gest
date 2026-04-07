@@ -1,132 +1,131 @@
 use clap::Args;
 
 use crate::{
-  cli::{self, AppContext},
-  store,
-  ui::composites::success_message::SuccessMessage,
+  AppContext,
+  cli::Error,
+  store::{model::primitives::TaskStatus, repo},
+  ui::{components::SuccessMessage, json},
 };
 
 /// Validate the active phase is complete and advance to the next phase.
-#[derive(Debug, Args)]
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Iteration ID or unique prefix.
-  pub id: String,
-  /// Advance even if current phase has non-terminal tasks.
+  /// The iteration ID or prefix.
+  id: String,
+  /// Advance even if the current phase has non-terminal tasks.
   #[arg(long)]
-  pub force: bool,
+  force: bool,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Execute the iteration advance command.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let id = store::resolve_iteration_id(config, &self.id, true)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let conn = context.store().connect().await?;
+    let id = repo::resolve::resolve_id(&conn, "iterations", &self.id).await?;
+    let iteration = repo::iteration::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
 
-    let summary = store::advance_phase(config, &id, self.force)?;
-
-    let msg = match summary.to_phase {
-      Some(phase) => format!(
-        "Advanced iteration {} to phase {}: {} tasks now open",
-        id, phase, summary.active_tasks
-      ),
-      None => "All phases complete".to_string(),
-    };
-
-    println!("{}", SuccessMessage::new(&msg, theme));
-    Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::{
-    model::task::Status as TaskStatus,
-    store,
-    test_helpers::{make_test_context, make_test_iteration, make_test_task},
-  };
-
-  mod call {
-    use super::*;
-
-    #[test]
-    fn it_advances_when_phase_is_terminal() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let mut t1 = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      t1.phase = Some(1);
-      t1.status = TaskStatus::Done;
-      store::write_task(&ctx.settings, &t1).unwrap();
-
-      let mut t2 = make_test_task("llllllllllllllllllllllllllllllll");
-      t2.phase = Some(2);
-      t2.status = TaskStatus::Open;
-      store::write_task(&ctx.settings, &t2).unwrap();
-
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks = vec![t1.id.to_string(), t2.id.to_string()];
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        force: false,
-      };
-
-      // Active phase is 2 (phase 1 all done), phase 2 has non-terminal -> error
-      assert!(cmd.call(&ctx).is_err());
+    if iteration.status().is_terminal() {
+      return Err(Error::Editor(format!(
+        "iteration {} is {}, not active",
+        id.short(),
+        iteration.status()
+      )));
     }
 
-    #[test]
-    fn it_errors_when_phase_has_non_terminal_tasks() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-
-      let mut t1 = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      t1.phase = Some(1);
-      t1.status = TaskStatus::InProgress;
-      store::write_task(&ctx.settings, &t1).unwrap();
-
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks = vec![t1.id.to_string()];
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        force: false,
-      };
-
-      let err = cmd.call(&ctx).unwrap_err();
-      let msg = err.to_string();
-      assert!(msg.contains("non-terminal"), "expected non-terminal error, got: {msg}");
+    let tasks = repo::iteration::tasks_with_phase(&conn, &id).await?;
+    if tasks.is_empty() {
+      return Err(Error::Editor(format!("iteration {} has no tasks", id.short())));
     }
 
-    #[test]
-    fn it_force_advances_with_non_terminal_tasks() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
+    // Active phase = lowest phase number where any task has a non-terminal status
+    let active_phase = tasks
+      .iter()
+      .filter(|t| {
+        t.status
+          .parse::<TaskStatus>()
+          .map(|s| !s.is_terminal())
+          .unwrap_or(false)
+      })
+      .map(|t| t.phase)
+      .min();
 
-      let mut t1 = make_test_task("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
-      t1.phase = Some(1);
-      t1.status = TaskStatus::Open;
-      store::write_task(&ctx.settings, &t1).unwrap();
+    let max_phase = tasks.iter().map(|t| t.phase).max().unwrap_or(0);
 
-      let mut t2 = make_test_task("llllllllllllllllllllllllllllllll");
-      t2.phase = Some(2);
-      t2.status = TaskStatus::Open;
-      store::write_task(&ctx.settings, &t2).unwrap();
+    match active_phase {
+      None => {
+        // All tasks in all phases are terminal
+        Err(Error::Editor(format!(
+          "iteration {} is already complete: all tasks in all phases are terminal",
+          id.short()
+        )))
+      }
+      Some(phase) => {
+        // Count non-terminal tasks in the active phase
+        let non_terminal_count = tasks
+          .iter()
+          .filter(|t| {
+            t.phase == phase
+              && t
+                .status
+                .parse::<TaskStatus>()
+                .map(|s| !s.is_terminal())
+                .unwrap_or(false)
+          })
+          .count();
 
-      let mut iteration = make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      iteration.tasks = vec![t1.id.to_string(), t2.id.to_string()];
-      store::write_iteration(&ctx.settings, &iteration).unwrap();
+        if non_terminal_count > 0 && !self.force {
+          return Err(Error::Editor(format!(
+            "phase {phase} has {non_terminal_count} non-terminal task(s); use --force to advance anyway"
+          )));
+        }
 
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        force: true,
-      };
+        // Determine the next phase (next higher phase number that exists)
+        let next_phase = tasks.iter().map(|t| t.phase).filter(|&p| p > phase).min();
 
-      cmd.call(&ctx).unwrap();
+        match next_phase {
+          Some(next) => {
+            let short_id = id.short();
+            let result = serde_json::json!({
+              "id": id.to_string(),
+              "from_phase": phase,
+              "to_phase": next,
+            });
+            self.output.print_entity(&result, &short_id, || {
+              SuccessMessage::new("advanced iteration")
+                .id(id.short())
+                .field("title", iteration.title().to_string())
+                .field("from phase", phase.to_string())
+                .field("to phase", next.to_string())
+                .to_string()
+            })?;
+          }
+          None => {
+            if phase == max_phase {
+              return Err(Error::Editor(format!(
+                "iteration {} is on the last phase ({phase}) with non-terminal tasks; \
+                complete remaining tasks to finish the iteration",
+                id.short()
+              )));
+            }
+            let short_id = id.short();
+            let result = serde_json::json!({
+              "id": id.to_string(),
+              "status": "all_phases_complete",
+            });
+            self.output.print_entity(&result, &short_id, || {
+              SuccessMessage::new("all phases complete")
+                .id(id.short())
+                .field("title", iteration.title().to_string())
+                .to_string()
+            })?;
+          }
+        }
+
+        Ok(())
+      }
     }
   }
 }

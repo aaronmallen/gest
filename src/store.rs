@@ -1,194 +1,35 @@
-//! Persistence layer for reading, writing, and querying entities on disk.
-
 /// Sequential schema migrations applied at startup.
 pub mod migration;
 pub mod model;
 pub mod repo;
+pub mod search_query;
 pub mod sync;
 
-mod artifact;
-pub mod artifact_meta;
-mod fs;
-mod helpers;
-mod iteration;
-pub mod meta;
-pub(crate) mod meta_value;
-pub mod note;
-mod orchestration;
-mod search;
-pub mod search_query;
-pub(crate) mod tag;
-mod task;
-
-use std::io;
-
-use crate::{
-  config::Settings,
-  model::{EntityType, Id},
+use std::{
+  fmt::{self, Debug, Formatter},
+  io::Error as IoError,
+  path::PathBuf,
+  sync::{
+    Arc, OnceLock,
+    atomic::{AtomicBool, Ordering},
+  },
 };
 
-/// A successfully resolved entity ID together with its type.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ResolvedEntity {
-  pub entity_type: EntityType,
-  pub id: Id,
-}
+use libsql::{Connection, Database, Error as DbError};
 
-/// Errors that can occur during store operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  #[error("{0}")]
-  AmbiguousId(String),
-  #[error("failed to generate a unique ID after {0} attempts")]
-  IdExhausted(usize),
-  #[error("{0}")]
-  InvalidFormat(String),
-  #[error("{0}")]
-  InvalidId(String),
-  #[error(transparent)]
-  Io(#[from] io::Error),
-  #[error("{0}")]
-  NotFound(String),
-  #[error("{0}")]
-  PhaseAdvance(String),
-  #[error(transparent)]
-  TomlDe(#[from] toml::de::Error),
-  #[error(transparent)]
-  TomlSer(#[from] toml::ser::Error),
-  #[error(transparent)]
-  Yaml(#[from] yaml_serde::Error),
-}
-
-/// Convenience alias for store operations.
-pub type Result<T> = std::result::Result<T, Error>;
-
-pub use artifact::{
-  archive_artifact, create_artifact, list_artifacts, read_artifact, resolve_artifact_id, update_artifact,
-  write_artifact,
-};
-#[allow(unused_imports)] // used in tests via crate::store::ensure_dirs
-pub use fs::ensure_dirs;
-#[allow(unused_imports)] // is_iteration_resolved, resolve_iteration used in tests
-pub use iteration::{
-  add_task as add_iteration_task, create_iteration, is_iteration_resolved, list_iterations, read_iteration,
-  read_iteration_tasks, remove_task as remove_iteration_task, resolve_iteration, resolve_iteration_id,
-  update_iteration, write_iteration,
-};
-#[allow(unused_imports)] // AdvanceSummary, OverallProgress, PhaseProgress used in tests
-pub use orchestration::{
-  AdvanceSummary, IterationProgress, OverallProgress, PhaseProgress, advance_phase, claim_task, iteration_status,
-  next_available_task,
-};
-pub use search::{SearchResults, search};
-#[allow(unused_imports)] // TagResult used by callers of tag_entity/untag_entity
-pub use tag::{TagParams, TagResult, tag_entity, untag_entity};
-#[allow(unused_imports)] // is_task_resolved, resolve_task used in tests
-pub use task::{
-  ResolvedBlocking, create_task, is_task_resolved, list_tasks, read_task, resolve_blocking, resolve_blocking_batch,
-  resolve_task, resolve_task_id, update_task, write_task,
-};
-
-/// Collect every unique tag used across tasks, artifacts, and iterations, sorted alphabetically.
-///
-/// When `entity_types` is `None` (or an empty slice), tags are collected from all entity types.
-/// Otherwise only the specified types are queried.
-pub fn list_tags(
-  config: &crate::config::Settings,
-  entity_types: Option<&[crate::model::EntityType]>,
-) -> Result<Vec<String>> {
-  use std::collections::BTreeSet;
-
-  use crate::model::EntityType;
-
-  let include_all = entity_types.is_none_or(|t| t.is_empty());
-
-  let mut tags: BTreeSet<String> = BTreeSet::new();
-
-  if include_all || entity_types.is_some_and(|t| t.contains(&EntityType::Task)) {
-    let task_filter = crate::model::TaskFilter {
-      all: true,
-      ..Default::default()
-    };
-    for task in list_tasks(config, &task_filter)? {
-      tags.extend(task.tags);
-    }
-  }
-
-  if include_all || entity_types.is_some_and(|t| t.contains(&EntityType::Artifact)) {
-    let artifact_filter = crate::model::ArtifactFilter {
-      all: true,
-      ..Default::default()
-    };
-    for artifact in list_artifacts(config, &artifact_filter)? {
-      tags.extend(artifact.tags);
-    }
-  }
-
-  if include_all || entity_types.is_some_and(|t| t.contains(&EntityType::Iteration)) {
-    let iteration_filter = crate::model::IterationFilter {
-      all: true,
-      ..Default::default()
-    };
-    for iteration in list_iterations(config, &iteration_filter)? {
-      tags.extend(iteration.tags);
-    }
-  }
-
-  Ok(tags.into_iter().collect())
-}
-
-/// Resolve an ID prefix across tasks, artifacts, and iterations.
-///
-/// Returns the full [`Id`] and [`EntityType`] when the prefix matches exactly one
-/// entity type. Returns an error with disambiguation info when the prefix matches
-/// multiple entity types, or a "not found" error when it matches none.
-///
-/// Resolved/archived entities are always included in the search.
-pub fn resolve_any_id(config: &Settings, prefix: &str) -> Result<ResolvedEntity> {
-  Id::validate_prefix(prefix).map_err(Error::InvalidId)?;
-
-  let mut matches: Vec<(EntityType, Id)> = Vec::new();
-
-  if let Ok(id) = resolve_task_id(config, prefix, true) {
-    matches.push((EntityType::Task, id));
-  }
-  if let Ok(id) = resolve_artifact_id(config, prefix, true) {
-    matches.push((EntityType::Artifact, id));
-  }
-  if let Ok(id) = resolve_iteration_id(config, prefix, true) {
-    matches.push((EntityType::Iteration, id));
-  }
-
-  match matches.len() {
-    0 => Err(Error::NotFound(format!("No entity found matching '{prefix}'"))),
-    1 => {
-      let (entity_type, id) = matches.remove(0);
-      Ok(ResolvedEntity {
-        entity_type,
-        id,
-      })
-    }
-    _ => {
-      let types: Vec<String> = matches.iter().map(|(et, id)| format!("{et} ({id})")).collect();
-      Err(Error::AmbiguousId(format!(
-        "Ambiguous ID prefix '{prefix}' matches multiple entity types: {}",
-        types.join(", ")
-      )))
-    }
-  }
-}
+use crate::store::model::primitives::Id;
 
 /// Thin wrapper around a [`libsql::Database`] with optional transparent sync.
 pub struct Db {
-  inner: libsql::Database,
+  inner: Database,
   /// Whether the initial sync import has already run this process.
-  imported: std::sync::atomic::AtomicBool,
+  imported: AtomicBool,
   /// Sync context set after project resolution: `(project_id, gest_dir)`.
-  sync_ctx: std::sync::OnceLock<(model::primitives::Id, std::path::PathBuf)>,
+  sync_ctx: OnceLock<(Id, PathBuf)>,
 }
 
-impl std::fmt::Debug for Db {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for Db {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     f.debug_struct("Db").finish_non_exhaustive()
   }
 }
@@ -198,7 +39,7 @@ impl Db {
   ///
   /// Each connection has `PRAGMA foreign_keys = ON` enabled so that
   /// `REFERENCES` constraints are enforced.
-  pub async fn connect(&self) -> std::result::Result<libsql::Connection, DbError> {
+  pub async fn connect(&self) -> Result<Connection, Error> {
     let conn = self.inner.connect()?;
     conn.execute("PRAGMA foreign_keys = ON", ()).await?;
     Ok(conn)
@@ -208,32 +49,73 @@ impl Db {
   ///
   /// Must be called after project resolution and before the first
   /// `import_if_needed()` call. Subsequent calls are no-ops.
-  pub fn configure_sync(&self, project_id: model::primitives::Id, gest_dir: std::path::PathBuf) {
+  pub fn configure_sync(&self, project_id: Id, gest_dir: PathBuf) {
     self.sync_ctx.set((project_id, gest_dir)).ok();
+  }
+
+  /// Run the sync import if configured and not yet imported this process.
+  ///
+  /// Called automatically at application startup; safe to call multiple times
+  /// (only the first call actually imports).
+  pub async fn import_if_needed(&self) -> Result<(), Error> {
+    if let Some((pid, dir)) = self.sync_ctx.get()
+      && !self.imported.swap(true, Ordering::SeqCst)
+    {
+      let conn = self.connect().await?;
+      if let Err(e) = sync::import(&conn, pid, dir).await {
+        log::warn!("sync import failed: {e}");
+      }
+    }
+    Ok(())
+  }
+
+  /// Run the sync export if configured.
+  ///
+  /// Called at application exit to flush any database changes back to the
+  /// `.gest/` directory.
+  pub async fn export_if_needed(&self) -> Result<(), Error> {
+    if let Some((pid, dir)) = self.sync_ctx.get() {
+      let conn = self.connect().await?;
+      if let Err(e) = sync::export(&conn, pid, dir).await {
+        log::warn!("sync export failed: {e}");
+      }
+    }
+    Ok(())
   }
 }
 
 /// Errors that can occur when opening the database store.
 #[derive(Debug, thiserror::Error)]
-pub enum DbError {
+pub enum Error {
   #[error(transparent)]
-  Database(#[from] libsql::Error),
+  Config(#[from] crate::config::Error),
   #[error(transparent)]
-  Io(#[from] std::io::Error),
+  Database(#[from] DbError),
+  #[error(transparent)]
+  Io(#[from] IoError),
 }
 
-/// Open (or create) the local database at `<data_dir>/gest.db`.
-pub async fn open(settings: &crate::config::Settings) -> std::result::Result<std::sync::Arc<Db>, DbError> {
-  let data_dir = settings.storage().data_dir();
-  std::fs::create_dir_all(data_dir)?;
-  let path = data_dir.join("gest.db");
-  log::debug!("opening local database at {}", path.display());
-  let db = libsql::Builder::new_local(path).build().await?;
+/// Open (or create) the database described by `settings`.
+///
+/// When `database.url` is configured the store connects to that remote database.
+/// Otherwise a standalone local SQLite file at `<data_dir>/gest.db` is used.
+pub async fn open(settings: &crate::config::Settings) -> Result<Arc<Db>, Error> {
+  let db = if let Some(url) = settings.database().url() {
+    log::debug!("opening remote database at {url}");
+    let auth_token = settings.database().auth_token().clone().unwrap_or_default();
+    libsql::Builder::new_remote(url, auth_token).build().await?
+  } else {
+    let data_dir = settings.storage().data_dir()?;
+    std::fs::create_dir_all(&data_dir)?;
+    let path = data_dir.join("gest.db");
+    log::debug!("opening local database at {}", path.display());
+    libsql::Builder::new_local(path).build().await?
+  };
 
-  let store = std::sync::Arc::new(Db {
+  let store = Arc::new(Db {
     inner: db,
-    imported: std::sync::atomic::AtomicBool::new(false),
-    sync_ctx: std::sync::OnceLock::new(),
+    imported: AtomicBool::new(false),
+    sync_ctx: OnceLock::new(),
   });
 
   let conn = store.connect().await?;
@@ -242,18 +124,21 @@ pub async fn open(settings: &crate::config::Settings) -> std::result::Result<std
   Ok(store)
 }
 
-/// Open a temporary local database. Useful for tests that need a database
+/// Open a temporary local database. Useful for tests that need an `AppContext`
 /// but don't exercise persistence.
+///
+/// Uses a temp file rather than `:memory:` because libsql in-memory databases
+/// do not share state across connections.
 #[cfg(test)]
-pub async fn open_temp() -> std::result::Result<(std::sync::Arc<Db>, tempfile::TempDir), DbError> {
+pub async fn open_temp() -> Result<(Arc<Db>, tempfile::TempDir), Error> {
   let tmp = tempfile::tempdir()?;
   let path = tmp.path().join("gest-test.db");
   let db = libsql::Builder::new_local(path).build().await?;
 
-  let store = std::sync::Arc::new(Db {
+  let store = Arc::new(Db {
     inner: db,
-    imported: std::sync::atomic::AtomicBool::new(false),
-    sync_ctx: std::sync::OnceLock::new(),
+    imported: AtomicBool::new(false),
+    sync_ctx: OnceLock::new(),
   });
 
   let conn = store.connect().await?;
@@ -265,127 +150,46 @@ pub async fn open_temp() -> std::result::Result<(std::sync::Arc<Db>, tempfile::T
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::config::Settings;
 
-  fn make_config(base: &std::path::Path) -> Settings {
-    crate::test_helpers::make_test_config(base.to_path_buf())
-  }
-
-  mod resolve_any_id {
-    use pretty_assertions::assert_eq;
+  mod open {
+    use std::path::PathBuf;
 
     use super::*;
+    use crate::config::Settings;
 
-    #[test]
-    fn it_errors_when_no_entity_matches() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      ensure_dirs(&config).unwrap();
-
-      let result = resolve_any_id(&config, "zyxw");
-
-      assert!(result.is_err());
-      let err = result.unwrap_err().to_string();
-      assert!(err.contains("No entity found"), "Expected not-found error, got: {err}");
+    fn settings_with_data_dir(dir: PathBuf) -> Settings {
+      toml::from_str(&format!("[storage]\ndata_dir = {:?}", dir.to_str().unwrap())).unwrap()
     }
 
-    #[test]
-    fn it_errors_with_disambiguation_when_multiple_types_match() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = crate::test_helpers::make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      let artifact = crate::test_helpers::make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      write_task(&config, &task).unwrap();
-      write_artifact(&config, &artifact).unwrap();
+    #[tokio::test]
+    async fn it_creates_data_dir_if_missing() {
+      let tmp = tempfile::tempdir().unwrap();
+      let nested = tmp.path().join("nested").join("dir");
+      let settings = settings_with_data_dir(nested.clone());
 
-      let result = resolve_any_id(&config, "zyxw");
+      let _store = open(&settings).await.unwrap();
 
-      assert!(result.is_err());
-      let err = result.unwrap_err().to_string();
-      assert!(err.contains("Ambiguous"), "Expected ambiguity error, got: {err}");
-      assert!(err.contains("task"), "Expected task in disambiguation, got: {err}");
-      assert!(
-        err.contains("artifact"),
-        "Expected artifact in disambiguation, got: {err}"
-      );
+      assert!(nested.exists());
     }
 
-    #[test]
-    fn it_includes_archived_artifacts() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let artifact = crate::test_helpers::make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      write_artifact(&config, &artifact).unwrap();
-      archive_artifact(&config, &artifact.id).unwrap();
+    #[tokio::test]
+    async fn it_creates_local_db_when_no_url() {
+      let tmp = tempfile::tempdir().unwrap();
+      let settings = settings_with_data_dir(tmp.path().to_path_buf());
 
-      let resolved = resolve_any_id(&config, "zyxw").unwrap();
+      let store = open(&settings).await.unwrap();
+      let conn = store.connect().await.unwrap();
 
-      assert_eq!(resolved.entity_type, EntityType::Artifact);
-    }
-
-    #[test]
-    fn it_includes_resolved_iterations() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let iteration = crate::test_helpers::make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      write_iteration(&config, &iteration).unwrap();
-      resolve_iteration(&config, &iteration.id).unwrap();
-
-      let resolved = resolve_any_id(&config, "zyxw").unwrap();
-
-      assert_eq!(resolved.entity_type, EntityType::Iteration);
-    }
-
-    #[test]
-    fn it_includes_resolved_tasks() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = crate::test_helpers::make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      write_task(&config, &task).unwrap();
-      resolve_task(&config, &task.id).unwrap();
-
-      let resolved = resolve_any_id(&config, "zyxw").unwrap();
-
-      assert_eq!(resolved.entity_type, EntityType::Task);
-    }
-
-    #[test]
-    fn it_resolves_a_task_prefix() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let task = crate::test_helpers::make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      write_task(&config, &task).unwrap();
-
-      let resolved = resolve_any_id(&config, "zyxw").unwrap();
-
-      assert_eq!(resolved.entity_type, EntityType::Task);
-      assert_eq!(resolved.id.to_string(), "zyxwvutsrqponmlkzyxwvutsrqponmlk");
-    }
-
-    #[test]
-    fn it_resolves_an_artifact_prefix() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let artifact = crate::test_helpers::make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      write_artifact(&config, &artifact).unwrap();
-
-      let resolved = resolve_any_id(&config, "zyxw").unwrap();
-
-      assert_eq!(resolved.entity_type, EntityType::Artifact);
-      assert_eq!(resolved.id.to_string(), "zyxwvutsrqponmlkzyxwvutsrqponmlk");
-    }
-
-    #[test]
-    fn it_resolves_an_iteration_prefix() {
-      let dir = tempfile::tempdir().unwrap();
-      let config = make_config(dir.path());
-      let iteration = crate::test_helpers::make_test_iteration("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      write_iteration(&config, &iteration).unwrap();
-
-      let resolved = resolve_any_id(&config, "zyxw").unwrap();
-
-      assert_eq!(resolved.entity_type, EntityType::Iteration);
-      assert_eq!(resolved.id.to_string(), "zyxwvutsrqponmlkzyxwvutsrqponmlk");
+      // Verify we can execute a basic query
+      conn
+        .execute("CREATE TABLE test (id INTEGER PRIMARY KEY)", ())
+        .await
+        .unwrap();
+      conn.execute("INSERT INTO test (id) VALUES (1)", ()).await.unwrap();
+      let mut rows = conn.query("SELECT id FROM test", ()).await.unwrap();
+      let row = rows.next().await.unwrap().unwrap();
+      let id: i64 = row.get(0).unwrap();
+      assert_eq!(id, 1);
     }
   }
 }

@@ -1,18 +1,28 @@
 <h1 class="section-heading">Artifacts</h1>
 <div class="summary">
-  {% if current_status == "open" %}
-    <strong>{{ open_count }} open</strong>
-  {% else %}
-    <a href="/artifacts">{{ open_count }} open</a>
-  {% endif %}
-  ·
-  {% if current_status == "archived" %}
-    <strong>{{ archived_count }} archived</strong>
-  {% else %}
-    <a href="/artifacts?status=archived">{{ archived_count }} archived</a>
-  {% endif %}
+  {{ open_count }} open &middot; {{ archived_count }} archived
   &middot;
   <a href="/artifacts/new">+ new</a>
+</div>
+
+<div class="summary">
+  {% if current_status == "all" %}
+    <strong>All</strong>
+  {% else %}
+    <a href="/artifacts?status=all">All</a>
+  {% endif %}
+  &middot;
+  {% if current_status == "open" %}
+    <strong>Open</strong>
+  {% else %}
+    <a href="/artifacts?status=open">Open</a>
+  {% endif %}
+  &middot;
+  {% if current_status == "archived" %}
+    <strong>Archived</strong>
+  {% else %}
+    <a href="/artifacts?status=archived">Archived</a>
+  {% endif %}
 </div>
 
 {% if artifacts.is_empty() %}
@@ -20,7 +30,7 @@
 {% else %}
 <div class="term">
   <div class="term-bar">
-<span class="term-title">gest artifact list</span>
+    <span class="term-title">gest artifact list</span>
   </div>
   <div class="term-body">
     <table class="list-table">
@@ -28,23 +38,28 @@
         <tr>
           <th style="width:90px">ID</th>
           <th style="width:auto">Title</th>
-          <th style="width:80px">Type</th>
-          <th style="width:120px">Tags</th>
-          <th style="width:90px"></th>
+          <th style="width:auto">Tags</th>
+          <th style="width:130px">Updated</th>
         </tr>
       </thead>
       <tbody>
-        {% for a in artifacts %}
-        <tr{% if a.archived_at.is_some() %} class="c-dim"{% endif %}>
+        {% for row in artifacts %}
+        <tr{% if row.artifact.is_archived() %} class="c-dim"{% endif %}>
           <td>
-            <a href="/artifacts/{{ a.id }}">
-              <span class="id-prefix">{{ a.id.short() }}</span>
+            <a href="/artifacts/{{ row.artifact.id() }}">
+              <span class="id-prefix">{{ row.artifact.id().short() }}</span>
             </a>
           </td>
-          <td>{{ a.title }}</td>
-          <td class="c-pewter">{% match a.kind %}{% when Some with (k) %}{{ k }}{% when None %}{% endmatch %}</td>
-          <td>{% for t in a.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
-          <td>{% if a.archived_at.is_some() %}<span class="c-dim">[archived]</span>{% endif %}</td>
+          <td>
+            {{ row.artifact.title() }}
+            {% if row.artifact.is_archived() %}<span class="c-dim"> [archived]</span>{% endif %}
+          </td>
+          <td>
+            {% for tag in row.tags %}
+              <a href="/search?q=tag:{{ tag }}" class="tag">#{{ tag }}</a>{{ " " }}
+            {% endfor %}
+          </td>
+          <td class="c-dim">{{ row.artifact.updated_at().format("%Y-%m-%d %H:%M") }}</td>
         </tr>
         {% endfor %}
       </tbody>

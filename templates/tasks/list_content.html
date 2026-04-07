@@ -1,38 +1,48 @@
 <h1 class="section-heading">Tasks</h1>
 <div class="summary">
-  {% if current_status == Status::Open %}
-    <span class="bold">{{ open_count }} open</span>
-  {% else %}
-    <a href="/tasks">{{ open_count }} open</a>
-  {% endif %}
-  &middot;
-  {% if current_status == Status::InProgress %}
-    <span class="bold">{{ in_progress_count }} in progress</span>
-  {% else %}
-    <a href="/tasks?status=in_progress">{{ in_progress_count }} in progress</a>
-  {% endif %}
-  &middot;
-  {% if current_status == Status::Done %}
-    <span class="bold">{{ done_count }} done</span>
-  {% else %}
-    <a href="/tasks?status=done">{{ done_count }} done</a>
-  {% endif %}
-  &middot;
-  {% if current_status == Status::Cancelled %}
-    <span class="bold">{{ cancelled_count }} cancelled</span>
-  {% else %}
-    <a href="/tasks?status=cancelled">{{ cancelled_count }} cancelled</a>
-  {% endif %}
+  {{ rows.len() }} task{{ rows.len()|pluralize }}
   &middot;
   <a href="/tasks/new">+ new</a>
 </div>
 
-{% if tasks.is_empty() %}
+<div class="summary" style="margin-bottom: 12px;">
+  {% if current_status.is_empty() %}
+    <strong>All</strong>
+  {% else %}
+    <a href="/tasks">All</a>
+  {% endif %}
+  &middot;
+  {% if current_status == "open" %}
+    <strong class="status-open">Open ({{ open_count }})</strong>
+  {% else %}
+    <a href="/tasks?status=open" class="status-open">Open ({{ open_count }})</a>
+  {% endif %}
+  &middot;
+  {% if current_status == "in-progress" %}
+    <strong class="status-in-progress">In Progress ({{ in_progress_count }})</strong>
+  {% else %}
+    <a href="/tasks?status=in-progress" class="status-in-progress">In Progress ({{ in_progress_count }})</a>
+  {% endif %}
+  &middot;
+  {% if current_status == "done" %}
+    <strong class="status-done">Done ({{ done_count }})</strong>
+  {% else %}
+    <a href="/tasks?status=done" class="status-done">Done ({{ done_count }})</a>
+  {% endif %}
+  &middot;
+  {% if current_status == "cancelled" %}
+    <strong class="status-cancelled">Cancelled ({{ cancelled_count }})</strong>
+  {% else %}
+    <a href="/tasks?status=cancelled" class="status-cancelled">Cancelled ({{ cancelled_count }})</a>
+  {% endif %}
+</div>
+
+{% if rows.is_empty() %}
 <p class="empty">No tasks found.</p>
 {% else %}
 <div class="term">
   <div class="term-bar">
-<span class="term-title">gest task list{% if current_status != Status::Open %} --status {{ current_status }}{% endif %}</span>
+    <span class="term-title">gest task list{% if !current_status.is_empty() %} --status {{ current_status }}{% endif %}</span>
   </div>
   <div class="term-body">
     <table class="list-table">
@@ -42,78 +52,65 @@
           <th style="width:90px">ID</th>
           <th style="width:60px">Pri</th>
           <th style="width:auto">Title</th>
+          <th style="width:100px">Info</th>
+          <th style="width:auto">Tags</th>
           <th style="width:100px">Status</th>
-          <th style="width:150px">Info</th>
-          <th style="width:120px">Tags</th>
         </tr>
       </thead>
       <tbody>
         {% for row in rows %}
         <tr>
           <td>
-            {% if row.is_blocked %}
-            <span class="status-blocked">⊗</span>
-            {% else %}
-            {% match row.task.status %}
-              {% when Status::Open %}
-                <span class="status-open">○</span>
-              {% when Status::InProgress %}
-                <span class="status-in-progress">◐</span>
-              {% when Status::Done %}
-                <span class="status-done">●</span>
-              {% when Status::Cancelled %}
-                <span class="status-cancelled">✗</span>
-            {% endmatch %}
+            {% if row.task.status().to_string() == "open" %}
+              <span class="status-open">&#9675;</span>
+            {% else if row.task.status().to_string() == "in-progress" %}
+              <span class="status-in-progress">&#9680;</span>
+            {% else if row.task.status().to_string() == "done" %}
+              <span class="status-done">&#9679;</span>
+            {% else if row.task.status().to_string() == "cancelled" %}
+              <span class="status-cancelled">&#10007;</span>
             {% endif %}
           </td>
           <td>
-            <a href="/tasks/{{ row.task.id }}">
-              <span class="id-prefix">{{ row.task.id.short() }}</span>
+            <a href="/tasks/{{ row.task.id() }}">
+              <span class="id-prefix">{{ row.task.id().short() }}</span>
             </a>
           </td>
           <td>
-            {% match row.task.priority %}
-              {% when Some with (p) %}
-                <span class="priority">[P{{ p }}]</span>
-              {% when None %}
-            {% endmatch %}
+            {% if let Some(p) = row.task.priority() %}
+              <span class="priority">[P{{ p }}]</span>
+            {% endif %}
           </td>
           <td>
-            {% if row.task.status.is_terminal() %}
-              <span class="c-dim">{{ row.task.title }}</span>
+            {% if row.task.status().is_terminal() %}
+              <span class="c-dim">{{ row.task.title() }}</span>
             {% else %}
-              {{ row.task.title }}
+              {{ row.task.title() }}
             {% endif %}
           </td>
           <td>
             {% if row.is_blocked %}
-              <span class="status-blocked">blocked</span>
-            {% else if row.blocking.is_blocking %}
+              <span class="status-blocked" title="{{ row.blocked_by_display }}">blocked</span>
+            {% endif %}
+            {% if row.blocking %}
               <span class="status-blocking">blocking</span>
-            {% else %}
-              {% match row.task.status %}
-                {% when Status::Open %}
-                  <span class="status-open">open</span>
-                {% when Status::InProgress %}
-                  <span class="status-in-progress">in-progress</span>
-                {% when Status::Done %}
-                  <span class="status-done">done</span>
-                {% when Status::Cancelled %}
-                  <span class="status-cancelled">cancelled</span>
-              {% endmatch %}
-            {% endif %}
-          </td>
-          <td class="c-dim">
-            {% if row.is_blocked %}
-              blocked by {{ row.blocked_by_display }}
-            {% else if row.blocking.is_blocking %}
-              blocking others
             {% endif %}
           </td>
           <td>
-            {% for tag in row.task.tags.iter() %}
+            {% for tag in row.tags %}
               <a href="/search?q=tag:{{ tag }}" class="tag">#{{ tag }}</a>{{ " " }}
             {% endfor %}
+          </td>
+          <td>
+            {% if row.task.status().to_string() == "open" %}
+              <span class="status-open">open</span>
+            {% else if row.task.status().to_string() == "in-progress" %}
+              <span class="status-in-progress">in-progress</span>
+            {% else if row.task.status().to_string() == "done" %}
+              <span class="status-done">done</span>
+            {% else if row.task.status().to_string() == "cancelled" %}
+              <span class="status-cancelled">cancelled</span>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

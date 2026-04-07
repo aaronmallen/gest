@@ -1,34 +1,34 @@
-//! Subcommands for viewing and modifying gest configuration.
-
 mod get;
 mod set;
 mod show;
 
 use clap::{Args, Subcommand};
 
-use crate::cli::{self, AppContext};
+use crate::{AppContext, cli::Error};
 
-/// Entry point for the `config` subcommand tree.
-#[derive(Debug, Args)]
+/// View or modify configuration.
+#[derive(Args, Debug)]
 pub struct Command {
   #[command(subcommand)]
-  command: ConfigCommand,
+  subcommand: Sub,
 }
 
 #[derive(Debug, Subcommand)]
-enum ConfigCommand {
+enum Sub {
+  /// Get a configuration value.
   Get(get::Command),
+  /// Set a configuration value.
   Set(set::Command),
+  /// Show the current configuration.
   Show(show::Command),
 }
 
 impl Command {
-  /// Dispatch to the appropriate config subcommand.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    match &self.command {
-      ConfigCommand::Get(cmd) => cmd.call(ctx),
-      ConfigCommand::Set(cmd) => cmd.call(ctx),
-      ConfigCommand::Show(cmd) => cmd.call(ctx),
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    match &self.subcommand {
+      Sub::Get(cmd) => cmd.call(context).await,
+      Sub::Set(cmd) => cmd.call(context).await,
+      Sub::Show(cmd) => cmd.call(context).await,
     }
   }
 }

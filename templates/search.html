@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}search — gest{% endblock %}
+{% block title %}search -- gest{% endblock %}
 {% block nav_search %}class="active"{% endblock %}
 
 {% block content %}
 <h1 class="section-heading">Search</h1>
 
 <form action="/search" method="get" style="margin-bottom: 20px;">
-  <input type="text" name="q" class="search-input" placeholder="search tasks and artifacts…" value="{{ query }}" autofocus aria-label="Search tasks and artifacts">
+  <input type="text" name="q" class="search-input" placeholder="search tasks, artifacts, iterations..." value="{{ query }}" autofocus aria-label="Search tasks, artifacts, and iterations">
 </form>
 
 {% if !query.is_empty() %}
-<div class="summary">{{ task_count + artifact_count + iteration_count }} result{% if task_count + artifact_count + iteration_count != 1 %}s{% endif %} for "{{ query }}"</div>
+<div class="summary">{{ tasks.len() + artifacts.len() + iterations.len() }} result{% if tasks.len() + artifacts.len() + iterations.len() != 1 %}s{% endif %} for "{{ query }}"</div>
 
 {% if tasks.is_empty() && artifacts.is_empty() && iterations.is_empty() %}
 <p class="empty">No results found.</p>
@@ -27,19 +27,17 @@
           <tr>
             <th style="width:100px">ID</th>
             <th style="width:auto">Title</th>
-            <th style="width:120px">Tags</th>
           </tr>
         </thead>
         <tbody>
           {% for a in artifacts %}
-          <tr{% if a.archived_at.is_some() %} class="c-dim"{% endif %}>
+          <tr{% if a.is_archived() %} class="c-dim"{% endif %}>
             <td>
-              <a href="/artifacts/{{ a.id }}">
-                <span class="id-prefix">{{ a.id.short() }}</span>
+              <a href="/artifacts/{{ a.id() }}">
+                <span class="id-prefix">{{ a.id().short() }}</span>
               </a>
             </td>
-            <td>{{ a.title }}</td>
-            <td>{% for t in a.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
+            <td>{{ a.title() }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -60,7 +58,6 @@
             <th style="width:30px"></th>
             <th style="width:100px">ID</th>
             <th style="width:auto">Title</th>
-            <th style="width:120px">Tags</th>
             <th style="width:100px">Status</th>
           </tr>
         </thead>
@@ -68,27 +65,32 @@
           {% for task in tasks %}
           <tr>
             <td>
-              {% match task.status %}
-                {% when TaskStatus::Open %}<span class="status-open">○</span>
-                {% when TaskStatus::InProgress %}<span class="status-in-progress">◐</span>
-                {% when TaskStatus::Done %}<span class="status-done">●</span>
-                {% when TaskStatus::Cancelled %}<span class="status-cancelled">✗</span>
-              {% endmatch %}
+              {% if task.status().to_string() == "open" %}
+                <span class="status-open">&#9675;</span>
+              {% else if task.status().to_string() == "in-progress" %}
+                <span class="status-in-progress">&#9680;</span>
+              {% else if task.status().to_string() == "done" %}
+                <span class="status-done">&#9679;</span>
+              {% else if task.status().to_string() == "cancelled" %}
+                <span class="status-cancelled">&#10007;</span>
+              {% endif %}
             </td>
             <td>
-              <a href="/tasks/{{ task.id }}">
-                <span class="id-prefix">{{ task.id.short() }}</span>
+              <a href="/tasks/{{ task.id() }}">
+                <span class="id-prefix">{{ task.id().short() }}</span>
               </a>
             </td>
-            <td>{{ task.title }}</td>
-            <td>{% for t in task.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
+            <td>{{ task.title() }}</td>
             <td>
-              {% match task.status %}
-                {% when TaskStatus::Open %}<span class="status-open">open</span>
-                {% when TaskStatus::InProgress %}<span class="status-in-progress">in-progress</span>
-                {% when TaskStatus::Done %}<span class="status-done">done</span>
-                {% when TaskStatus::Cancelled %}<span class="status-cancelled">cancelled</span>
-              {% endmatch %}
+              {% if task.status().to_string() == "open" %}
+                <span class="status-open">open</span>
+              {% else if task.status().to_string() == "in-progress" %}
+                <span class="status-in-progress">in-progress</span>
+              {% else if task.status().to_string() == "done" %}
+                <span class="status-done">done</span>
+              {% else if task.status().to_string() == "cancelled" %}
+                <span class="status-cancelled">cancelled</span>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -109,21 +111,19 @@
           <tr>
             <th style="width:100px">ID</th>
             <th style="width:auto">Title</th>
-            <th style="width:120px">Tags</th>
             <th style="width:90px">Status</th>
           </tr>
         </thead>
         <tbody>
           {% for iter in iterations %}
-          <tr{% if iter.completed_at.is_some() %} class="c-dim"{% endif %}>
+          <tr{% if iter.status().is_terminal() %} class="c-dim"{% endif %}>
             <td>
-              <a href="/iterations/{{ iter.id }}">
-                <span class="id-prefix">{{ iter.id.short() }}</span>
+              <a href="/iterations/{{ iter.id() }}">
+                <span class="id-prefix">{{ iter.id().short() }}</span>
               </a>
             </td>
-            <td>{{ iter.title }}</td>
-            <td>{% for t in iter.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
-            <td>{{ iter.status }}</td>
+            <td>{{ iter.title() }}</td>
+            <td>{{ iter.status() }}</td>
           </tr>
           {% endfor %}
         </tbody>

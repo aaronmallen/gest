@@ -1,77 +1,54 @@
-use std::io::Write;
+//! The `self-update` subcommand — downloads and installs the latest release from GitHub.
 
 use clap::Args;
+use self_update::backends::github::Update;
 
-use crate::{
-  cli::{self, AppContext},
-  ui::composites::success_message::SuccessMessage,
-};
+use crate::{AppContext, cli::Error, ui::components::SuccessMessage};
 
-const BIN_NAME: &str = "gest";
-const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
-const REPO_NAME: &str = "gest";
-const REPO_OWNER: &str = "aaronmallen";
-
-/// Update gest to the latest (or a pinned) GitHub release.
-#[derive(Debug, Args)]
+/// Download and install the latest release from GitHub.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Pin to a specific version (bare semver, e.g. `1.2.3`).
+  /// Pin to a specific release version (e.g. `0.5.0`).
   #[arg(long)]
   target: Option<String>,
 }
 
 impl Command {
-  /// Fetch releases, prompt for confirmation, and perform the in-place binary update.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let releases = self_update::backends::github::ReleaseList::configure()
-      .repo_owner(REPO_OWNER)
-      .repo_name(REPO_NAME)
-      .build()
-      .map_err(|e| cli::Error::Runtime(e.to_string()))?
-      .fetch()
-      .map_err(|e| cli::Error::Runtime(e.to_string()))?;
+  /// Check for updates and, if a newer version is available, download and
+  /// replace the current binary.
+  pub async fn call(&self, _context: &AppContext) -> Result<(), Error> {
+    let current_version = env!("CARGO_PKG_VERSION");
+    let target = self.target.clone();
 
-    let latest = releases
-      .first()
-      .ok_or_else(|| cli::Error::Runtime("no releases found on GitHub".into()))?;
+    let status = tokio::task::spawn_blocking(move || {
+      let mut builder = Update::configure();
+      builder
+        .repo_owner("aaronmallen")
+        .repo_name("gest")
+        .bin_name("gest")
+        .current_version(current_version)
+        .show_download_progress(true)
+        .no_confirm(true);
 
-    let target_version = self.target.as_deref().unwrap_or(&latest.version);
+      if let Some(ref version) = target {
+        builder.target_version_tag(&format!("v{version}"));
+      }
 
-    if target_version == CURRENT_VERSION {
-      let msg = format!("Already on version {CURRENT_VERSION}");
-      println!("{}", SuccessMessage::new(&msg, &ctx.theme));
-      return Ok(());
+      builder.build().and_then(|updater| updater.update())
+    })
+    .await
+    .map_err(std::io::Error::other)?
+    .map_err(std::io::Error::other)?;
+
+    if status.updated() {
+      let message = SuccessMessage::new("updated gest")
+        .field("previous version", current_version)
+        .field("new version", status.version());
+      println!("{message}");
+    } else {
+      let message = SuccessMessage::new("gest is already up to date").field("version", current_version);
+      println!("{message}");
     }
-
-    println!("Update available: {CURRENT_VERSION} → {target_version}");
-    print!("Proceed? [y/N] ");
-    std::io::stdout().flush()?;
-
-    let mut answer = String::new();
-    std::io::stdin().read_line(&mut answer)?;
-    let answer = answer.trim().to_lowercase();
-
-    if answer != "y" && answer != "yes" {
-      println!("Update cancelled.");
-      return Ok(());
-    }
-
-    let status = self_update::backends::github::Update::configure()
-      .repo_owner(REPO_OWNER)
-      .repo_name(REPO_NAME)
-      .bin_name(BIN_NAME)
-      .target_version_tag(target_version)
-      .identifier("tar.gz")
-      .show_download_progress(true)
-      .current_version(CURRENT_VERSION)
-      .no_confirm(true)
-      .build()
-      .map_err(|e| cli::Error::Runtime(e.to_string()))?
-      .update()
-      .map_err(|e| cli::Error::Runtime(e.to_string()))?;
-
-    let msg = format!("Updated to version {}", status.version());
-    println!("{}", SuccessMessage::new(&msg, &ctx.theme));
 
     Ok(())
   }

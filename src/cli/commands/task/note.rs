@@ -6,35 +6,37 @@ mod update;
 
 use clap::{Args, Subcommand};
 
-use crate::cli::{self, AppContext};
+use crate::{AppContext, cli::Error};
 
 /// Manage notes on a task.
-#[derive(Debug, Args)]
+#[derive(Args, Debug)]
 pub struct Command {
   #[command(subcommand)]
-  command: NoteCommand,
-}
-
-impl Command {
-  /// Dispatch to the appropriate note subcommand.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    match &self.command {
-      NoteCommand::Add(cmd) => cmd.call(ctx),
-      NoteCommand::Delete(cmd) => cmd.call(ctx),
-      NoteCommand::List(cmd) => cmd.call(ctx),
-      NoteCommand::Show(cmd) => cmd.call(ctx),
-      NoteCommand::Update(cmd) => cmd.call(ctx),
-    }
-  }
+  subcommand: Sub,
 }
 
 #[derive(Debug, Subcommand)]
-enum NoteCommand {
+enum Sub {
+  /// Add a note to a task.
   Add(add::Command),
+  /// Delete a note from a task.
   Delete(delete::Command),
-  #[command(visible_alias = "ls")]
+  /// List notes on a task.
   List(list::Command),
-  #[command(visible_alias = "view")]
+  /// Show a single note.
   Show(show::Command),
+  /// Update a note's body.
   Update(update::Command),
+}
+
+impl Command {
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    match &self.subcommand {
+      Sub::Add(cmd) => cmd.call(context).await,
+      Sub::Delete(cmd) => cmd.call(context).await,
+      Sub::List(cmd) => cmd.call(context).await,
+      Sub::Show(cmd) => cmd.call(context).await,
+      Sub::Update(cmd) => cmd.call(context).await,
+    }
+  }
 }

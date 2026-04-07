@@ -3,27 +3,28 @@ mod set;
 
 use clap::{Args, Subcommand};
 
-use crate::cli::{self, AppContext};
+use crate::{AppContext, cli::Error};
 
-/// Read or write iteration metadata fields.
-#[derive(Debug, Args)]
+/// Get or set custom metadata on an iteration.
+#[derive(Args, Debug)]
 pub struct Command {
   #[command(subcommand)]
-  command: MetaCommand,
-}
-
-impl Command {
-  /// Dispatch to the `get` or `set` metadata subcommand.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    match &self.command {
-      MetaCommand::Get(cmd) => cmd.call(ctx),
-      MetaCommand::Set(cmd) => cmd.call(ctx),
-    }
-  }
+  subcommand: Sub,
 }
 
 #[derive(Debug, Subcommand)]
-enum MetaCommand {
+enum Sub {
+  /// Get a metadata value.
   Get(get::Command),
+  /// Set a metadata value.
   Set(set::Command),
+}
+
+impl Command {
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    match &self.subcommand {
+      Sub::Get(cmd) => cmd.call(context).await,
+      Sub::Set(cmd) => cmd.call(context).await,
+    }
+  }
 }

@@ -1,69 +1,32 @@
 use clap::Args;
+use toml::Value;
 
-use crate::{
-  cli::{self, AppContext},
-  config::Settings,
-};
+use crate::{AppContext, cli::Error};
 
-/// Retrieve a single configuration value by dot-delimited key.
-#[derive(Debug, Args)]
+/// Get a configuration value by dotted key path.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Dot-delimited config key (e.g. `storage.project_dir`).
-  pub key: String,
+  /// The configuration key (e.g. "storage.data_dir", "log.level").
+  key: String,
 }
 
 impl Command {
-  /// Print the resolved value for the requested key.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let value = resolve_key(&ctx.settings, &self.key)?;
-    println!("{value}");
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let toml_value = Value::try_from(context.settings()).map_err(std::io::Error::other)?;
+
+    let value = resolve_dotted_key(&toml_value, &self.key);
+    match value {
+      Some(v) => println!("{v}"),
+      None => println!("(not set)"),
+    }
     Ok(())
   }
 }
 
-/// Walk the serialized settings tree using dot-separated path segments.
-fn resolve_key(settings: &Settings, key: &str) -> cli::Result<String> {
-  let json =
-    serde_json::to_value(settings).map_err(|e| cli::Error::Runtime(format!("Failed to serialize config: {e}")))?;
-  let mut current = &json;
-
-  for segment in key.split('.') {
-    match current.get(segment) {
-      Some(v) => current = v,
-      None => {
-        return Err(cli::Error::NotFound(format!("Unknown config key: '{key}'")));
-      }
-    }
+fn resolve_dotted_key<'a>(value: &'a Value, key: &str) -> Option<&'a Value> {
+  let mut current = value;
+  for part in key.split('.') {
+    current = current.get(part)?;
   }
-
-  match current {
-    serde_json::Value::String(s) => Ok(s.clone()),
-    serde_json::Value::Null => Ok("null".to_string()),
-    other => Ok(other.to_string()),
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  mod resolve_key {
-    use super::*;
-
-    #[test]
-    fn it_errors_on_unknown_key() {
-      let settings = Settings::default();
-      let result = resolve_key(&settings, "nonexistent.key");
-
-      assert!(result.is_err());
-    }
-
-    #[test]
-    fn it_resolves_top_level_section() {
-      let settings = Settings::default();
-      let value = resolve_key(&settings, "storage").unwrap();
-
-      assert!(value.contains('{'));
-    }
-  }
+  Some(current)
 }

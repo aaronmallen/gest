@@ -110,80 +110,9 @@ impl Log for Logger {
 /// The level may be adjusted later (e.g. after config is loaded) via
 /// [`log::set_max_level`]. Repeated calls to [`log::set_logger`] are
 /// harmless — only the first succeeds.
-pub fn init(level: impl Into<log::LevelFilter>, _theme: &crate::ui::theming::theme::Theme) {
+pub fn init(level: LevelFilter) {
   let _ = log::set_logger(&Logger);
   log::set_max_level(level.into());
-}
-
-/// Legacy compatibility: install the logger with a numeric level before
-/// the user's theme is loaded. Removed once the CLI is fully rewritten.
-pub fn init_early(level: log::LevelFilter) {
-  let _ = log::set_logger(&Logger);
-  log::set_max_level(level);
-}
-
-/// Legacy compatibility: resolve a [`log::LevelFilter`] from a verbosity
-/// count, an optional environment override, and an optional config override.
-///
-/// Resolution precedence: env > config > verbosity-derived default.
-pub fn resolve_level(verbosity: u8, env_level: Option<&str>, config_level: Option<&str>) -> log::LevelFilter {
-  if let Some(env) = env_level
-    && let Ok(parsed) = env.parse::<LevelFilter>()
-  {
-    return parsed.into();
-  }
-  if let Some(cfg) = config_level
-    && let Ok(parsed) = cfg.parse::<LevelFilter>()
-  {
-    return parsed.into();
-  }
-  match verbosity {
-    0 => log::LevelFilter::Warn,
-    1 => log::LevelFilter::Info,
-    2 => log::LevelFilter::Debug,
-    _ => log::LevelFilter::Trace,
-  }
-}
-
-/// Legacy compatibility: same as [`resolve_level`] but with an explicit default.
-pub fn resolve_level_with_default(
-  verbosity: u8,
-  env_level: Option<&str>,
-  config_level: Option<&str>,
-  default: log::LevelFilter,
-) -> log::LevelFilter {
-  if let Some(env) = env_level
-    && let Ok(parsed) = env.parse::<LevelFilter>()
-  {
-    return parsed.into();
-  }
-  if let Some(cfg) = config_level
-    && let Ok(parsed) = cfg.parse::<LevelFilter>()
-  {
-    return parsed.into();
-  }
-  match verbosity {
-    0 => default,
-    1 => log::LevelFilter::Info,
-    2 => log::LevelFilter::Debug,
-    _ => log::LevelFilter::Trace,
-  }
-}
-
-impl std::str::FromStr for LevelFilter {
-  type Err = String;
-
-  fn from_str(s: &str) -> Result<Self, Self::Err> {
-    match s.trim().to_ascii_lowercase().as_str() {
-      "debug" | "4" => Ok(Self::Debug),
-      "error" | "1" => Ok(Self::Error),
-      "info" | "3" => Ok(Self::Info),
-      "off" | "0" => Ok(Self::Off),
-      "trace" | "5" => Ok(Self::Trace),
-      "warn" | "2" => Ok(Self::Warn),
-      other => Err(format!("invalid log level: {other}")),
-    }
-  }
 }
 
 #[cfg(test)]

@@ -1,96 +1,55 @@
 use clap::Args;
 
 use crate::{
-  action,
-  cli::{self, AppContext},
-  model::Artifact,
-  ui::composites::success_message::SuccessMessage,
+  AppContext,
+  cli::Error,
+  store::{model::primitives::EntityType, repo},
+  ui::{components::SuccessMessage, json},
 };
 
-/// Remove tags from an artifact.
-#[derive(Debug, Args)]
+/// Remove a tag from an artifact.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Artifact ID or unique prefix.
-  pub id: String,
-  /// Output the artifact as JSON after untagging.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Output only the artifact ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
-  /// Tags to remove (space or comma-separated).
-  #[arg(value_delimiter = ',')]
-  pub tags: Vec<String>,
+  /// The artifact ID or prefix.
+  id: String,
+  /// The tag label to remove.
+  label: String,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Remove the given tags from the artifact's tag list and persist.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let artifact = action::untag::<Artifact>(&ctx.settings, &self.id, &self.tags)?;
-
-    if self.json {
-      println!("{}", serde_json::to_string_pretty(&artifact)?);
-    } else if self.quiet {
-      println!("{}", artifact.id.short());
-    } else {
-      let msg = format!("Untagged artifact {} from {}", artifact.id, self.tags.join(", "));
-      println!("{}", SuccessMessage::new(&msg, &ctx.theme));
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
+    let id = repo::resolve::resolve_id(&conn, "artifacts", &self.id).await?;
+    let before_tag = repo::tag::find_by_label(&conn, &self.label).await?;
+    let tx = repo::transaction::begin(&conn, project_id, "artifact untag").await?;
+    repo::tag::detach(&conn, EntityType::Artifact, &id, &self.label).await?;
+    if let Some(tag) = &before_tag {
+      let before = serde_json::to_value(crate::store::model::entity_tag::Model::new(
+        EntityType::Artifact,
+        id.clone(),
+        tag.id().clone(),
+      ))?;
+      repo::transaction::record_event(
+        &conn,
+        tx.id(),
+        "entity_tags",
+        &tag.id().to_string(),
+        "deleted",
+        Some(&before),
+      )
+      .await?;
     }
+
+    let short_id = id.short();
+    self.output.print_delete(|| {
+      SuccessMessage::new("untagged artifact")
+        .id(short_id.clone())
+        .field("tag", self.label.clone())
+        .to_string()
+    })?;
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::test_helpers::{make_test_artifact, make_test_context};
-
-  mod call {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-    use crate::store;
-
-    #[test]
-    fn it_handles_nonexistent_tags_gracefully() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      artifact.tags = vec!["spec".to_string()];
-      store::write_artifact(&ctx.settings, &artifact).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-        quiet: false,
-        tags: vec!["nonexistent".to_string()],
-      };
-      cmd.call(&ctx).unwrap();
-
-      let loaded = store::read_artifact(&ctx.settings, &artifact.id).unwrap();
-
-      assert_eq!(loaded.tags, vec!["spec".to_string()]);
-    }
-
-    #[test]
-    fn it_removes_tags() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let mut artifact = make_test_artifact("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      artifact.tags = vec!["spec".to_string(), "backend".to_string(), "keep".to_string()];
-      store::write_artifact(&ctx.settings, &artifact).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        json: false,
-        quiet: false,
-        tags: vec!["spec".to_string(), "backend".to_string()],
-      };
-      cmd.call(&ctx).unwrap();
-
-      let loaded = store::read_artifact(&ctx.settings, &artifact.id).unwrap();
-
-      assert_eq!(loaded.tags, vec!["keep".to_string()]);
-    }
   }
 }

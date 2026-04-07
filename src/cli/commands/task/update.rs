@@ -1,241 +1,120 @@
 use clap::Args;
+use serde_json::Value;
 
 use crate::{
-  action,
-  cli::{self, AppContext},
-  model::{TaskPatch, task::Status},
-  store,
-  ui::views::task::TaskUpdateView,
+  AppContext,
+  cli::Error,
+  store::{
+    model::{
+      primitives::{AuthorType, EntityType, TaskStatus},
+      task::Patch,
+    },
+    repo,
+  },
+  ui::{components::SuccessMessage, json},
 };
 
-/// Update a task's title, description, status, tags, or metadata.
-#[derive(Debug, Args)]
+/// Update a task.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Task ID or unique prefix.
-  pub id: String,
-  /// Actor assigned to this task.
+  /// The task ID or prefix.
+  id: String,
+  /// Set the assigned author by name.
   #[arg(long)]
-  pub assigned_to: Option<String>,
-  /// New description text.
-  #[arg(short, long)]
-  pub description: Option<String>,
-  /// Output as JSON.
-  #[arg(short, long, conflicts_with = "quiet")]
-  pub json: bool,
-  /// Key=value metadata pair, merged with existing (repeatable).
-  #[arg(short, long)]
-  pub metadata: Vec<String>,
-  /// Execution phase for parallel grouping.
+  assigned_to: Option<String>,
+  /// Set the task description.
+  #[arg(long, short)]
+  description: Option<String>,
+  /// Set a metadata key=value pair. Repeatable.
+  #[arg(long, short)]
+  metadata: Vec<String>,
+  /// Move the task to a phase within its iteration.
   #[arg(long)]
-  pub phase: Option<u16>,
-  /// Priority level (0-4, where 0 is highest).
-  #[arg(short, long)]
-  pub priority: Option<u8>,
-  /// Print only the task ID.
-  #[arg(short, long, conflicts_with = "json")]
-  pub quiet: bool,
-  /// New status (done/cancelled auto-resolves; open/in-progress un-resolves).
-  #[arg(short, long)]
-  pub status: Option<String>,
-  /// Replace all tags (repeatable, or comma-separated).
-  // TODO: deprecate --tags in favor of --tag
-  #[arg(long = "tag", value_delimiter = ',', alias = "tags")]
-  pub tag: Vec<String>,
-  /// New title.
-  #[arg(short, long)]
-  pub title: Option<String>,
+  phase: Option<u32>,
+  /// Set the task priority (0-4).
+  #[arg(long, short)]
+  priority: Option<u8>,
+  /// Set the task status.
+  #[arg(long, short)]
+  status: Option<TaskStatus>,
+  /// Replace all tags on the task. Repeatable.
+  #[arg(long)]
+  tag: Vec<String>,
+  /// Set the task title.
+  #[arg(long, short)]
+  title: Option<String>,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Apply the patch to an existing task and print the confirmation view.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let id = store::resolve_task_id(config, &self.id, true)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
 
-    let description = self.description.clone();
+    let id = repo::resolve::resolve_id(&conn, "tasks", &self.id).await?;
+    let before_task = repo::task::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or(Error::UninitializedProject)?;
+    let before = serde_json::to_value(&before_task)?;
+    let tx = repo::transaction::begin(&conn, project_id, "task update").await?;
 
-    let status = crate::cli::helpers::parse_optional_status::<Status>(self.status.as_deref())?;
-
-    let metadata = {
-      let existing = store::read_task(config, &id)?.metadata;
-      crate::cli::helpers::merge_toml_metadata(&self.metadata, existing)?
-    };
-
-    let tags = if self.tag.is_empty() {
-      None
+    // Build metadata from existing + new key=value pairs
+    let metadata = if !self.metadata.is_empty() {
+      let mut existing = before_task.metadata().clone();
+      for pair in &self.metadata {
+        let (key, value) = pair
+          .split_once('=')
+          .ok_or_else(|| Error::Editor(format!("invalid metadata format (expected key=value): {pair}")))?;
+        let parsed: Value = serde_json::from_str(value).unwrap_or_else(|_| Value::String(value.to_string()));
+        existing[key] = parsed;
+      }
+      Some(existing)
     } else {
-      Some(self.tag.clone())
+      None
     };
 
-    let patch = TaskPatch {
-      assigned_to: self.assigned_to.as_ref().map(|v| Some(v.clone())),
-      description,
-      links: None,
+    // Resolve assigned_to
+    let assigned_to = if let Some(name) = &self.assigned_to {
+      let author = repo::author::find_or_create(&conn, name, None, AuthorType::Human).await?;
+      Some(Some(author.id().clone()))
+    } else {
+      None
+    };
+
+    let patch = Patch {
+      assigned_to,
+      description: self.description.clone(),
       metadata,
-      phase: self.phase.map(Some),
       priority: self.priority.map(Some),
-      status,
-      tags,
+      status: self.status,
       title: self.title.clone(),
     };
 
-    let author = action::resolve_author(false)?;
-    let task = store::update_task(config, &id, patch, Some(&author))?;
+    let task = repo::task::update(&conn, &id, &patch).await?;
+    repo::transaction::record_event(&conn, tx.id(), "tasks", &id.to_string(), "modified", Some(&before)).await?;
 
-    if self.json {
-      let json = serde_json::to_string_pretty(&task)?;
-      println!("{json}");
-      return Ok(());
+    // Replace all tags if --tag was specified
+    if !self.tag.is_empty() {
+      repo::tag::detach_all(&conn, EntityType::Task, &id).await?;
+      for label in &self.tag {
+        let tag = repo::tag::attach(&conn, EntityType::Task, &id, label).await?;
+        repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
+      }
     }
 
-    if self.quiet {
-      println!("{}", task.id.short());
-      return Ok(());
+    // Update phase if specified
+    if let Some(phase) = self.phase {
+      repo::iteration::update_task_phase(&conn, &id, phase).await?;
     }
 
-    let id_str = task.id.to_string();
-
-    let status_str = if self.status.is_some() {
-      Some(task.status.as_str())
-    } else {
-      None
-    };
-    let mut fields = Vec::new();
-    if self.assigned_to.is_some() {
-      fields.push(("assigned", task.assigned_to.as_deref().unwrap_or("").to_string()));
-    }
-
-    let view = TaskUpdateView {
-      id: &id_str,
-      fields,
-      status: status_str,
-      theme,
-    };
-    println!("{view}");
+    let short_id = task.id().short();
+    self.output.print_entity(&task, &short_id, || {
+      SuccessMessage::new("updated task")
+        .id(task.id().short())
+        .field("title", task.title().to_string())
+        .to_string()
+    })?;
     Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::{
-    model::link::{Link, RelationshipType},
-    store,
-    test_helpers::{make_test_context, make_test_task},
-  };
-
-  mod call {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_adds_metadata_entries() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        assigned_to: None,
-        description: None,
-        json: false,
-        metadata: vec!["team=backend".to_string()],
-        phase: None,
-        priority: None,
-        quiet: false,
-        status: None,
-        tag: vec![],
-        title: None,
-      };
-
-      cmd.call(&ctx).unwrap();
-
-      let updated = store::read_task(&ctx.settings, &task.id).unwrap();
-
-      assert_eq!(updated.metadata.get("priority").unwrap().as_str().unwrap(), "low");
-      assert_eq!(updated.metadata.get("team").unwrap().as_str().unwrap(), "backend");
-    }
-
-    #[test]
-    fn it_preserves_links_and_metadata() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        assigned_to: None,
-        description: Some("New desc".to_string()),
-        json: false,
-        metadata: vec![],
-        phase: None,
-        priority: None,
-        quiet: false,
-        status: None,
-        tag: vec![],
-        title: None,
-      };
-
-      cmd.call(&ctx).unwrap();
-
-      let updated = store::read_task(&ctx.settings, &task.id).unwrap();
-
-      assert_eq!(updated.links.len(), 1);
-      assert_eq!(updated.links[0].rel, RelationshipType::RelatesTo);
-      assert_eq!(updated.metadata.get("priority").unwrap().as_str().unwrap(), "low");
-    }
-
-    #[test]
-    fn it_updates_title_only() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_rich_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let cmd = Command {
-        id: "zyxw".to_string(),
-        assigned_to: None,
-        description: None,
-        json: false,
-        metadata: vec![],
-        phase: None,
-        priority: None,
-        quiet: false,
-        status: None,
-        tag: vec![],
-        title: Some("New Title".to_string()),
-      };
-
-      cmd.call(&ctx).unwrap();
-
-      let updated = store::read_task(&ctx.settings, &task.id).unwrap();
-
-      assert_eq!(updated.title, "New Title");
-      assert_eq!(updated.description, "Original description");
-      assert_eq!(updated.status, Status::Open);
-      assert_eq!(updated.tags, vec!["original"]);
-    }
-  }
-
-  fn make_rich_task(id: &str) -> crate::model::Task {
-    let mut task = make_test_task(id);
-    task.description = "Original description".to_string();
-    task.links = vec![Link {
-      ref_: "https://example.com".to_string(),
-      rel: RelationshipType::RelatesTo,
-    }];
-    task.metadata = {
-      let mut table = toml::Table::new();
-      table.insert("priority".to_string(), toml::Value::String("low".to_string()));
-      table
-    };
-    task.tags = vec!["original".to_string()];
-    task.title = "Original Title".to_string();
-    task
   }
 }

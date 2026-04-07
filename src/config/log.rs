@@ -1,48 +1,69 @@
-//! Logging configuration settings.
+//! Log-related configuration (`[log]` table).
 
 use serde::{Deserialize, Serialize};
 
-/// Configuration for the `[log]` section.
+use super::env::GEST_LOG__LEVEL;
+use crate::logging::LevelFilter;
+
+/// Settings from the `[log]` configuration table.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
 pub struct Settings {
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  level: Option<String>,
+  /// The configured log level filter.
+  level: LevelFilter,
 }
 
 impl Settings {
-  /// Returns the configured log level filter string, if any.
-  pub fn level(&self) -> Option<&str> {
-    self.level.as_deref()
+  /// Resolve the effective log level.
+  ///
+  /// The `GEST_LOG__LEVEL` environment variable takes precedence over the
+  /// config-file value. If the env var is unset or unparseable, the
+  /// config-file value (or its default) is used.
+  pub fn level(&self) -> LevelFilter {
+    GEST_LOG__LEVEL.value().ok().unwrap_or(self.level)
   }
 }
 
 #[cfg(test)]
 mod tests {
-  use pretty_assertions::assert_eq;
-
   use super::*;
 
-  #[test]
-  fn it_defaults_to_no_level() {
-    let settings = Settings::default();
+  mod level {
+    use pretty_assertions::assert_eq;
 
-    assert_eq!(settings.level(), None);
-  }
+    use super::*;
 
-  #[test]
-  fn it_deserializes_level() {
-    let toml_str = r#"level = "debug""#;
-    let settings: Settings = toml::from_str(toml_str).unwrap();
+    #[test]
+    fn it_prefers_env_var_over_config_value() {
+      let settings = Settings {
+        level: LevelFilter::Warn,
+      };
 
-    assert_eq!(settings.level(), Some("debug"));
-  }
+      temp_env::with_var("GEST_LOG__LEVEL", Some("debug"), || {
+        assert_eq!(settings.level(), LevelFilter::Debug);
+      });
+    }
 
-  #[test]
-  fn it_omits_none_level_on_serialize() {
-    let settings = Settings::default();
-    let serialized = toml::to_string(&settings).unwrap();
+    #[test]
+    fn it_uses_config_value_when_env_var_is_unset() {
+      let settings = Settings {
+        level: LevelFilter::Error,
+      };
 
-    assert!(!serialized.contains("level"));
+      temp_env::with_var("GEST_LOG__LEVEL", None::<&str>, || {
+        assert_eq!(settings.level(), LevelFilter::Error);
+      });
+    }
+
+    #[test]
+    fn it_falls_back_to_config_value_when_env_var_is_invalid() {
+      let settings = Settings {
+        level: LevelFilter::Info,
+      };
+
+      temp_env::with_var("GEST_LOG__LEVEL", Some("not_a_level"), || {
+        assert_eq!(settings.level(), LevelFilter::Info);
+      });
+    }
   }
 }

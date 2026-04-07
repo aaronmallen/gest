@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ artifact.title }} — gest{% endblock %}
+{% block title %}{{ artifact.title() }} -- gest{% endblock %}
 {% block nav_artifacts %}class="active"{% endblock %}
 {% block body_attrs %}data-live-reload{% endblock %}
 

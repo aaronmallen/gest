@@ -1,326 +1,282 @@
-//! Hierarchical TOML configuration loader.
-//!
-//! Merges the global config with per-directory configs found by walking
-//! from the filesystem root down to `cwd`. Closer configs win.
+use std::{env, fs, path::PathBuf};
 
-use std::path::{Path, PathBuf};
-
-use toml::{Table, Value};
+use toml::{Value, value::Table};
 
 use super::{Error, Settings, env::GEST_CONFIG};
 
-/// Project-level config file names, checked in priority order within each directory.
-const CONFIG_NAMES: &[&str] = &[".config/gest.toml", ".gest/config.toml", ".gest.toml"];
-
-/// Filename for the global config under the user's config home.
-const GLOBAL_CONFIG_NAME: &str = "config.toml";
-
-/// Loads and merges configuration from global and per-directory TOML files.
+/// Load and merge configuration from all sources.
 ///
-/// Storage paths are resolved automatically so the returned [`Settings`] is
-/// ready to use immediately.
-pub fn load(cwd: &Path) -> Result<Settings, Error> {
-  let mut merged = empty_table();
+/// Resolution order (each layer overrides the previous):
+///
+/// 1. Global config: `$GEST_CONFIG` or `$XDG_CONFIG_HOME/gest/config.toml`
+/// 2. Per-directory configs walking from filesystem root to `$CWD`, checking `.config/gest.toml` and `.gest.toml` at
+///    each level.
+/// 3. Environment variables prefixed with `GEST_` (e.g. `GEST_STORAGE__DATA_DIR`).
+pub fn load() -> Result<Settings, Error> {
+  let mut merged = Table::new();
 
-  deep_merge(&mut merged, load_global()?);
-  for dir in ancestors_root_first(cwd) {
-    deep_merge(&mut merged, load_first_match(&dir, CONFIG_NAMES)?);
+  if let Some(table) = read_toml(&global_config_path()?)? {
+    merge_tables(&mut merged, table);
   }
 
-  let mut settings: Settings = merged
-    .try_into()
-    .map_err(|e: toml::de::Error| Error::Config(e.to_string()))?;
+  let cwd = env::current_dir().unwrap_or_default();
+  let mut ancestors: Vec<PathBuf> = cwd.ancestors().map(PathBuf::from).collect();
+  ancestors.reverse();
 
-  settings.storage.resolve(cwd.to_path_buf())?;
+  for dir in ancestors {
+    for candidate in [dir.join(".config/gest.toml"), dir.join(".gest.toml")] {
+      if let Some(table) = read_toml(&candidate)? {
+        merge_tables(&mut merged, table);
+      }
+    }
+  }
+
+  merge_env(&mut merged);
+
+  let settings: Settings = Value::Table(merged).try_into()?;
 
   Ok(settings)
 }
 
-/// Returns all ancestor directories of `path`, ordered from root to `path` itself.
-fn ancestors_root_first(path: &Path) -> Vec<PathBuf> {
-  let mut dirs: Vec<_> = path.ancestors().map(Path::to_path_buf).collect();
-  dirs.reverse();
-  dirs
+/// Resolve the path to the global config file, preferring `$GEST_CONFIG` over the XDG default.
+fn global_config_path() -> Result<PathBuf, Error> {
+  GEST_CONFIG
+    .value()
+    .ok()
+    .or_else(|| dir_spec::config_home().map(|path| path.join("gest/config.toml")))
+    .ok_or(Error::XDGDirNotFound("config"))
 }
 
-/// Recursively merges `overlay` into `base`, with overlay values taking precedence.
-fn deep_merge(base: &mut Value, overlay: Value) {
-  match (base, overlay) {
-    (Value::Table(base_map), Value::Table(overlay_map)) => {
-      for (key, value) in overlay_map {
-        deep_merge(base_map.entry(key).or_insert(empty_table()), value);
-      }
+/// Merge environment variables prefixed with `GEST_` into the config table.
+///
+/// `__` separates nesting levels and key segments are lowercased.
+/// For example, `GEST_STORAGE__DATA_DIR=foo` becomes `[storage] data_dir = "foo"`.
+fn merge_env(base: &mut Table) {
+  const PREFIX: &str = "GEST_";
+
+  for (key, value) in env::vars() {
+    if !key.starts_with(PREFIX) || key == GEST_CONFIG.name() {
+      continue;
     }
-    (base, overlay) => *base = overlay,
-  }
-}
 
-fn empty_table() -> Value {
-  Value::Table(Table::new())
-}
+    let path: Vec<&str> = key[PREFIX.len()..].split("__").collect();
+    let lowered: Vec<String> = path.iter().map(|s| s.to_lowercase()).collect();
 
-/// Returns the parsed TOML of the first file in `names` that exists under `dir`.
-fn load_first_match(dir: &Path, names: &[&str]) -> Result<Value, Error> {
-  for name in names {
-    let value = read_toml(&dir.join(name))?;
-    if value != empty_table() {
-      return Ok(value);
+    let mut table = &mut *base;
+    for segment in &lowered[..lowered.len() - 1] {
+      table = table
+        .entry(segment.clone())
+        .or_insert_with(|| Value::Table(Table::new()))
+        .as_table_mut()
+        .unwrap_or_else(|| panic!("config key `{segment}` is not a table"));
     }
+
+    table.insert(lowered.last().unwrap().clone(), Value::String(value));
   }
-  Ok(empty_table())
 }
 
-/// Loads the global config from `$GEST_CONFIG` or the platform config home.
-fn load_global() -> Result<Value, Error> {
-  if let Ok(path) = GEST_CONFIG.value() {
-    log::debug!("loading global config from $GEST_CONFIG: {}", path.display());
-    return read_toml(&path);
-  }
-
-  if let Some(config_home) = dir_spec::config_home() {
-    let path = config_home.join("gest").join(GLOBAL_CONFIG_NAME);
-    log::debug!("searching for global config at {}", path.display());
-    return read_toml(&path);
-  }
-
-  log::trace!("no global config home found");
-  Ok(empty_table())
-}
-
-/// Reads and parses a TOML file, returning an empty table if the file does not exist.
-fn read_toml(path: &Path) -> Result<Value, Error> {
-  match std::fs::read_to_string(path) {
-    Ok(content) => {
-      log::trace!("loaded config: {}", path.display());
-      toml::from_str(&content).map_err(|e| Error::Config(e.to_string()))
+/// Recursively merge `overlay` into `base`. Nested tables are merged; all other values are overwritten.
+fn merge_tables(base: &mut Table, overlay: Table) {
+  for (key, overlay_value) in overlay {
+    if let Value::Table(overlay_table) = &overlay_value
+      && let Some(Value::Table(base_table)) = base.get_mut(&key)
+    {
+      merge_tables(base_table, overlay_table.clone());
+      continue;
     }
-    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(empty_table()),
-    Err(e) => Err(e.into()),
+    base.insert(key, overlay_value);
   }
+}
+
+/// Read and parse a TOML file into a [`Table`]. Returns `Ok(None)` if the file does not exist.
+fn read_toml(path: &PathBuf) -> Result<Option<Table>, Error> {
+  if !path.is_file() {
+    return Ok(None);
+  }
+
+  let content = fs::read_to_string(path)?;
+  let table: Table = toml::from_str(&content)?;
+
+  Ok(Some(table))
 }
 
 #[cfg(test)]
 mod tests {
+  use std::io::Write;
+
+  use tempfile::TempDir;
+  use toml::Value;
+
   use super::*;
-
-  mod ancestors_root_first {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_returns_ancestors_ordered_from_root_to_path() {
-      let dirs = ancestors_root_first(Path::new("/a/b/c"));
-
-      assert_eq!(
-        dirs,
-        vec![
-          PathBuf::from("/"),
-          PathBuf::from("/a"),
-          PathBuf::from("/a/b"),
-          PathBuf::from("/a/b/c"),
-        ]
-      );
-    }
-
-    #[test]
-    fn it_returns_root_for_root_path() {
-      let dirs = ancestors_root_first(Path::new("/"));
-
-      assert_eq!(dirs, vec![PathBuf::from("/")]);
-    }
-  }
-
-  mod deep_merge {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-
-    #[test]
-    fn it_adds_new_keys() {
-      let mut base: Value = toml::from_str("[storage]\ndata_dir = \"/a\"").unwrap();
-      let overlay: Value = toml::from_str("name = \"test\"").unwrap();
-      deep_merge(&mut base, overlay);
-
-      assert_eq!(base["storage"]["data_dir"], Value::String("/a".into()));
-      assert_eq!(base["name"], Value::String("test".into()));
-    }
-
-    #[test]
-    fn it_merges_nested_tables() {
-      let mut base: Value = toml::from_str("[storage]\ndata_dir = \"/a\"").unwrap();
-      let overlay: Value = toml::from_str("[storage]\nbackup = true").unwrap();
-      deep_merge(&mut base, overlay);
-
-      assert_eq!(base["storage"]["data_dir"], Value::String("/a".into()));
-      assert_eq!(base["storage"]["backup"], Value::Boolean(true));
-    }
-
-    #[test]
-    fn it_overwrites_scalars() {
-      let mut base: Value = toml::from_str("[storage]\ndata_dir = \"/a\"").unwrap();
-      let overlay: Value = toml::from_str("[storage]\ndata_dir = \"/b\"").unwrap();
-      deep_merge(&mut base, overlay);
-
-      assert_eq!(base["storage"]["data_dir"], Value::String("/b".into()));
-    }
-  }
 
   mod load {
     use pretty_assertions::assert_eq;
-    use temp_env::with_vars_unset;
-    use tempfile::TempDir;
 
     use super::*;
 
-    const UNSET_VARS: [&str; 3] = ["GEST_CONFIG", "GEST_DATA_DIR", "GEST_PROJECT_DIR"];
-
     #[test]
-    fn it_loads_config_from_dot_config_gest_toml() {
-      let tmp = TempDir::new().unwrap();
-      let data_dir = tmp.path().join("data");
-      std::fs::create_dir_all(&data_dir).unwrap();
-      std::fs::create_dir_all(tmp.path().join(".config")).unwrap();
-      std::fs::write(
-        tmp.path().join(".config/gest.toml"),
-        format!("[storage]\ndata_dir = \"{}\"", data_dir.display()),
-      )
-      .unwrap();
+    fn it_merges_per_directory_config_into_settings() {
+      let dir = TempDir::new().unwrap();
+      let config_path = dir.path().join(".gest.toml");
 
-      with_vars_unset(UNSET_VARS, || {
-        let settings = load(tmp.path()).unwrap();
-        assert_eq!(settings.storage().resolve_data_dir().unwrap(), data_dir);
-      })
-    }
+      let mut file = fs::File::create(&config_path).unwrap();
+      file.write_all(b"[storage]\ndata_dir = \"/custom/data\"\n").unwrap();
 
-    #[test]
-    fn it_loads_config_from_gest_config_toml() {
-      let tmp = TempDir::new().unwrap();
-      let data_dir = tmp.path().join("data");
-      std::fs::create_dir_all(&data_dir).unwrap();
-      std::fs::create_dir_all(tmp.path().join(".gest")).unwrap();
-      std::fs::write(
-        tmp.path().join(".gest/config.toml"),
-        format!("[storage]\ndata_dir = \"{}\"", data_dir.display()),
-      )
-      .unwrap();
+      temp_env::with_vars(
+        [
+          ("GEST_CONFIG", None::<&str>),
+          ("GEST_DATA_DIR", None::<&str>),
+          ("XDG_CONFIG_HOME", Some(dir.path().join(".config").to_str().unwrap())),
+        ],
+        || {
+          let original_dir = env::current_dir().unwrap();
+          env::set_current_dir(dir.path()).unwrap();
 
-      with_vars_unset(UNSET_VARS, || {
-        let settings = load(tmp.path()).unwrap();
-        assert_eq!(settings.storage().resolve_data_dir().unwrap(), data_dir);
-      })
-    }
+          let settings = load().unwrap();
 
-    #[test]
-    fn it_loads_config_from_gest_toml() {
-      let tmp = TempDir::new().unwrap();
-      let data_dir = tmp.path().join("data");
-      std::fs::create_dir_all(&data_dir).unwrap();
-      std::fs::write(
-        tmp.path().join(".gest.toml"),
-        format!("[storage]\ndata_dir = \"{}\"", data_dir.display()),
-      )
-      .unwrap();
+          env::set_current_dir(original_dir).unwrap();
 
-      with_vars_unset(UNSET_VARS, || {
-        let settings = load(tmp.path()).unwrap();
-        assert_eq!(settings.storage().resolve_data_dir().unwrap(), data_dir);
-      })
-    }
-
-    #[test]
-    fn it_loads_default_settings_when_no_config_exists() {
-      let tmp = TempDir::new().unwrap();
-
-      with_vars_unset(UNSET_VARS, || {
-        let settings = load(tmp.path()).unwrap();
-        // Config values should match defaults; resolved storage paths will differ.
-        assert_eq!(settings.colors(), &crate::config::colors::Settings::default());
-        assert_eq!(settings.log(), &crate::config::log::Settings::default());
-        assert_eq!(settings.serve(), &crate::config::serve::Settings::default());
-      })
-    }
-
-    #[test]
-    fn it_merges_child_config_over_parent() {
-      let tmp = TempDir::new().unwrap();
-      let parent_dir = tmp.path().join("parent_data");
-      let child_dir = tmp.path().join("child_data");
-      let child = tmp.path().join("child");
-      std::fs::create_dir_all(&parent_dir).unwrap();
-      std::fs::create_dir_all(&child_dir).unwrap();
-      std::fs::create_dir_all(&child).unwrap();
-
-      std::fs::write(
-        tmp.path().join(".gest.toml"),
-        format!("[storage]\ndata_dir = \"{}\"", parent_dir.display()),
-      )
-      .unwrap();
-      std::fs::write(
-        child.join(".gest.toml"),
-        format!("[storage]\ndata_dir = \"{}\"", child_dir.display()),
-      )
-      .unwrap();
-
-      with_vars_unset(UNSET_VARS, || {
-        let settings = load(&child).unwrap();
-        assert_eq!(settings.storage().resolve_data_dir().unwrap(), child_dir);
-      })
+          assert_eq!(
+            settings.storage().data_dir().unwrap(),
+            std::path::PathBuf::from("/custom/data")
+          );
+        },
+      );
     }
   }
 
-  mod load_first_match {
+  mod merge_env {
     use pretty_assertions::assert_eq;
-    use tempfile::TempDir;
 
     use super::*;
 
     #[test]
-    fn it_returns_empty_table_when_no_files_exist() {
-      let tmp = TempDir::new().unwrap();
-      let value = load_first_match(tmp.path(), CONFIG_NAMES).unwrap();
+    fn it_inserts_a_flat_key() {
+      temp_env::with_var("GEST_TESTFLAT", Some("hello"), || {
+        let mut table = Table::new();
+        merge_env(&mut table);
 
-      assert_eq!(value, empty_table());
+        assert_eq!(table.get("testflat").unwrap().as_str().unwrap(), "hello");
+      });
     }
 
     #[test]
-    fn it_returns_first_matching_file() {
-      let tmp = TempDir::new().unwrap();
-      std::fs::create_dir_all(tmp.path().join(".config")).unwrap();
-      std::fs::write(tmp.path().join(".config/gest.toml"), "[storage]\ndata_dir = \"/first\"").unwrap();
-      std::fs::write(tmp.path().join(".gest.toml"), "[storage]\ndata_dir = \"/second\"").unwrap();
+    fn it_inserts_a_nested_key() {
+      temp_env::with_var("GEST_SECTION__NESTED_KEY", Some("val"), || {
+        let mut table = Table::new();
+        merge_env(&mut table);
 
-      let value = load_first_match(tmp.path(), CONFIG_NAMES).unwrap();
+        let section = table.get("section").unwrap().as_table().unwrap();
+        assert_eq!(section.get("nested_key").unwrap().as_str().unwrap(), "val");
+      });
+    }
 
-      assert_eq!(value["storage"]["data_dir"], Value::String("/first".into()));
+    #[test]
+    fn it_lowercases_key_segments() {
+      temp_env::with_var("GEST_UPPER__CASE", Some("low"), || {
+        let mut table = Table::new();
+        merge_env(&mut table);
+
+        let section = table.get("upper").unwrap().as_table().unwrap();
+        assert_eq!(section.get("case").unwrap().as_str().unwrap(), "low");
+      });
+    }
+
+    #[test]
+    fn it_skips_gest_config_env_var() {
+      temp_env::with_var("GEST_CONFIG", Some("/some/path"), || {
+        let mut table = Table::new();
+        merge_env(&mut table);
+
+        assert!(table.get("config").is_none());
+      });
     }
   }
 
-  mod load_global {
+  mod merge_tables {
     use pretty_assertions::assert_eq;
-    use temp_env::{with_var, with_var_unset};
-    use tempfile::TempDir;
 
     use super::*;
 
     #[test]
-    fn it_loads_from_gest_config_env_var() {
-      let tmp = TempDir::new().unwrap();
-      let path = tmp.path().join("custom.toml");
-      std::fs::write(&path, "[storage]\ndata_dir = \"/custom\"").unwrap();
+    fn it_inserts_new_keys() {
+      let mut base = Table::new();
+      let mut overlay = Table::new();
+      overlay.insert("key".into(), Value::String("value".into()));
 
-      with_var("GEST_CONFIG", Some(path.to_str().unwrap()), || {
-        let value = load_global().unwrap();
-        assert_eq!(value["storage"]["data_dir"], Value::String("/custom".into()));
-      })
+      merge_tables(&mut base, overlay);
+
+      assert_eq!(base.get("key").unwrap().as_str().unwrap(), "value");
     }
 
     #[test]
-    fn it_returns_empty_table_when_no_global_config_exists() {
-      with_var_unset("GEST_CONFIG", || {
-        let value = load_global().unwrap();
-        assert_eq!(value, empty_table());
-      })
+    fn it_overwrites_scalar_values() {
+      let mut base = Table::new();
+      base.insert("key".into(), Value::String("old".into()));
+
+      let mut overlay = Table::new();
+      overlay.insert("key".into(), Value::String("new".into()));
+
+      merge_tables(&mut base, overlay);
+
+      assert_eq!(base.get("key").unwrap().as_str().unwrap(), "new");
+    }
+
+    #[test]
+    fn it_recursively_merges_nested_tables() {
+      let mut inner_base = Table::new();
+      inner_base.insert("a".into(), Value::String("1".into()));
+      inner_base.insert("b".into(), Value::String("2".into()));
+
+      let mut base = Table::new();
+      base.insert("section".into(), Value::Table(inner_base));
+
+      let mut inner_overlay = Table::new();
+      inner_overlay.insert("b".into(), Value::String("overridden".into()));
+      inner_overlay.insert("c".into(), Value::String("3".into()));
+
+      let mut overlay = Table::new();
+      overlay.insert("section".into(), Value::Table(inner_overlay));
+
+      merge_tables(&mut base, overlay);
+
+      let section = base.get("section").unwrap().as_table().unwrap();
+      assert_eq!(section.get("a").unwrap().as_str().unwrap(), "1");
+      assert_eq!(section.get("b").unwrap().as_str().unwrap(), "overridden");
+      assert_eq!(section.get("c").unwrap().as_str().unwrap(), "3");
+    }
+
+    #[test]
+    fn it_replaces_scalar_with_table() {
+      let mut base = Table::new();
+      base.insert("key".into(), Value::String("scalar".into()));
+
+      let mut inner = Table::new();
+      inner.insert("nested".into(), Value::String("value".into()));
+
+      let mut overlay = Table::new();
+      overlay.insert("key".into(), Value::Table(inner));
+
+      merge_tables(&mut base, overlay);
+
+      let table = base.get("key").unwrap().as_table().unwrap();
+      assert_eq!(table.get("nested").unwrap().as_str().unwrap(), "value");
+    }
+
+    #[test]
+    fn it_replaces_table_with_scalar() {
+      let mut inner = Table::new();
+      inner.insert("nested".into(), Value::String("value".into()));
+
+      let mut base = Table::new();
+      base.insert("key".into(), Value::Table(inner));
+
+      let mut overlay = Table::new();
+      overlay.insert("key".into(), Value::String("scalar".into()));
+
+      merge_tables(&mut base, overlay);
+
+      assert_eq!(base.get("key").unwrap().as_str().unwrap(), "scalar");
     }
   }
 
@@ -330,20 +286,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_parses_a_toml_file() {
-      let tmp = tempfile::tempdir().unwrap();
-      let path = tmp.path().join("config.toml");
-      std::fs::write(&path, "[storage]\ndata_dir = \"/tmp/gest\"").unwrap();
+    fn it_returns_none_for_missing_file() {
+      let dir = TempDir::new().unwrap();
+      let path = dir.path().join("nonexistent.toml");
 
-      let value = read_toml(&path).unwrap();
+      let result = read_toml(&path).unwrap();
 
-      assert_eq!(value["storage"]["data_dir"], Value::String("/tmp/gest".into()));
+      assert!(result.is_none());
     }
 
     #[test]
-    fn it_returns_an_empty_table_when_not_found() {
-      let value = read_toml(Path::new("/nonexistent/config.toml")).unwrap();
-      assert_eq!(value, empty_table());
+    fn it_parses_a_valid_toml_file() {
+      let dir = TempDir::new().unwrap();
+      let path = dir.path().join("config.toml");
+
+      let mut file = fs::File::create(&path).unwrap();
+      file.write_all(b"[section]\nkey = \"value\"\n").unwrap();
+
+      let result = read_toml(&path).unwrap().unwrap();
+
+      let section = result.get("section").unwrap().as_table().unwrap();
+      assert_eq!(section.get("key").unwrap().as_str().unwrap(), "value");
+    }
+
+    #[test]
+    fn it_returns_an_error_for_invalid_toml() {
+      let dir = TempDir::new().unwrap();
+      let path = dir.path().join("bad.toml");
+
+      let mut file = fs::File::create(&path).unwrap();
+      file.write_all(b"not valid [[ toml").unwrap();
+
+      let result = read_toml(&path);
+
+      assert!(result.is_err());
     }
   }
 }

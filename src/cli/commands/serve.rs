@@ -1,87 +1,52 @@
-use std::{net::IpAddr, time::Duration};
+use std::net::SocketAddr;
 
 use clap::Args;
 
-use crate::{
-  cli::{self, AppContext},
-  ui::composites::success_message::SuccessMessage,
-};
+use crate::{AppContext, cli::Error};
 
-/// Start a local web server for browsing gest entities.
-#[derive(Debug, Args)]
+/// Start the web dashboard server.
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Address to bind to (overrides config).
-  #[arg(long = "bind", short = 'b')]
-  bind_address: Option<IpAddr>,
-  /// Port to listen on (overrides config).
-  #[arg(long)]
-  port: Option<u16>,
-  /// Do not automatically open the browser.
+  /// File watcher debounce in milliseconds.
+  #[arg(long, default_value = "300")]
+  debounce_ms: u64,
+  /// The host to bind to.
+  #[arg(long, alias = "bind", default_value = "127.0.0.1")]
+  host: String,
+  /// Suppress automatic browser opening.
   #[arg(long)]
   no_open: bool,
+  /// The port to bind to.
+  #[arg(long, short, default_value = "2300")]
+  port: u16,
 }
 
 impl Command {
-  /// Resolve effective settings from config + CLI flags and start the server.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let serve_config = ctx.settings.serve();
-    let bind_address = self.bind_address.unwrap_or_else(|| serve_config.bind_address());
-    let port = self.port.unwrap_or_else(|| serve_config.port());
-    let open = !self.no_open && serve_config.open();
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let addr: SocketAddr = format!("{}:{}", self.host, self.port)
+      .parse()
+      .map_err(|e: std::net::AddrParseError| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
 
-    // Re-resolve log level with serve.log_level as the config value and
-    // `Info` as the default (instead of the CLI-wide `Warn`).
-    let env_level = crate::config::env::GEST_LOG_LEVEL.value().ok();
-    let serve_log_level = serve_config.log_level().or(ctx.settings.log().level());
-    let level = crate::logging::resolve_level_with_default(
-      ctx.verbosity,
-      env_level.as_deref(),
-      serve_log_level,
-      log::LevelFilter::Info,
-    );
-    log::set_max_level(level);
+    let url = format!("http://{addr}");
+    println!("  starting gest dashboard at {url}");
 
-    let state = crate::server::ServerState::new(ctx.settings.clone());
+    if !self.no_open
+      && let Err(e) = open::that(&url)
+    {
+      log::warn!("failed to open browser: {e}");
+    }
 
-    let rt = tokio::runtime::Runtime::new().map_err(|e| cli::Error::Runtime(e.to_string()))?;
-    rt.block_on(async {
-      let debounce = Duration::from_millis(serve_config.debounce_ms());
-      let _watcher_handle = crate::server::watcher::spawn(&state.settings, debounce, state.ping_sender());
+    crate::web::serve(
+      context.store().clone(),
+      project_id.clone(),
+      addr,
+      context.gest_dir().clone(),
+      self.debounce_ms,
+    )
+    .await
+    .map_err(std::io::Error::other)?;
 
-      let app = crate::server::router(state);
-      let addr = std::net::SocketAddr::from((bind_address, port));
-      let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|e| cli::Error::Runtime(e.to_string()))?;
-
-      let url = format!("http://{bind_address}:{port}");
-      let msg = SuccessMessage::new(format!("listening on {url}"), &ctx.theme);
-      println!("{msg}");
-
-      if open {
-        let _ = open_browser(&url);
-      }
-
-      axum::serve(listener, app)
-        .await
-        .map_err(|e| cli::Error::Runtime(e.to_string()))
-    })
+    Ok(())
   }
-}
-
-/// Attempt to open the given URL in the default browser.
-fn open_browser(url: &str) -> std::io::Result<()> {
-  #[cfg(target_os = "macos")]
-  {
-    std::process::Command::new("open").arg(url).spawn()?;
-  }
-  #[cfg(target_os = "linux")]
-  {
-    std::process::Command::new("xdg-open").arg(url).spawn()?;
-  }
-  #[cfg(target_os = "windows")]
-  {
-    std::process::Command::new("cmd").args(["/C", "start", url]).spawn()?;
-  }
-  Ok(())
 }

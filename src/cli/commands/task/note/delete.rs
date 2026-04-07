@@ -1,75 +1,39 @@
 use clap::Args;
 
 use crate::{
-  action,
-  cli::{self, AppContext},
-  store,
-  ui::composites::success_message::SuccessMessage,
+  AppContext,
+  cli::Error,
+  store::repo,
+  ui::{components::SuccessMessage, json},
 };
 
 /// Delete a note from a task.
-#[derive(Debug, Args)]
+#[derive(Args, Debug)]
 pub struct Command {
-  /// Task ID or unique prefix.
-  pub task_id: String,
-  /// Note ID or unique prefix.
-  pub note_id: String,
+  /// The note ID or prefix.
+  id: String,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
-  /// Remove the note and print a confirmation.
-  pub fn call(&self, ctx: &AppContext) -> cli::Result<()> {
-    let config = &ctx.settings;
-    let theme = &ctx.theme;
-    let task_id = store::resolve_task_id(config, &self.task_id, true)?;
+  pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
+    let conn = context.store().connect().await?;
+    let note_id = repo::resolve::resolve_id(&conn, "notes", &self.id).await?;
 
-    let note = action::resolve_note_prefix(config, &task_id, &self.note_id)?;
-    let note_id = note.id;
-
-    store::note::delete_note(config, &task_id, &note_id)?;
-
-    let msg = format!("deleted note {} from task {}", note_id.short(), task_id.short());
-    println!("{}", SuccessMessage::new(&msg, theme));
-    Ok(())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  mod call {
-    use pretty_assertions::assert_eq;
-
-    use super::*;
-    use crate::{
-      model::{NewNote, note::AuthorType},
-      test_helpers::{make_test_context, make_test_task},
-    };
-
-    #[test]
-    fn it_deletes_a_note() {
-      let dir = tempfile::tempdir().unwrap();
-      let ctx = make_test_context(dir.path());
-      let task = make_test_task("zyxwvutsrqponmlkzyxwvutsrqponmlk");
-      store::write_task(&ctx.settings, &task).unwrap();
-
-      let new = NewNote {
-        author: "claude".to_string(),
-        author_email: None,
-        author_type: AuthorType::Agent,
-        body: "To be deleted".to_string(),
-      };
-      let note = store::note::add_note(&ctx.settings, &task.id, new).unwrap();
-
-      let cmd = Command {
-        task_id: "zyxw".to_string(),
-        note_id: note.id.short(),
-      };
-      cmd.call(&ctx).unwrap();
-
-      let notes = store::note::list_notes(&ctx.settings, &task.id).unwrap();
-      assert_eq!(notes.len(), 0);
+    let before_note = repo::note::find_by_id(&conn, note_id.clone()).await?;
+    let tx = repo::transaction::begin(&conn, project_id, "task note delete").await?;
+    repo::note::delete(&conn, &note_id).await?;
+    if let Some(note) = &before_note {
+      let before = serde_json::to_value(note)?;
+      repo::transaction::record_event(&conn, tx.id(), "notes", &note_id.to_string(), "deleted", Some(&before)).await?;
     }
+
+    let short_id = note_id.short();
+    self
+      .output
+      .print_delete(|| SuccessMessage::new("deleted note").id(short_id.clone()).to_string())?;
+    Ok(())
   }
 }

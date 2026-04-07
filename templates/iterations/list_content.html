@@ -1,18 +1,20 @@
 <h1 class="section-heading">Iterations</h1>
 <div class="summary">
-  {% if current_status == "active" %}<strong>{{ active_count }} active</strong>{% else %}<a href="/iterations">{{ active_count }} active</a>{% endif %}
-  &middot;
-  {% if current_status == "completed" %}<strong>{{ completed_count }} completed</strong>{% else %}<a href="/iterations?status=completed">{{ completed_count }} completed</a>{% endif %}
-  &middot;
-  {% if current_status == "cancelled" %}<strong>{{ cancelled_count }} cancelled</strong>{% else %}<a href="/iterations?status=cancelled">{{ cancelled_count }} cancelled</a>{% endif %}
+  <a href="/iterations?status=all"{% if current_status.is_empty() || current_status == "all" %} style="color:var(--silver);font-weight:500"{% endif %}>All ({{ active_count + completed_count + cancelled_count }})</a>
+  &nbsp;&middot;&nbsp;
+  <a href="/iterations?status=active"{% if current_status == "active" %} style="color:var(--silver);font-weight:500"{% endif %}>Active ({{ active_count }})</a>
+  &nbsp;&middot;&nbsp;
+  <a href="/iterations?status=completed"{% if current_status == "completed" %} style="color:var(--silver);font-weight:500"{% endif %}>Completed ({{ completed_count }})</a>
+  &nbsp;&middot;&nbsp;
+  <a href="/iterations?status=cancelled"{% if current_status == "cancelled" %} style="color:var(--silver);font-weight:500"{% endif %}>Cancelled ({{ cancelled_count }})</a>
 </div>
 
-{% if iterations.is_empty() %}
+{% if rows.is_empty() %}
 <p class="empty">No iterations found.</p>
 {% else %}
 <div class="term">
   <div class="term-bar">
-<span class="term-title">gest iteration list</span>
+    <span class="term-title">gest iteration list</span>
   </div>
   <div class="term-body">
     <table class="list-table">
@@ -21,35 +23,34 @@
           <th style="width:90px">ID</th>
           <th style="width:auto">Title</th>
           <th style="width:90px">Status</th>
-          <th style="width:60px">Tasks</th>
-          <th style="width:60px">Phases</th>
-          <th style="width:120px">Tags</th>
+          <th style="width:70px">Tasks</th>
+          <th style="width:70px">Phases</th>
+          <th style="width:auto">Tags</th>
         </tr>
       </thead>
       <tbody>
-        {% for it in iterations %}
-        <tr>
+        {% for row in rows %}
+        <tr{% if row.iteration.status().is_terminal() %} class="c-dim"{% endif %}>
           <td>
-            <a href="/iterations/{{ it.id }}">
-              <span class="id-prefix">{{ it.id.short() }}</span>
+            <a href="/iterations/{{ row.iteration.id() }}">
+              <span class="id-prefix">{{ row.iteration.id().short() }}</span>
             </a>
           </td>
-          <td>{{ it.title }}</td>
+          <td>{{ row.iteration.title() }}</td>
           <td>
-            {% match it.status %}
-              {% when IterationStatus::Active %}
-                <span class="status-in-progress">active</span>
-              {% when IterationStatus::Cancelled %}
-                <span class="status-cancelled">cancelled</span>
-              {% when IterationStatus::Completed %}
-                <span class="status-done">completed</span>
-              {% when IterationStatus::Failed %}
-                <span class="status-cancelled">failed</span>
-            {% endmatch %}
+            {% if row.iteration.status().to_string() == "active" %}
+              <span class="status-in-progress">active</span>
+            {% else if row.iteration.status().to_string() == "cancelled" %}
+              <span class="status-cancelled">cancelled</span>
+            {% else if row.iteration.status().to_string() == "completed" %}
+              <span class="status-done">completed</span>
+            {% endif %}
           </td>
-          <td class="c-pewter">{{ it.tasks.len() }}</td>
-          <td class="c-pewter">{% match it.phase_count %}{% when Some with (n) %}{{ n }}{% when None %}—{% endmatch %}</td>
-          <td>{% for t in it.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}</td>
+          <td>{{ row.task_count }}</td>
+          <td>{{ row.phase_count }}</td>
+          <td>
+            {% for tag in row.tags %}<span class="tag">{{ tag }}</span>{% if !loop.last %} {% endif %}{% endfor %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

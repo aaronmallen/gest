@@ -1,68 +1,52 @@
 <div class="summary">
-  <a href="/iterations/{{ iteration.id }}">← {{ iteration.title }}</a>
+  <a href="/iterations/{{ iteration.id() }}">&larr; {{ iteration.title() }}</a>
 </div>
 
 <h1 class="section-heading">Kanban Board</h1>
 
 <div class="kanban">
   <div class="kanban-col">
-    <div class="kanban-col-header status-open">○ Open ({{ open_tasks.len() }})</div>
+    <div class="kanban-col-header status-open">&#9675; Open ({{ open_tasks.len() }})</div>
     {% for task in open_tasks %}
     <div class="kanban-card">
       <div class="kanban-card-title">
-        <a href="/tasks/{{ task.id }}">{{ task.title }}</a>
+        <a href="/tasks/{{ task.id_short }}">{{ task.title }}</a>
       </div>
       <div class="kanban-card-meta">
-        <a href="/tasks/{{ task.id }}"><span class="id-prefix">{{ task.id.short() }}</span></a>
-        {% match task.priority %}
-          {% when Some with (p) %} · <span class="priority">P{{ p }}</span>{% when None %}
-        {% endmatch %}
+        <span class="id-prefix">{{ task.id_short }}</span>
+        &middot; Phase {{ task.phase }}
       </div>
-      {% if !task.tags.is_empty() %}
-      <div class="kanban-card-meta">
-        {% for t in task.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}
-      </div>
-      {% endif %}
     </div>
     {% endfor %}
     {% if open_tasks.is_empty() %}<div class="empty">no tasks</div>{% endif %}
   </div>
 
   <div class="kanban-col">
-    <div class="kanban-col-header status-in-progress">◐ In Progress ({{ in_progress_tasks.len() }})</div>
+    <div class="kanban-col-header status-in-progress">&#9680; In Progress ({{ in_progress_tasks.len() }})</div>
     {% for task in in_progress_tasks %}
     <div class="kanban-card">
       <div class="kanban-card-title">
-        <a href="/tasks/{{ task.id }}">{{ task.title }}</a>
+        <a href="/tasks/{{ task.id_short }}">{{ task.title }}</a>
       </div>
       <div class="kanban-card-meta">
-        <a href="/tasks/{{ task.id }}"><span class="id-prefix">{{ task.id.short() }}</span></a>
-        {% match task.priority %}
-          {% when Some with (p) %} · <span class="priority">P{{ p }}</span>{% when None %}
-        {% endmatch %}
+        <span class="id-prefix">{{ task.id_short }}</span>
+        &middot; Phase {{ task.phase }}
       </div>
-      {% if !task.tags.is_empty() %}
-      <div class="kanban-card-meta">
-        {% for t in task.tags %}<a href="/search?q=tag:{{ t }}" class="tag">#{{ t }}</a>{% if !loop.last %} {% endif %}{% endfor %}
-      </div>
-      {% endif %}
     </div>
     {% endfor %}
     {% if in_progress_tasks.is_empty() %}<div class="empty">no tasks</div>{% endif %}
   </div>
 
   <div class="kanban-col">
-    <div class="kanban-col-header status-done">● Done ({{ done_tasks.len() }})</div>
+    <div class="kanban-col-header status-done">&#9679; Done ({{ done_tasks.len() }})</div>
     {% for task in done_tasks %}
     <div class="kanban-card">
       <div class="kanban-card-title">
-        <a href="/tasks/{{ task.id }}">{{ task.title }}</a>
+        <a href="/tasks/{{ task.id_short }}">{{ task.title }}</a>
       </div>
       <div class="kanban-card-meta">
-        <a href="/tasks/{{ task.id }}"><span class="id-prefix">{{ task.id.short() }}</span></a>
-        {% match task.priority %}
-          {% when Some with (p) %} · <span class="priority">P{{ p }}</span>{% when None %}
-        {% endmatch %}
+        <span class="id-prefix">{{ task.id_short }}</span>
+        &middot; Phase {{ task.phase }}
       </div>
     </div>
     {% endfor %}
@@ -70,14 +54,15 @@
   </div>
 
   <div class="kanban-col">
-    <div class="kanban-col-header status-cancelled">✗ Cancelled ({{ cancelled_tasks.len() }})</div>
+    <div class="kanban-col-header status-cancelled">&#10007; Cancelled ({{ cancelled_tasks.len() }})</div>
     {% for task in cancelled_tasks %}
     <div class="kanban-card">
       <div class="kanban-card-title">
-        <a href="/tasks/{{ task.id }}">{{ task.title }}</a>
+        <a href="/tasks/{{ task.id_short }}">{{ task.title }}</a>
       </div>
       <div class="kanban-card-meta">
-        <a href="/tasks/{{ task.id }}"><span class="id-prefix">{{ task.id.short() }}</span></a>
+        <span class="id-prefix">{{ task.id_short }}</span>
+        &middot; Phase {{ task.phase }}
       </div>
     </div>
     {% endfor %}

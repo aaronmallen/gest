@@ -202,10 +202,10 @@ async fn migrate_artifacts(
 
           // Tags (including kind as a tag)
           let mut tags = artifact.tags;
-          if let Some(kind) = artifact.kind {
-            if !tags.contains(&kind) {
-              tags.push(kind);
-            }
+          if let Some(kind) = artifact.kind
+            && !tags.contains(&kind)
+          {
+            tags.push(kind);
           }
           for tag in &tags {
             repo::tag::attach(conn, EntityType::Artifact, &new_id, tag).await?;

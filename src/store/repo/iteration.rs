@@ -467,6 +467,114 @@ mod tests {
     }
   }
 
+  mod shortest_prefix_fns {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::ui::components::min_unique_prefix;
+
+    #[tokio::test]
+    async fn it_matches_min_unique_prefix_over_active_iterations() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let mut active_ids = Vec::new();
+      for i in 0..4 {
+        let iter = create(
+          &conn,
+          &pid,
+          &New {
+            title: format!("Iter {i}"),
+            ..Default::default()
+          },
+        )
+        .await
+        .unwrap();
+        active_ids.push(iter.id().to_string());
+      }
+      let done = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Done iter".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      update(
+        &conn,
+        done.id(),
+        &Patch {
+          status: Some(IterationStatus::Completed),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+
+      let refs: Vec<&str> = active_ids.iter().map(String::as_str).collect();
+      let expected = min_unique_prefix(&refs);
+      let got = shortest_active_prefix(&conn, &pid).await.unwrap();
+
+      assert_eq!(got, expected);
+    }
+
+    #[tokio::test]
+    async fn it_matches_min_unique_prefix_over_all_iterations() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let mut all_ids = Vec::new();
+      for i in 0..3 {
+        let iter = create(
+          &conn,
+          &pid,
+          &New {
+            title: format!("Iter {i}"),
+            ..Default::default()
+          },
+        )
+        .await
+        .unwrap();
+        all_ids.push(iter.id().to_string());
+      }
+      let done = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Done iter".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      all_ids.push(done.id().to_string());
+      update(
+        &conn,
+        done.id(),
+        &Patch {
+          status: Some(IterationStatus::Completed),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+
+      let refs: Vec<&str> = all_ids.iter().map(String::as_str).collect();
+      let expected = min_unique_prefix(&refs);
+      let got = shortest_all_prefix(&conn, &pid).await.unwrap();
+
+      assert_eq!(got, expected);
+    }
+
+    #[tokio::test]
+    async fn it_returns_two_for_empty_population() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      assert_eq!(shortest_active_prefix(&conn, &pid).await.unwrap(), 2);
+      assert_eq!(shortest_all_prefix(&conn, &pid).await.unwrap(), 2);
+    }
+  }
+
   mod create_fn {
     use pretty_assertions::assert_eq;
 

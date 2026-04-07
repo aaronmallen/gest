@@ -280,6 +280,97 @@ mod tests {
     }
   }
 
+  mod shortest_prefix_fns {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::ui::components::min_unique_prefix;
+
+    #[tokio::test]
+    async fn it_matches_min_unique_prefix_over_active_artifacts() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let mut active_ids = Vec::new();
+      for i in 0..5 {
+        let a = create(
+          &conn,
+          &pid,
+          &New {
+            title: format!("Active {i}"),
+            ..Default::default()
+          },
+        )
+        .await
+        .unwrap();
+        active_ids.push(a.id().to_string());
+      }
+
+      let archived = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Archived".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      archive(&conn, archived.id()).await.unwrap();
+
+      let refs: Vec<&str> = active_ids.iter().map(String::as_str).collect();
+      let expected = min_unique_prefix(&refs);
+      let got = shortest_active_prefix(&conn, &pid).await.unwrap();
+
+      assert_eq!(got, expected);
+    }
+
+    #[tokio::test]
+    async fn it_matches_min_unique_prefix_over_all_artifacts() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let mut all_ids = Vec::new();
+      for i in 0..3 {
+        let a = create(
+          &conn,
+          &pid,
+          &New {
+            title: format!("Active {i}"),
+            ..Default::default()
+          },
+        )
+        .await
+        .unwrap();
+        all_ids.push(a.id().to_string());
+      }
+      let arch = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Archived".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      all_ids.push(arch.id().to_string());
+      archive(&conn, arch.id()).await.unwrap();
+
+      let refs: Vec<&str> = all_ids.iter().map(String::as_str).collect();
+      let expected = min_unique_prefix(&refs);
+      let got = shortest_all_prefix(&conn, &pid).await.unwrap();
+
+      assert_eq!(got, expected);
+    }
+
+    #[tokio::test]
+    async fn it_returns_two_for_empty_population() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      assert_eq!(shortest_active_prefix(&conn, &pid).await.unwrap(), 2);
+      assert_eq!(shortest_all_prefix(&conn, &pid).await.unwrap(), 2);
+    }
+  }
+
   mod all_fn {
     use pretty_assertions::assert_eq;
 

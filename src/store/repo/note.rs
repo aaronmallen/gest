@@ -272,6 +272,75 @@ mod tests {
     }
   }
 
+  mod shortest_prefix_fn {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::ui::components::min_unique_prefix;
+
+    async fn make_artifact(conn: &Connection, project_id: &Id) -> Id {
+      let artifact_id = Id::new();
+      conn
+        .execute(
+          "INSERT INTO artifacts (id, project_id, title, body, created_at, updated_at, metadata) \
+            VALUES (?1, ?2, 'A', '', '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z', '{}')",
+          [artifact_id.to_string(), project_id.to_string()],
+        )
+        .await
+        .unwrap();
+      artifact_id
+    }
+
+    #[tokio::test]
+    async fn it_matches_min_unique_prefix_over_artifact_notes() {
+      let (_store, conn, _tmp, pid, _task_id) = setup().await;
+      let artifact_id = make_artifact(&conn, &pid).await;
+
+      let mut ids = Vec::new();
+      for i in 0..5 {
+        let note = create(
+          &conn,
+          EntityType::Artifact,
+          &artifact_id,
+          &New {
+            author_id: None,
+            body: format!("Note {i}"),
+          },
+        )
+        .await
+        .unwrap();
+        ids.push(note.id().to_string());
+      }
+
+      let other_artifact = make_artifact(&conn, &pid).await;
+      create(
+        &conn,
+        EntityType::Artifact,
+        &other_artifact,
+        &New {
+          author_id: None,
+          body: "Other".into(),
+        },
+      )
+      .await
+      .unwrap();
+
+      let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+      let expected = min_unique_prefix(&refs);
+      let got = shortest_prefix(&conn, &artifact_id).await.unwrap();
+
+      assert_eq!(got, expected);
+    }
+
+    #[tokio::test]
+    async fn it_returns_two_for_artifact_with_no_notes() {
+      let (_store, conn, _tmp, pid, _task_id) = setup().await;
+      let artifact_id = make_artifact(&conn, &pid).await;
+
+      assert_eq!(shortest_prefix(&conn, &artifact_id).await.unwrap(), 2);
+    }
+  }
+
   mod delete_fn {
     use super::*;
 

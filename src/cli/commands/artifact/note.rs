@@ -1,6 +1,8 @@
 mod add;
 mod delete;
 mod list;
+mod show;
+mod update;
 
 use clap::{Args, Subcommand};
 
@@ -21,6 +23,10 @@ enum Sub {
   Delete(delete::Command),
   /// List notes on an artifact.
   List(list::Command),
+  /// Show a single note.
+  Show(show::Command),
+  /// Update a note's body.
+  Update(update::Command),
 }
 
 impl Command {
@@ -29,6 +35,8 @@ impl Command {
       Sub::Add(cmd) => cmd.call(context).await,
       Sub::Delete(cmd) => cmd.call(context).await,
       Sub::List(cmd) => cmd.call(context).await,
+      Sub::Show(cmd) => cmd.call(context).await,
+      Sub::Update(cmd) => cmd.call(context).await,
     }
   }
 }

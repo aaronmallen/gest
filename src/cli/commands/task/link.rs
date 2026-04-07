@@ -53,10 +53,21 @@ impl Command {
       repo::relationship::create(&conn, self.rel, EntityType::Task, &source_id, target_type, &target_id).await?;
     repo::transaction::record_event(&conn, tx.id(), "relationships", &rel.id().to_string(), "created", None).await?;
 
+    // Pool follows the source task's status.
+    let source_task = repo::task::find_by_id(&conn, source_id.clone())
+      .await?
+      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let prefix_len = if source_task.status().is_terminal() {
+      repo::task::shortest_all_prefix(&conn, project_id).await?
+    } else {
+      repo::task::shortest_active_prefix(&conn, project_id).await?
+    };
+
     let short_id = source_id.short();
     self.output.print_entity(&rel, &short_id, || {
       SuccessMessage::new("linked task")
         .id(source_id.short())
+        .prefix_len(prefix_len)
         .field("rel", self.rel.to_string())
         .field("target", target_id.short())
         .to_string()

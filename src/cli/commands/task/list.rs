@@ -11,7 +11,7 @@ use crate::{
     repo,
   },
   ui::{
-    components::{TaskEntry, TaskListView, min_unique_prefix},
+    components::{TaskEntry, TaskListView},
     json,
   },
 };
@@ -64,8 +64,16 @@ impl Command {
       return Ok(());
     }
 
-    let id_refs: Vec<&str> = id_shorts.iter().map(|s| s.as_str()).collect();
-    let prefix_len = min_unique_prefix(&id_refs);
+    // Pick the prefix pool to match the resolver's view of the world:
+    // when the listing includes any terminal rows (`--all` or a terminal
+    // status filter), highlight against the project-wide pool; otherwise
+    // use the active pool so prefixes line up with `task show <prefix>`.
+    let includes_terminal = self.all || self.status.map(|s| s.is_terminal()).unwrap_or(false);
+    let prefix_len = if includes_terminal {
+      repo::task::shortest_all_prefix(&conn, project_id).await?
+    } else {
+      repo::task::shortest_active_prefix(&conn, project_id).await?
+    };
 
     let mut entries = Vec::new();
     for (task, id_short) in tasks.iter().zip(id_shorts.iter()) {

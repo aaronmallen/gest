@@ -62,10 +62,14 @@ impl Command {
     let task = repo::task::update(&conn, &id, &patch).await?;
     repo::transaction::record_event(&conn, tx.id(), "tasks", &id.to_string(), "modified", Some(&before)).await?;
 
+    // Claim moves to in-progress, which is active.
+    let prefix_len = repo::task::shortest_active_prefix(&conn, project_id).await?;
+
     let short_id = task.id().short();
     self.output.print_entity(&task, &short_id, || {
       SuccessMessage::new("claimed task")
         .id(task.id().short())
+        .prefix_len(prefix_len)
         .field("title", task.title().to_string())
         .field("assigned to", author_name.clone())
         .to_string()

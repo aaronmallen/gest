@@ -28,10 +28,21 @@ impl Command {
     let tag = repo::tag::attach(&conn, EntityType::Task, &id, &self.label).await?;
     repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
 
+    // Pool follows the tagged task's status.
+    let task = repo::task::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let prefix_len = if task.status().is_terminal() {
+      repo::task::shortest_all_prefix(&conn, project_id).await?
+    } else {
+      repo::task::shortest_active_prefix(&conn, project_id).await?
+    };
+
     let short_id = id.short();
     self.output.print_entity(&tag, &short_id, || {
       SuccessMessage::new("tagged task")
         .id(id.short())
+        .prefix_len(prefix_len)
         .field("tag", self.label.clone())
         .to_string()
     })?;

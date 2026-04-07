@@ -123,9 +123,17 @@ impl Command {
       repo::iteration::add_task(&conn, &iter_id, task.id(), phase).await?;
     }
 
+    let prefix_len = if task.status().is_terminal() {
+      repo::task::shortest_all_prefix(&conn, project_id).await?
+    } else {
+      repo::task::shortest_active_prefix(&conn, project_id).await?
+    };
+
     let short_id = task.id().short();
     self.output.print_entity(&task, &short_id, || {
-      let mut message = SuccessMessage::new("created task").id(task.id().short());
+      let mut message = SuccessMessage::new("created task")
+        .id(task.id().short())
+        .prefix_len(prefix_len);
       message = message.field("title", task.title().to_string());
       message.to_string()
     })?;

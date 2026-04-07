@@ -105,10 +105,17 @@ impl Command {
       repo::iteration::update_task_phase(&conn, &id, phase).await?;
     }
 
+    let prefix_len = if task.status().is_terminal() {
+      repo::task::shortest_all_prefix(&conn, project_id).await?
+    } else {
+      repo::task::shortest_active_prefix(&conn, project_id).await?
+    };
+
     let short_id = task.id().short();
     self.output.print_entity(&task, &short_id, || {
       SuccessMessage::new("updated task")
         .id(task.id().short())
+        .prefix_len(prefix_len)
         .field("title", task.title().to_string())
         .to_string()
     })?;

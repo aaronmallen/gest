@@ -38,10 +38,14 @@ impl Command {
     let task = repo::task::update(&conn, &id, &patch).await?;
     repo::transaction::record_event(&conn, tx.id(), "tasks", &id.to_string(), "modified", Some(&before)).await?;
 
+    // Done is terminal, so highlight against the all-rows pool.
+    let prefix_len = repo::task::shortest_all_prefix(&conn, project_id).await?;
+
     let short_id = task.id().short();
     self.output.print_entity(&task, &short_id, || {
       SuccessMessage::new("completed task")
         .id(task.id().short())
+        .prefix_len(prefix_len)
         .field("title", task.title().to_string())
         .to_string()
     })?;

@@ -44,10 +44,21 @@ impl Command {
       .await?;
     }
 
+    // Pool follows the tagged task's status.
+    let task = repo::task::find_by_id(&conn, id.clone())
+      .await?
+      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let prefix_len = if task.status().is_terminal() {
+      repo::task::shortest_all_prefix(&conn, project_id).await?
+    } else {
+      repo::task::shortest_active_prefix(&conn, project_id).await?
+    };
+
     let short_id = id.short();
     self.output.print_delete(|| {
       SuccessMessage::new("untagged task")
         .id(short_id.clone())
+        .prefix_len(prefix_len)
         .field("tag", self.label.clone())
         .to_string()
     })?;

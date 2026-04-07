@@ -23,5 +23,6 @@ mod when_tag;
 mod when_task;
 mod when_task_meta;
 mod when_task_metadata_args;
+mod when_task_prefix;
 mod when_undo;
 mod when_version;

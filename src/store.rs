@@ -1,5 +1,7 @@
 //! Persistence layer for reading, writing, and querying entities on disk.
 
+pub mod model;
+
 mod artifact;
 pub mod artifact_meta;
 mod fs;

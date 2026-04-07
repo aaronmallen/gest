@@ -1,0 +1,15 @@
+use super::Migration;
+
+pub const MIGRATION: Migration = Migration {
+  name: "create_iteration_tasks",
+  sql: "\
+    CREATE TABLE iteration_tasks (\
+      iteration_id TEXT NOT NULL REFERENCES iterations(id),\
+      task_id      TEXT NOT NULL REFERENCES tasks(id),\
+      phase        INTEGER NOT NULL DEFAULT 1,\
+      PRIMARY KEY (iteration_id, task_id)\
+    );\
+    CREATE INDEX idx_iteration_tasks_task_id ON iteration_tasks (task_id);\
+  ",
+  version: 12,
+};

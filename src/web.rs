@@ -1,8 +1,11 @@
 //! Web server for the gest dashboard.
 
 mod assets;
+mod forms;
+mod gravatar;
 mod handlers;
 mod markdown;
+mod note_display;
 mod request_log;
 mod security_headers;
 mod sse;

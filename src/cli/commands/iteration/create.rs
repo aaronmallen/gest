@@ -52,12 +52,15 @@ impl Command {
 
     let tx = repo::transaction::begin(&conn, project_id, "iteration create").await?;
     let iteration = repo::iteration::create(&conn, project_id, &new).await?;
-    repo::transaction::record_event(
+    repo::transaction::record_semantic_event(
       &conn,
       tx.id(),
       "iterations",
       &iteration.id().to_string(),
       "created",
+      None,
+      Some("created"),
+      None,
       None,
     )
     .await?;

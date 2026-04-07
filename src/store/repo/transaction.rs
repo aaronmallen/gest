@@ -95,6 +95,11 @@ pub async fn latest_undoable_n(conn: &Connection, project_id: &Id, n: u32) -> Re
 }
 
 /// Record a change event within a transaction.
+///
+/// This records the row-level audit metadata needed for undo replay and leaves
+/// the timeline-facing semantic fields `NULL`. Use [`record_semantic_event`]
+/// instead when the mutation maps to a user-facing activity entry
+/// (create/status-change/phase-change/priority-change/archive/complete/cancel).
 pub async fn record_event(
   conn: &Connection,
   transaction_id: &Id,
@@ -103,15 +108,60 @@ pub async fn record_event(
   event_type: &str,
   before_data: Option<&JsonValue>,
 ) -> Result<(), Error> {
+  record_semantic_event(
+    conn,
+    transaction_id,
+    table_name,
+    row_id,
+    event_type,
+    before_data,
+    None,
+    None,
+    None,
+  )
+  .await
+}
+
+/// Record a change event with semantic timeline metadata.
+///
+/// `semantic_type`, `old_value`, and `new_value` feed the unified activity
+/// timeline. They should be populated for user-facing mutations and left
+/// `None` for internal or free-form edits that have no human-readable
+/// timeline entry (in which case the plain [`record_event`] is sufficient).
+#[allow(clippy::too_many_arguments)]
+pub async fn record_semantic_event(
+  conn: &Connection,
+  transaction_id: &Id,
+  table_name: &str,
+  row_id: &str,
+  event_type: &str,
+  before_data: Option<&JsonValue>,
+  semantic_type: Option<&str>,
+  old_value: Option<&str>,
+  new_value: Option<&str>,
+) -> Result<(), Error> {
   let id = Id::new();
   let before: Value = match before_data {
     Some(d) => Value::from(d.to_string()),
     None => Value::Null,
   };
+  let semantic: Value = match semantic_type {
+    Some(s) => Value::from(s.to_string()),
+    None => Value::Null,
+  };
+  let old: Value = match old_value {
+    Some(v) => Value::from(v.to_string()),
+    None => Value::Null,
+  };
+  let new: Value = match new_value {
+    Some(v) => Value::from(v.to_string()),
+    None => Value::Null,
+  };
   conn
     .execute(
-      "INSERT INTO transaction_events (id, transaction_id, before_data, event_type, row_id, table_name) \
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+      "INSERT INTO transaction_events \
+        (id, transaction_id, before_data, event_type, row_id, table_name, semantic_type, old_value, new_value) \
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
       libsql::params![
         id.to_string(),
         transaction_id.to_string(),
@@ -119,6 +169,9 @@ pub async fn record_event(
         event_type.to_string(),
         row_id.to_string(),
         table_name.to_string(),
+        semantic,
+        old,
+        new,
       ],
     )
     .await?;
@@ -135,7 +188,8 @@ pub async fn undo(conn: &Connection, transaction_id: &Id) -> Result<String, Erro
   // Get all events in reverse order
   let mut rows = conn
     .query(
-      "SELECT id, transaction_id, before_data, created_at, event_type, row_id, table_name \
+      "SELECT id, transaction_id, before_data, created_at, event_type, row_id, table_name, \
+        semantic_type, old_value, new_value \
         FROM transaction_events WHERE transaction_id = ?1 ORDER BY created_at DESC",
       [transaction_id.to_string()],
     )
@@ -342,6 +396,236 @@ mod tests {
     }
   }
 
+  mod record_event_fn {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    async fn semantic_row(conn: &Connection, tx_id: &Id) -> (Option<String>, Option<String>, Option<String>) {
+      let mut rows = conn
+        .query(
+          "SELECT semantic_type, old_value, new_value FROM transaction_events WHERE transaction_id = ?1",
+          [tx_id.to_string()],
+        )
+        .await
+        .unwrap();
+      let row = rows.next().await.unwrap().unwrap();
+      (row.get(0).unwrap(), row.get(1).unwrap(), row.get(2).unwrap())
+    }
+
+    #[tokio::test]
+    async fn it_leaves_semantic_fields_null_for_plain_record_event() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let tx = begin(&conn, &pid, "task update").await.unwrap();
+      record_event(&conn, tx.id(), "tasks", "abc", "modified", None)
+        .await
+        .unwrap();
+
+      let (semantic, old, new) = semantic_row(&conn, tx.id()).await;
+
+      assert_eq!(semantic, None);
+      assert_eq!(old, None);
+      assert_eq!(new, None);
+    }
+  }
+
+  mod record_semantic_event_fn {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    async fn semantic_row(conn: &Connection, tx_id: &Id) -> (Option<String>, Option<String>, Option<String>) {
+      let mut rows = conn
+        .query(
+          "SELECT semantic_type, old_value, new_value FROM transaction_events WHERE transaction_id = ?1",
+          [tx_id.to_string()],
+        )
+        .await
+        .unwrap();
+      let row = rows.next().await.unwrap().unwrap();
+      (row.get(0).unwrap(), row.get(1).unwrap(), row.get(2).unwrap())
+    }
+
+    #[tokio::test]
+    async fn it_persists_created_semantic_type() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let tx = begin(&conn, &pid, "task create").await.unwrap();
+      record_semantic_event(
+        &conn,
+        tx.id(),
+        "tasks",
+        "abc",
+        "created",
+        None,
+        Some("created"),
+        None,
+        None,
+      )
+      .await
+      .unwrap();
+
+      let (semantic, old, new) = semantic_row(&conn, tx.id()).await;
+
+      assert_eq!(semantic.as_deref(), Some("created"));
+      assert_eq!(old, None);
+      assert_eq!(new, None);
+    }
+
+    #[tokio::test]
+    async fn it_persists_status_change_with_old_and_new_values() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let tx = begin(&conn, &pid, "task update").await.unwrap();
+      record_semantic_event(
+        &conn,
+        tx.id(),
+        "tasks",
+        "abc",
+        "modified",
+        None,
+        Some("status-change"),
+        Some("open"),
+        Some("in-progress"),
+      )
+      .await
+      .unwrap();
+
+      let (semantic, old, new) = semantic_row(&conn, tx.id()).await;
+
+      assert_eq!(semantic.as_deref(), Some("status-change"));
+      assert_eq!(old.as_deref(), Some("open"));
+      assert_eq!(new.as_deref(), Some("in-progress"));
+    }
+
+    #[tokio::test]
+    async fn it_persists_priority_change_with_old_and_new_values() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let tx = begin(&conn, &pid, "task update").await.unwrap();
+      record_semantic_event(
+        &conn,
+        tx.id(),
+        "tasks",
+        "abc",
+        "modified",
+        None,
+        Some("priority-change"),
+        Some("2"),
+        Some("1"),
+      )
+      .await
+      .unwrap();
+
+      let (semantic, old, new) = semantic_row(&conn, tx.id()).await;
+
+      assert_eq!(semantic.as_deref(), Some("priority-change"));
+      assert_eq!(old.as_deref(), Some("2"));
+      assert_eq!(new.as_deref(), Some("1"));
+    }
+
+    #[tokio::test]
+    async fn it_persists_phase_change_with_old_and_new_values() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let tx = begin(&conn, &pid, "task update").await.unwrap();
+      record_semantic_event(
+        &conn,
+        tx.id(),
+        "iteration_tasks",
+        "abc",
+        "modified",
+        None,
+        Some("phase-change"),
+        Some("1"),
+        Some("2"),
+      )
+      .await
+      .unwrap();
+
+      let (semantic, old, new) = semantic_row(&conn, tx.id()).await;
+
+      assert_eq!(semantic.as_deref(), Some("phase-change"));
+      assert_eq!(old.as_deref(), Some("1"));
+      assert_eq!(new.as_deref(), Some("2"));
+    }
+
+    #[tokio::test]
+    async fn it_persists_archived_semantic_type() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let tx = begin(&conn, &pid, "artifact archive").await.unwrap();
+      record_semantic_event(
+        &conn,
+        tx.id(),
+        "artifacts",
+        "abc",
+        "modified",
+        None,
+        Some("archived"),
+        None,
+        None,
+      )
+      .await
+      .unwrap();
+
+      let (semantic, _, _) = semantic_row(&conn, tx.id()).await;
+
+      assert_eq!(semantic.as_deref(), Some("archived"));
+    }
+
+    #[tokio::test]
+    async fn it_persists_completed_semantic_type() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let tx = begin(&conn, &pid, "task complete").await.unwrap();
+      record_semantic_event(
+        &conn,
+        tx.id(),
+        "tasks",
+        "abc",
+        "modified",
+        None,
+        Some("completed"),
+        Some("open"),
+        Some("done"),
+      )
+      .await
+      .unwrap();
+
+      let (semantic, old, new) = semantic_row(&conn, tx.id()).await;
+
+      assert_eq!(semantic.as_deref(), Some("completed"));
+      assert_eq!(old.as_deref(), Some("open"));
+      assert_eq!(new.as_deref(), Some("done"));
+    }
+
+    #[tokio::test]
+    async fn it_persists_cancelled_semantic_type() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let tx = begin(&conn, &pid, "task cancel").await.unwrap();
+      record_semantic_event(
+        &conn,
+        tx.id(),
+        "tasks",
+        "abc",
+        "modified",
+        None,
+        Some("cancelled"),
+        Some("open"),
+        Some("cancelled"),
+      )
+      .await
+      .unwrap();
+
+      let (semantic, _, _) = semantic_row(&conn, tx.id()).await;
+
+      assert_eq!(semantic.as_deref(), Some("cancelled"));
+    }
+  }
+
   mod undo_fn {
     use pretty_assertions::assert_eq;
 
@@ -377,6 +661,62 @@ mod tests {
         .await
         .unwrap();
       assert!(rows.next().await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn it_undoes_a_semantic_modified_event_via_before_data() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      // Insert a task in the `open` state
+      let task_id = Id::new();
+      conn
+        .execute(
+          "INSERT INTO tasks (id, project_id, title, status) VALUES (?1, ?2, ?3, 'open')",
+          [task_id.to_string(), pid.to_string(), "Task".to_string()],
+        )
+        .await
+        .unwrap();
+
+      // Capture before state, mutate, record semantic modified event
+      let before = serde_json::json!({
+        "id": task_id.to_string(),
+        "status": "open",
+        "title": "Task",
+      });
+      conn
+        .execute(
+          "UPDATE tasks SET status = 'in-progress' WHERE id = ?1",
+          [task_id.to_string()],
+        )
+        .await
+        .unwrap();
+
+      let tx = begin(&conn, &pid, "task claim").await.unwrap();
+      record_semantic_event(
+        &conn,
+        tx.id(),
+        "tasks",
+        &task_id.to_string(),
+        "modified",
+        Some(&before),
+        Some("status-change"),
+        Some("open"),
+        Some("in-progress"),
+      )
+      .await
+      .unwrap();
+
+      // Undo should restore status to "open" from before_data, ignoring the semantic fields.
+      undo(&conn, tx.id()).await.unwrap();
+
+      let mut rows = conn
+        .query("SELECT status FROM tasks WHERE id = ?1", [task_id.to_string()])
+        .await
+        .unwrap();
+      let row = rows.next().await.unwrap().unwrap();
+      let status: String = row.get(0).unwrap();
+
+      assert_eq!(status, "open");
     }
   }
 }

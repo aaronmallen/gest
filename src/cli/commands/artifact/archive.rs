@@ -28,7 +28,18 @@ impl Command {
     let before = serde_json::to_value(&before_artifact)?;
     let tx = repo::transaction::begin(&conn, project_id, "artifact archive").await?;
     let artifact = repo::artifact::archive(&conn, &id).await?;
-    repo::transaction::record_event(&conn, tx.id(), "artifacts", &id.to_string(), "modified", Some(&before)).await?;
+    repo::transaction::record_semantic_event(
+      &conn,
+      tx.id(),
+      "artifacts",
+      &id.to_string(),
+      "modified",
+      Some(&before),
+      Some("archived"),
+      None,
+      None,
+    )
+    .await?;
 
     let prefix_len = repo::artifact::shortest_all_prefix(&conn, project_id).await?;
     let short_id = artifact.id().short();

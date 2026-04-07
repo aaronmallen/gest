@@ -83,7 +83,10 @@ pub struct Event {
   created_at: DateTime<Utc>,
   event_type: String,
   id: Id,
+  new_value: Option<String>,
+  old_value: Option<String>,
   row_id: String,
+  semantic_type: Option<String>,
   table_name: String,
   transaction_id: Id,
 }
@@ -109,9 +112,25 @@ impl Event {
     &self.id
   }
 
+  /// The new value for the semantic change, if applicable.
+  pub fn new_value(&self) -> Option<&str> {
+    self.new_value.as_deref()
+  }
+
+  /// The previous value for the semantic change, if applicable.
+  pub fn old_value(&self) -> Option<&str> {
+    self.old_value.as_deref()
+  }
+
   /// The ID of the row that was changed.
   pub fn row_id(&self) -> &str {
     &self.row_id
+  }
+
+  /// The semantic kind of change (e.g. `"status-change"`, `"created"`),
+  /// if this event corresponds to a user-facing activity entry.
+  pub fn semantic_type(&self) -> Option<&str> {
+    self.semantic_type.as_deref()
   }
 
   /// The database table that was modified.
@@ -126,7 +145,7 @@ impl Event {
 }
 
 /// Expects columns in order: `id`, `transaction_id`, `before_data`, `created_at`,
-/// `event_type`, `row_id`, `table_name`.
+/// `event_type`, `row_id`, `table_name`, `semantic_type`, `old_value`, `new_value`.
 impl TryFrom<Row> for Event {
   type Error = Error;
 
@@ -138,6 +157,9 @@ impl TryFrom<Row> for Event {
     let event_type: String = row.get(4)?;
     let row_id: String = row.get(5)?;
     let table_name: String = row.get(6)?;
+    let semantic_type: Option<String> = row.get(7)?;
+    let old_value: Option<String> = row.get(8)?;
+    let new_value: Option<String> = row.get(9)?;
 
     let before_data = before_data
       .map(|s| serde_json::from_str(&s).map_err(|e| Error::InvalidValue(e.to_string())))
@@ -153,7 +175,10 @@ impl TryFrom<Row> for Event {
       created_at,
       event_type,
       id,
+      new_value,
+      old_value,
       row_id,
+      semantic_type,
       table_name,
       transaction_id,
     })

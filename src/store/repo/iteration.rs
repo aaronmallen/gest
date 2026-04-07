@@ -341,6 +341,24 @@ pub async fn update(conn: &Connection, id: &Id, patch: &Patch) -> Result<Model, 
     .ok_or_else(|| Error::NotFound(id.short()))
 }
 
+/// Return the current phase of a task within its iteration, if any.
+pub async fn task_phase(conn: &Connection, task_id: &Id) -> Result<Option<u32>, Error> {
+  let mut rows = conn
+    .query(
+      "SELECT phase FROM iteration_tasks WHERE task_id = ?1",
+      [task_id.to_string()],
+    )
+    .await?;
+
+  match rows.next().await? {
+    Some(row) => {
+      let phase: i64 = row.get(0)?;
+      Ok(Some(phase as u32))
+    }
+    None => Ok(None),
+  }
+}
+
 /// Update the phase of a task within its iteration.
 pub async fn update_task_phase(conn: &Connection, task_id: &Id, phase: u32) -> Result<(), Error> {
   conn
@@ -629,6 +647,153 @@ mod tests {
 
       assert_eq!(updated.status(), IterationStatus::Completed);
       assert!(updated.completed_at().is_some());
+    }
+  }
+
+  mod semantic_events {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::store::repo::transaction;
+
+    async fn semantic_row(conn: &Connection, tx_id: &Id) -> (Option<String>, Option<String>, Option<String>) {
+      let mut rows = conn
+        .query(
+          "SELECT semantic_type, old_value, new_value FROM transaction_events WHERE transaction_id = ?1",
+          [tx_id.to_string()],
+        )
+        .await
+        .unwrap();
+      let row = rows.next().await.unwrap().unwrap();
+      (row.get(0).unwrap(), row.get(1).unwrap(), row.get(2).unwrap())
+    }
+
+    #[tokio::test]
+    async fn it_records_a_created_event_when_creating_an_iteration() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let tx = transaction::begin(&conn, &pid, "iteration create").await.unwrap();
+      let iter = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Sprint".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      transaction::record_semantic_event(
+        &conn,
+        tx.id(),
+        "iterations",
+        &iter.id().to_string(),
+        "created",
+        None,
+        Some("created"),
+        None,
+        None,
+      )
+      .await
+      .unwrap();
+
+      let (semantic, _, _) = semantic_row(&conn, tx.id()).await;
+      assert_eq!(semantic.as_deref(), Some("created"));
+    }
+
+    #[tokio::test]
+    async fn it_records_a_completed_event_when_completing() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let iter = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Sprint".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      let before = serde_json::to_value(&iter).unwrap();
+
+      let tx = transaction::begin(&conn, &pid, "iteration complete").await.unwrap();
+      let updated = update(
+        &conn,
+        iter.id(),
+        &Patch {
+          status: Some(IterationStatus::Completed),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      transaction::record_semantic_event(
+        &conn,
+        tx.id(),
+        "iterations",
+        &iter.id().to_string(),
+        "modified",
+        Some(&before),
+        Some("completed"),
+        Some(&iter.status().to_string()),
+        Some(&updated.status().to_string()),
+      )
+      .await
+      .unwrap();
+
+      let (semantic, old, new) = semantic_row(&conn, tx.id()).await;
+      assert_eq!(semantic.as_deref(), Some("completed"));
+      assert_eq!(old.as_deref(), Some("active"));
+      assert_eq!(new.as_deref(), Some("completed"));
+    }
+
+    #[tokio::test]
+    async fn it_records_a_phase_change_event_when_updating_task_phase() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let iter = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Sprint".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+
+      let task_id = Id::new();
+      conn
+        .execute(
+          "INSERT INTO tasks (id, project_id, title) VALUES (?1, ?2, ?3)",
+          [task_id.to_string(), pid.to_string(), "Task".to_string()],
+        )
+        .await
+        .unwrap();
+      add_task(&conn, iter.id(), &task_id, 1).await.unwrap();
+
+      let old = task_phase(&conn, &task_id).await.unwrap().unwrap();
+      let tx = transaction::begin(&conn, &pid, "task update").await.unwrap();
+      update_task_phase(&conn, &task_id, 2).await.unwrap();
+      transaction::record_semantic_event(
+        &conn,
+        tx.id(),
+        "iteration_tasks",
+        &task_id.to_string(),
+        "modified",
+        None,
+        Some("phase-change"),
+        Some(&old.to_string()),
+        Some("2"),
+      )
+      .await
+      .unwrap();
+
+      let (semantic, old, new) = semantic_row(&conn, tx.id()).await;
+      assert_eq!(semantic.as_deref(), Some("phase-change"));
+      assert_eq!(old.as_deref(), Some("1"));
+      assert_eq!(new.as_deref(), Some("2"));
     }
   }
 

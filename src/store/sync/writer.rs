@@ -4,7 +4,7 @@ use chrono::Utc;
 use libsql::Connection;
 
 use super::{Error, digest};
-use crate::store::model::{artifact, event, iteration, note, primitives::Id, task};
+use crate::store::model::{artifact, iteration, note, primitives::Id, task};
 
 /// Export all project data to the `.gest/` directory as JSON and markdown files.
 pub async fn export_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
@@ -15,7 +15,6 @@ pub async fn export_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> 
   export_artifacts(conn, project_id, gest_dir).await?;
   export_iterations(conn, project_id, gest_dir).await?;
   export_notes(conn, project_id, gest_dir).await?;
-  export_events(conn, project_id, gest_dir).await?;
 
   Ok(())
 }
@@ -59,33 +58,6 @@ async fn export_artifacts(conn: &Connection, project_id: &Id, gest_dir: &Path) -
   let index_json = serde_json::to_string_pretty(&index)?;
   let index_path = artifacts_dir.join("index.json");
   write_if_changed(conn, project_id, &index_path, index_json.as_bytes()).await?;
-
-  Ok(())
-}
-
-async fn export_events(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
-  let mut rows = conn
-    .query(
-      "SELECT e.id, e.entity_id, e.entity_type, e.author_id, \
-        e.created_at, e.data, e.description, e.event_type \
-        FROM events e \
-        WHERE e.entity_id IN ( \
-          SELECT id FROM tasks WHERE project_id = ?1 \
-          UNION SELECT id FROM artifacts WHERE project_id = ?1 \
-          UNION SELECT id FROM iterations WHERE project_id = ?1 \
-        ) ORDER BY e.created_at DESC",
-      [project_id.to_string()],
-    )
-    .await?;
-
-  let mut events = Vec::new();
-  while let Some(row) = rows.next().await? {
-    events.push(event::Model::try_from(row)?);
-  }
-
-  let json = serde_json::to_string_pretty(&events)?;
-  let path = gest_dir.join("events.json");
-  write_if_changed(conn, project_id, &path, json.as_bytes()).await?;
 
   Ok(())
 }

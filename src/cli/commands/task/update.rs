@@ -89,7 +89,52 @@ impl Command {
     };
 
     let task = repo::task::update(&conn, &id, &patch).await?;
-    repo::transaction::record_event(&conn, tx.id(), "tasks", &id.to_string(), "modified", Some(&before)).await?;
+
+    // Emit semantic events for status/priority changes; fall back to a plain
+    // "modified" event (no semantic_type) when only free-form fields changed.
+    let status_changed = patch.status.is_some() && before_task.status() != task.status();
+    let priority_changed = patch.priority.is_some() && before_task.priority() != task.priority();
+
+    if status_changed {
+      let semantic = match task.status() {
+        TaskStatus::Done => "completed",
+        TaskStatus::Cancelled => "cancelled",
+        _ => "status-change",
+      };
+      repo::transaction::record_semantic_event(
+        &conn,
+        tx.id(),
+        "tasks",
+        &id.to_string(),
+        "modified",
+        Some(&before),
+        Some(semantic),
+        Some(&before_task.status().to_string()),
+        Some(&task.status().to_string()),
+      )
+      .await?;
+    }
+
+    if priority_changed {
+      let old = before_task.priority().map(|p| p.to_string());
+      let new = task.priority().map(|p| p.to_string());
+      repo::transaction::record_semantic_event(
+        &conn,
+        tx.id(),
+        "tasks",
+        &id.to_string(),
+        "modified",
+        Some(&before),
+        Some("priority-change"),
+        old.as_deref(),
+        new.as_deref(),
+      )
+      .await?;
+    }
+
+    if !status_changed && !priority_changed {
+      repo::transaction::record_event(&conn, tx.id(), "tasks", &id.to_string(), "modified", Some(&before)).await?;
+    }
 
     // Replace all tags if --tag was specified
     if !self.tag.is_empty() {
@@ -102,7 +147,28 @@ impl Command {
 
     // Update phase if specified
     if let Some(phase) = self.phase {
+      let old_phase = repo::iteration::task_phase(&conn, &id).await?;
       repo::iteration::update_task_phase(&conn, &id, phase).await?;
+      // Only record a timeline-facing phase-change when the task is actually
+      // tracked in an iteration and the phase moved.
+      if let Some(old) = old_phase
+        && old != phase
+      {
+        let old_str = old.to_string();
+        let new_str = phase.to_string();
+        repo::transaction::record_semantic_event(
+          &conn,
+          tx.id(),
+          "iteration_tasks",
+          &id.to_string(),
+          "modified",
+          None,
+          Some("phase-change"),
+          Some(&old_str),
+          Some(&new_str),
+        )
+        .await?;
+      }
     }
 
     let prefix_len = if task.status().is_terminal() {

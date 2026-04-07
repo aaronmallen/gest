@@ -85,7 +85,18 @@ impl Command {
 
     let tx = repo::transaction::begin(&conn, project_id, "artifact create").await?;
     let artifact = repo::artifact::create(&conn, project_id, &new).await?;
-    repo::transaction::record_event(&conn, tx.id(), "artifacts", &artifact.id().to_string(), "created", None).await?;
+    repo::transaction::record_semantic_event(
+      &conn,
+      tx.id(),
+      "artifacts",
+      &artifact.id().to_string(),
+      "created",
+      None,
+      Some("created"),
+      None,
+      None,
+    )
+    .await?;
 
     for label in &self.tag {
       let tag = repo::tag::attach(&conn, EntityType::Artifact, artifact.id(), label).await?;
@@ -143,7 +154,18 @@ impl Command {
       };
 
       let artifact = repo::artifact::create(&conn, project_id, &new).await?;
-      repo::transaction::record_event(&conn, tx.id(), "artifacts", &artifact.id().to_string(), "created", None).await?;
+      repo::transaction::record_semantic_event(
+        &conn,
+        tx.id(),
+        "artifacts",
+        &artifact.id().to_string(),
+        "created",
+        None,
+        Some("created"),
+        None,
+        None,
+      )
+      .await?;
 
       if let Some(tags) = &record.tags {
         for label in tags {

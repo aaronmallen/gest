@@ -92,7 +92,18 @@ impl Command {
 
     let tx = repo::transaction::begin(&conn, project_id, "task create").await?;
     let task = repo::task::create(&conn, project_id, &new).await?;
-    repo::transaction::record_event(&conn, tx.id(), "tasks", &task.id().to_string(), "created", None).await?;
+    repo::transaction::record_semantic_event(
+      &conn,
+      tx.id(),
+      "tasks",
+      &task.id().to_string(),
+      "created",
+      None,
+      Some("created"),
+      None,
+      None,
+    )
+    .await?;
 
     // Apply tags
     for label in &self.tag {
@@ -153,7 +164,18 @@ impl Command {
       let new: New = serde_json::from_str(line).map_err(|e| Error::Editor(format!("invalid NDJSON: {e}")))?;
       let tx = repo::transaction::begin(conn, project_id, "task create").await?;
       let task = repo::task::create(conn, project_id, &new).await?;
-      repo::transaction::record_event(conn, tx.id(), "tasks", &task.id().to_string(), "created", None).await?;
+      repo::transaction::record_semantic_event(
+        conn,
+        tx.id(),
+        "tasks",
+        &task.id().to_string(),
+        "created",
+        None,
+        Some("created"),
+        None,
+        None,
+      )
+      .await?;
       count += 1;
     }
 

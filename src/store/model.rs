@@ -1,7 +1,6 @@
 pub(crate) mod artifact;
 pub(crate) mod author;
 pub(crate) mod entity_tag;
-pub(crate) mod event;
 pub(crate) mod iteration;
 pub(crate) mod iteration_task;
 pub(crate) mod note;

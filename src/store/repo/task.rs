@@ -553,6 +553,168 @@ mod tests {
     }
   }
 
+  mod semantic_events {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::store::repo::transaction;
+
+    async fn semantic_row(conn: &Connection, tx_id: &Id) -> (String, Option<String>, Option<String>, Option<String>) {
+      let mut rows = conn
+        .query(
+          "SELECT event_type, semantic_type, old_value, new_value \
+            FROM transaction_events WHERE transaction_id = ?1",
+          [tx_id.to_string()],
+        )
+        .await
+        .unwrap();
+      let row = rows.next().await.unwrap().unwrap();
+      (
+        row.get(0).unwrap(),
+        row.get(1).unwrap(),
+        row.get(2).unwrap(),
+        row.get(3).unwrap(),
+      )
+    }
+
+    #[tokio::test]
+    async fn it_records_a_created_event_when_creating_a_task() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let tx = transaction::begin(&conn, &pid, "task create").await.unwrap();
+      let task = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Task".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      transaction::record_semantic_event(
+        &conn,
+        tx.id(),
+        "tasks",
+        &task.id().to_string(),
+        "created",
+        None,
+        Some("created"),
+        None,
+        None,
+      )
+      .await
+      .unwrap();
+
+      let (event_type, semantic, old, new) = semantic_row(&conn, tx.id()).await;
+
+      assert_eq!(event_type, "created");
+      assert_eq!(semantic.as_deref(), Some("created"));
+      assert_eq!(old, None);
+      assert_eq!(new, None);
+    }
+
+    #[tokio::test]
+    async fn it_records_a_status_change_event_when_updating_task_status() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let task = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Task".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      let before = serde_json::to_value(&task).unwrap();
+
+      let tx = transaction::begin(&conn, &pid, "task claim").await.unwrap();
+      let updated = update(
+        &conn,
+        task.id(),
+        &Patch {
+          status: Some(TaskStatus::InProgress),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      transaction::record_semantic_event(
+        &conn,
+        tx.id(),
+        "tasks",
+        &task.id().to_string(),
+        "modified",
+        Some(&before),
+        Some("status-change"),
+        Some(&task.status().to_string()),
+        Some(&updated.status().to_string()),
+      )
+      .await
+      .unwrap();
+
+      let (event_type, semantic, old, new) = semantic_row(&conn, tx.id()).await;
+
+      assert_eq!(event_type, "modified");
+      assert_eq!(semantic.as_deref(), Some("status-change"));
+      assert_eq!(old.as_deref(), Some("open"));
+      assert_eq!(new.as_deref(), Some("in-progress"));
+    }
+
+    #[tokio::test]
+    async fn it_records_a_priority_change_event_when_updating_task_priority() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let task = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Task".into(),
+          priority: Some(3),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      let before = serde_json::to_value(&task).unwrap();
+
+      let tx = transaction::begin(&conn, &pid, "task update").await.unwrap();
+      let updated = update(
+        &conn,
+        task.id(),
+        &Patch {
+          priority: Some(Some(1)),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      let old = task.priority().map(|p| p.to_string()).unwrap();
+      let new = updated.priority().map(|p| p.to_string()).unwrap();
+      transaction::record_semantic_event(
+        &conn,
+        tx.id(),
+        "tasks",
+        &task.id().to_string(),
+        "modified",
+        Some(&before),
+        Some("priority-change"),
+        Some(&old),
+        Some(&new),
+      )
+      .await
+      .unwrap();
+
+      let (_event_type, semantic, old, new) = semantic_row(&conn, tx.id()).await;
+
+      assert_eq!(semantic.as_deref(), Some("priority-change"));
+      assert_eq!(old.as_deref(), Some("3"));
+      assert_eq!(new.as_deref(), Some("1"));
+    }
+  }
+
   mod delete_fn {
     use super::*;
 

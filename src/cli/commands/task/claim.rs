@@ -60,7 +60,18 @@ impl Command {
 
     let tx = repo::transaction::begin(&conn, project_id, "task claim").await?;
     let task = repo::task::update(&conn, &id, &patch).await?;
-    repo::transaction::record_event(&conn, tx.id(), "tasks", &id.to_string(), "modified", Some(&before)).await?;
+    repo::transaction::record_semantic_event(
+      &conn,
+      tx.id(),
+      "tasks",
+      &id.to_string(),
+      "modified",
+      Some(&before),
+      Some("status-change"),
+      Some(&before_task.status().to_string()),
+      Some(&task.status().to_string()),
+    )
+    .await?;
 
     // Claim moves to in-progress, which is active.
     let prefix_len = repo::task::shortest_active_prefix(&conn, project_id).await?;

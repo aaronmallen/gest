@@ -36,10 +36,6 @@ pub async fn import_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> 
   if let Err(e) = import_notes(conn, project_id, gest_dir, "artifact_notes.json", "artifacts").await {
     log::warn!("skipping artifact notes import: {e}");
   }
-  if let Err(e) = import_events(conn, project_id, gest_dir).await {
-    log::warn!("skipping events import: {e}");
-  }
-
   Ok(())
 }
 
@@ -186,37 +182,6 @@ async fn import_artifact_bodies_via_title(
   Ok(())
 }
 
-async fn import_events(conn: &Connection, _project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
-  let path = gest_dir.join("events.json");
-  if !path.exists() {
-    return Ok(());
-  }
-
-  let content = std::fs::read_to_string(&path)?;
-  let events: Vec<Value> = serde_json::from_str(&content)?;
-
-  for event_val in events {
-    let Some(id_str) = event_val.get("id").and_then(|v| v.as_str()) else {
-      continue;
-    };
-
-    // Only insert if the event doesn't already exist (events are immutable)
-    let mut rows = conn
-      .query("SELECT 1 FROM events WHERE id = ?1", [id_str.to_string()])
-      .await?;
-
-    if rows.next().await?.is_some() {
-      continue;
-    }
-
-    if let Err(e) = insert_event(conn, &event_val).await {
-      log::warn!("skipping malformed event {id_str}: {e}");
-    }
-  }
-
-  Ok(())
-}
-
 async fn import_iterations(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
   let path = gest_dir.join("iterations.json");
   if !path.exists() {
@@ -328,44 +293,6 @@ async fn import_tasks(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
     // Upsert the task from the JSON value
     upsert_entity(conn, "tasks", project_id, &task_val).await?;
   }
-
-  Ok(())
-}
-
-/// Insert an event from a JSON value. Events are immutable, so this is insert-only.
-async fn insert_event(conn: &Connection, value: &Value) -> Result<(), Error> {
-  let obj = value
-    .as_object()
-    .ok_or_else(|| Error::Io(std::io::Error::other("event is not an object")))?;
-
-  let id = obj.get("id").and_then(|v| v.as_str()).unwrap_or_default();
-  let entity_id = obj.get("entity_id").and_then(|v| v.as_str()).unwrap_or_default();
-  let entity_type = obj.get("entity_type").and_then(|v| v.as_str()).unwrap_or_default();
-  let author_id = obj.get("author_id").and_then(|v| v.as_str()).map(|s| s.to_string());
-  let created_at = obj.get("created_at").and_then(|v| v.as_str()).unwrap_or_default();
-  let data = obj
-    .get("data")
-    .map(|v| v.to_string())
-    .unwrap_or_else(|| "{}".to_string());
-  let description = obj.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
-  let event_type = obj.get("event_type").and_then(|v| v.as_str()).unwrap_or_default();
-
-  conn
-    .execute(
-      "INSERT OR IGNORE INTO events (id, entity_id, entity_type, author_id, created_at, data, description, event_type) \
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-      libsql::params![
-        id.to_string(),
-        entity_id.to_string(),
-        entity_type.to_string(),
-        author_id,
-        created_at.to_string(),
-        data,
-        description,
-        event_type.to_string(),
-      ],
-    )
-    .await?;
 
   Ok(())
 }

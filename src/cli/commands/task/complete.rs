@@ -36,7 +36,18 @@ impl Command {
     };
 
     let task = repo::task::update(&conn, &id, &patch).await?;
-    repo::transaction::record_event(&conn, tx.id(), "tasks", &id.to_string(), "modified", Some(&before)).await?;
+    repo::transaction::record_semantic_event(
+      &conn,
+      tx.id(),
+      "tasks",
+      &id.to_string(),
+      "modified",
+      Some(&before),
+      Some("completed"),
+      Some(&before_task.status().to_string()),
+      Some(&task.status().to_string()),
+    )
+    .await?;
 
     // Done is terminal, so highlight against the all-rows pool.
     let prefix_len = repo::task::shortest_all_prefix(&conn, project_id).await?;

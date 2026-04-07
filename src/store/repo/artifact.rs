@@ -371,6 +371,92 @@ mod tests {
     }
   }
 
+  mod semantic_events {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::store::repo::transaction;
+
+    async fn semantic_type(conn: &Connection, tx_id: &Id) -> Option<String> {
+      let mut rows = conn
+        .query(
+          "SELECT semantic_type FROM transaction_events WHERE transaction_id = ?1",
+          [tx_id.to_string()],
+        )
+        .await
+        .unwrap();
+      let row = rows.next().await.unwrap().unwrap();
+      row.get(0).unwrap()
+    }
+
+    #[tokio::test]
+    async fn it_records_a_created_event_when_creating_an_artifact() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let tx = transaction::begin(&conn, &pid, "artifact create").await.unwrap();
+      let artifact = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Spec".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      transaction::record_semantic_event(
+        &conn,
+        tx.id(),
+        "artifacts",
+        &artifact.id().to_string(),
+        "created",
+        None,
+        Some("created"),
+        None,
+        None,
+      )
+      .await
+      .unwrap();
+
+      assert_eq!(semantic_type(&conn, tx.id()).await.as_deref(), Some("created"));
+    }
+
+    #[tokio::test]
+    async fn it_records_an_archived_event_when_archiving() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let artifact = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Spec".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      let before = serde_json::to_value(&artifact).unwrap();
+
+      let tx = transaction::begin(&conn, &pid, "artifact archive").await.unwrap();
+      archive(&conn, artifact.id()).await.unwrap();
+      transaction::record_semantic_event(
+        &conn,
+        tx.id(),
+        "artifacts",
+        &artifact.id().to_string(),
+        "modified",
+        Some(&before),
+        Some("archived"),
+        None,
+        None,
+      )
+      .await
+      .unwrap();
+
+      assert_eq!(semantic_type(&conn, tx.id()).await.as_deref(), Some("archived"));
+    }
+  }
+
   mod all_fn {
     use pretty_assertions::assert_eq;
 

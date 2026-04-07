@@ -36,7 +36,18 @@ impl Command {
     };
 
     let iteration = repo::iteration::update(&conn, &id, &patch).await?;
-    repo::transaction::record_event(&conn, tx.id(), "iterations", &id.to_string(), "modified", Some(&before)).await?;
+    repo::transaction::record_semantic_event(
+      &conn,
+      tx.id(),
+      "iterations",
+      &id.to_string(),
+      "modified",
+      Some(&before),
+      Some("status-change"),
+      Some(&before_iter.status().to_string()),
+      Some(&iteration.status().to_string()),
+    )
+    .await?;
 
     let prefix_len = repo::iteration::shortest_active_prefix(&conn, project_id).await?;
 

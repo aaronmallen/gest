@@ -1,10 +1,13 @@
 use chrono::Utc;
 use libsql::{Connection, Error as DbError, Value};
 
-use crate::store::model::{
-  Error as ModelError,
-  note::{Model, New, Patch},
-  primitives::{EntityType, Id},
+use crate::{
+  store::model::{
+    Error as ModelError,
+    note::{Model, New, Patch},
+    primitives::{EntityType, Id},
+  },
+  ui::components::min_unique_prefix,
 };
 
 /// Errors that can occur in note repository operations.
@@ -93,6 +96,23 @@ pub async fn for_entity(conn: &Connection, entity_type: EntityType, entity_id: &
     notes.push(Model::try_from(row)?);
   }
   Ok(notes)
+}
+
+/// Return the minimum unique prefix length over all notes attached to the
+/// given parent artifact.
+pub async fn shortest_prefix(conn: &Connection, artifact_id: &Id) -> Result<usize, Error> {
+  let mut rows = conn
+    .query(
+      "SELECT id FROM notes WHERE entity_type = 'artifact' AND entity_id = ?1",
+      [artifact_id.to_string()],
+    )
+    .await?;
+  let mut ids = Vec::new();
+  while let Some(row) = rows.next().await? {
+    ids.push(row.get::<String>(0)?);
+  }
+  let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+  Ok(min_unique_prefix(&refs))
 }
 
 /// Update an existing note with the given patch.

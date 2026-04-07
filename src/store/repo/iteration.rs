@@ -1,10 +1,13 @@
 use chrono::Utc;
 use libsql::{Connection, Error as DbError, Value};
 
-use crate::store::model::{
-  Error as ModelError,
-  iteration::{Filter, Model, New, Patch},
-  primitives::{Id, IterationStatus},
+use crate::{
+  store::model::{
+    Error as ModelError,
+    iteration::{Filter, Model, New, Patch},
+    primitives::{Id, IterationStatus},
+  },
+  ui::components::min_unique_prefix,
 };
 
 /// Errors that can occur in iteration repository operations.
@@ -253,6 +256,35 @@ pub async fn tasks_with_phase(conn: &Connection, iteration_id: &Id) -> Result<Ve
     });
   }
   Ok(result)
+}
+
+/// Return the minimum unique prefix length over all active iterations (status
+/// not `completed` or `cancelled`) in the project.
+pub async fn shortest_active_prefix(conn: &Connection, project_id: &Id) -> Result<usize, Error> {
+  let ids = collect_ids(
+    conn,
+    "SELECT id FROM iterations WHERE project_id = ?1 AND status NOT IN ('completed', 'cancelled')",
+    project_id,
+  )
+  .await?;
+  let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+  Ok(min_unique_prefix(&refs))
+}
+
+/// Return the minimum unique prefix length over every iteration in the project.
+pub async fn shortest_all_prefix(conn: &Connection, project_id: &Id) -> Result<usize, Error> {
+  let ids = collect_ids(conn, "SELECT id FROM iterations WHERE project_id = ?1", project_id).await?;
+  let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+  Ok(min_unique_prefix(&refs))
+}
+
+async fn collect_ids(conn: &Connection, sql: &str, project_id: &Id) -> Result<Vec<String>, Error> {
+  let mut rows = conn.query(sql, [project_id.to_string()]).await?;
+  let mut ids = Vec::new();
+  while let Some(row) = rows.next().await? {
+    ids.push(row.get::<String>(0)?);
+  }
+  Ok(ids)
 }
 
 /// Update an existing iteration with the given patch.

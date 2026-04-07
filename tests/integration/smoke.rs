@@ -14,6 +14,7 @@ mod when_config;
 mod when_init;
 mod when_iteration;
 mod when_search;
+mod when_tag;
 mod when_task;
 mod when_undo;
 mod when_version;

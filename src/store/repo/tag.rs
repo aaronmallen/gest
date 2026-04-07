@@ -39,6 +39,25 @@ pub async fn attach(conn: &Connection, entity_type: EntityType, entity_id: &Id, 
   Ok(tag)
 }
 
+/// Return all distinct tags attached to entities of the given type, ordered by label.
+pub async fn by_entity_type(conn: &Connection, entity_type: EntityType) -> Result<Vec<Tag>, Error> {
+  let mut rows = conn
+    .query(
+      "SELECT DISTINCT t.id, t.label FROM tags t \
+        INNER JOIN entity_tags et ON et.tag_id = t.id \
+        WHERE et.entity_type = ?1 \
+        ORDER BY t.label",
+      [entity_type.to_string()],
+    )
+    .await?;
+
+  let mut tags = Vec::new();
+  while let Some(row) = rows.next().await? {
+    tags.push(Tag::try_from(row)?);
+  }
+  Ok(tags)
+}
+
 /// Create a new tag with the given label.
 pub async fn create(conn: &Connection, tag: &Tag) -> Result<Tag, Error> {
   conn

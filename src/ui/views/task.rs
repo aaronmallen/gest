@@ -102,7 +102,7 @@ impl Display for TaskDetailView<'_> {
             let val = Value::new(&created, self.theme.task_detail_value);
             writeln!(f, "    {label}  {val}")?;
 
-            let rendered = markdown::render(&note.body, self.theme, width.saturating_sub(6));
+            let rendered = markdown::render(&note.body);
             for line in rendered.lines() {
               writeln!(f, "    {line}")?;
             }

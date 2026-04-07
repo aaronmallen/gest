@@ -200,7 +200,7 @@ impl Display for TaskDetail<'_> {
       writeln!(f, "{INDENT}{sep}")?;
       writeln!(f)?;
 
-      let rendered = markdown::render(body, self.theme, self.body_width());
+      let rendered = markdown::render(body);
       for line in rendered.lines() {
         writeln!(f, "{INDENT}{line}")?;
       }

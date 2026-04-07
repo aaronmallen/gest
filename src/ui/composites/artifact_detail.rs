@@ -88,7 +88,7 @@ impl Display for ArtifactDetail<'_> {
       writeln!(f)?;
 
       let content_width = width.saturating_sub(4);
-      let rendered = markdown::render(body, self.theme, content_width);
+      let rendered = markdown::render(body);
       for line in rendered.lines() {
         writeln!(f, "{INDENT}{line}")?;
       }

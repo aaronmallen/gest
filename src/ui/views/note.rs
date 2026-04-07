@@ -47,7 +47,7 @@ impl Display for NoteDetailView<'_> {
     writeln!(f, "{}", Separator::labeled("body", self.theme.task_detail_separator))?;
     writeln!(f)?;
     let width = utils::terminal_width() as usize;
-    let rendered = markdown::render(&note.body, self.theme, width.saturating_sub(4));
+    let rendered = markdown::render(&note.body);
     for line in rendered.lines() {
       writeln!(f, "  {line}")?;
     }

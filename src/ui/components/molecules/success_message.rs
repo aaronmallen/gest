@@ -18,6 +18,7 @@ pub struct Component {
   fields: FieldList,
   has_fields: bool,
   id: Option<String>,
+  prefix_len: usize,
 }
 
 impl Component {
@@ -28,6 +29,7 @@ impl Component {
       fields: FieldList::new(),
       has_fields: false,
       id: None,
+      prefix_len: 2,
     }
   }
 
@@ -41,6 +43,12 @@ impl Component {
   /// Set the entity ID to display after the action text.
   pub fn id(mut self, id: impl Into<String>) -> Self {
     self.id = Some(id.into());
+    self
+  }
+
+  /// Set the highlighted prefix length passed to the rendered [`Id`].
+  pub fn prefix_len(mut self, len: usize) -> Self {
+    self.prefix_len = len;
     self
   }
 
@@ -64,7 +72,7 @@ impl Display for Component {
     )?;
 
     if let Some(id) = &self.id {
-      write!(f, "  {}", Id::new(id))?;
+      write!(f, "  {}", Id::new(id).prefix_len(self.prefix_len))?;
     }
 
     if self.has_fields {

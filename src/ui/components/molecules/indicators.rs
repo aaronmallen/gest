@@ -8,6 +8,7 @@ use crate::ui::components::atoms::{Icon, Id};
 pub struct Component<'a> {
   blocked_by: Vec<&'a str>,
   is_blocking: bool,
+  prefix_len: usize,
 }
 
 impl<'a> Component<'a> {
@@ -15,6 +16,7 @@ impl<'a> Component<'a> {
     Self {
       blocked_by: Vec::new(),
       is_blocking: false,
+      prefix_len: 2,
     }
   }
 
@@ -27,6 +29,12 @@ impl<'a> Component<'a> {
   /// Marks this task as blocking other tasks.
   pub fn blocking(mut self, v: bool) -> Self {
     self.is_blocking = v;
+    self
+  }
+
+  /// Set the highlighted prefix length passed to rendered [`Id`]s.
+  pub fn prefix_len(mut self, len: usize) -> Self {
+    self.prefix_len = len;
     self
   }
 }
@@ -44,7 +52,7 @@ impl Display for Component<'_> {
 
     for id in &self.blocked_by {
       let label = "blocked-by".paint(*theme.indicator_blocked_by_label());
-      let id = Id::new(id);
+      let id = Id::new(id).prefix_len(self.prefix_len);
       parts.push(format!("{label} {id}"));
     }
 

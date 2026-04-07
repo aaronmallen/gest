@@ -14,6 +14,7 @@ pub struct Component {
   body: Option<String>,
   created: Option<String>,
   id: String,
+  id_prefix_len: usize,
   notes: Vec<NoteView>,
   tags: Vec<String>,
   title: String,
@@ -31,6 +32,7 @@ impl Component {
       body: None,
       created: None,
       id: id.into(),
+      id_prefix_len: 2,
       notes: Vec::new(),
       tags: Vec::new(),
       title: title.into(),
@@ -40,6 +42,12 @@ impl Component {
 
   /// Marks this artifact as archived (currently unused in detail rendering but kept for API compat).
   pub fn archived(self) -> Self {
+    self
+  }
+
+  /// Sets the number of highlighted prefix characters in the artifact ID.
+  pub fn id_prefix_len(mut self, len: usize) -> Self {
+    self.id_prefix_len = len;
     self
   }
 
@@ -84,7 +92,7 @@ impl Display for Component {
     let label_style = *theme.artifact_detail_label();
     let value_style = *theme.artifact_detail_value();
 
-    writeln!(f, "{}", Id::new(&self.id))?;
+    writeln!(f, "{}", Id::new(&self.id).prefix_len(self.id_prefix_len))?;
 
     writeln!(f)?;
 

@@ -15,7 +15,7 @@ mod storage;
 use std::io::Error as IoError;
 
 use getset::Getters;
-pub use loader::load;
+pub use loader::{active_global_config_path, active_project_config_paths, load};
 use serde::{Deserialize, Serialize};
 use toml::de::Error as TomlDeError;
 

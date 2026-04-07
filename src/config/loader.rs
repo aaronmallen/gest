@@ -38,6 +38,30 @@ pub fn load() -> Result<Settings, Error> {
   Ok(settings)
 }
 
+/// Return the active global config file path, if one exists on disk.
+pub fn active_global_config_path() -> Option<PathBuf> {
+  let path = global_config_path().ok()?;
+  path.is_file().then_some(path)
+}
+
+/// Return the active per-directory config file paths in load order, walking from
+/// filesystem root down to `$CWD`. Only files that exist on disk are included.
+pub fn active_project_config_paths() -> Vec<PathBuf> {
+  let cwd = env::current_dir().unwrap_or_default();
+  let mut ancestors: Vec<PathBuf> = cwd.ancestors().map(PathBuf::from).collect();
+  ancestors.reverse();
+
+  let mut paths = Vec::new();
+  for dir in ancestors {
+    for candidate in [dir.join(".config/gest.toml"), dir.join(".gest.toml")] {
+      if candidate.is_file() {
+        paths.push(candidate);
+      }
+    }
+  }
+  paths
+}
+
 /// Resolve the path to the global config file, preferring `$GEST_CONFIG` over the XDG default.
 fn global_config_path() -> Result<PathBuf, Error> {
   GEST_CONFIG

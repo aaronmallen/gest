@@ -55,11 +55,11 @@ impl Display for Component<'_> {
 /// Compute the minimum prefix length that uniquely identifies every short ID
 /// in the set (each ID is first truncated to 8 chars).
 ///
-/// Returns at least 2 (the visual minimum) and at most 8.
+/// Returns at least 1 and at most 8.
 pub fn min_unique_prefix(ids: &[&str]) -> usize {
   let shorts: Vec<String> = ids.iter().map(|id| id.chars().take(8).collect()).collect();
 
-  for len in 2..=8 {
+  for len in 1..=8 {
     let prefixes: Vec<&str> = shorts.iter().map(|s| &s[..len.min(s.len())]).collect();
     let unique: HashSet<&str> = prefixes.iter().copied().collect();
     if unique.len() == shorts.len() {
@@ -77,32 +77,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_returns_2_when_all_ids_differ_at_first_char() {
+    fn it_returns_1_when_all_ids_differ_at_first_char() {
       let ids = vec!["abcd1234", "bcde2345", "cdef3456"];
 
-      assert_eq!(min_unique_prefix(&ids), 2);
+      assert_eq!(min_unique_prefix(&ids), 1);
     }
 
     #[test]
     fn it_increases_when_ids_share_a_prefix() {
       let ids = vec!["aaxyz111", "aaxyz222", "bbcde333"];
 
-      // "aa" collides at len=2..5, unique at len=6 (aaxyz1 vs aaxyz2)
+      // "a"/"b" collide at len=1, "aa" collides at len=2..5, unique at len=6 (aaxyz1 vs aaxyz2)
       assert_eq!(min_unique_prefix(&ids), 6);
     }
 
     #[test]
-    fn it_returns_2_for_a_single_id() {
+    fn it_returns_1_for_a_single_id() {
       let ids = vec!["abcdefgh"];
 
-      assert_eq!(min_unique_prefix(&ids), 2);
+      assert_eq!(min_unique_prefix(&ids), 1);
     }
 
     #[test]
-    fn it_returns_2_for_empty_list() {
+    fn it_returns_1_for_empty_list() {
       let ids: Vec<&str> = vec![];
 
-      assert_eq!(min_unique_prefix(&ids), 2);
+      assert_eq!(min_unique_prefix(&ids), 1);
     }
 
     #[test]

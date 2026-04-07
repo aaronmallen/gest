@@ -6,7 +6,7 @@ use crate::support::helpers::GestCmd;
 /// to at most 8 characters), matching `ui::components::atoms::id::min_unique_prefix`.
 fn min_unique_prefix(ids: &[String]) -> usize {
   let shorts: Vec<String> = ids.iter().map(|id| id.chars().take(8).collect()).collect();
-  for len in 2..=8 {
+  for len in 1..=8 {
     let prefixes: HashSet<&str> = shorts.iter().map(|s| &s[..len.min(s.len())]).collect();
     if prefixes.len() == shorts.len() {
       return len;

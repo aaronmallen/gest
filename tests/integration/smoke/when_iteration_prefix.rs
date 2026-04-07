@@ -77,7 +77,7 @@ fn styled_prefix_len(output: &str, short_id: &str) -> usize {
           k += 1;
         }
         // Ensure the following chars in the short id also match.
-        if count >= 2 && output[j..k].starts_with(&short_id[..count.min(short_id.len())]) {
+        if count >= 1 && output[j..k].starts_with(&short_id[..count.min(short_id.len())]) {
           return count;
         }
       }
@@ -129,8 +129,8 @@ fn it_highlights_active_pool_prefix_in_list() {
   let len_b = styled_prefix_len(&raw, &ids[2]);
   assert_eq!(len_a, len_b, "all rows in a list should share the same prefix length");
   assert!(
-    (2..=8).contains(&len_a),
-    "prefix length should be clamped to [2, 8], got {len_a}"
+    (1..=8).contains(&len_a),
+    "prefix length should be clamped to [1, 8], got {len_a}"
   );
 }
 
@@ -223,13 +223,13 @@ fn it_graph_highlights_task_ids_through_id_component() {
   }
 
   // Each task id should be routed through the `Id` atom, which emits a bold
-  // prefix style. Verify the styled prefix length is within [2, 8] for every
+  // prefix style. Verify the styled prefix length is within [1, 8] for every
   // task id in the graph.
   for tid in &tasks {
     let len = styled_prefix_len(&raw, tid);
     assert!(
-      (2..=8).contains(&len),
-      "task id {tid} rendered with prefix len {len}; expected 2..=8"
+      (1..=8).contains(&len),
+      "task id {tid} rendered with prefix len {len}; expected 1..=8"
     );
   }
 }

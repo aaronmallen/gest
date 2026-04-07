@@ -333,11 +333,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn it_returns_two_for_artifact_with_no_notes() {
+    async fn it_returns_one_for_artifact_with_no_notes() {
       let (_store, conn, _tmp, pid, _task_id) = setup().await;
       let artifact_id = make_artifact(&conn, &pid).await;
 
-      assert_eq!(shortest_prefix(&conn, &artifact_id).await.unwrap(), 2);
+      assert_eq!(shortest_prefix(&conn, &artifact_id).await.unwrap(), 1);
     }
   }
 

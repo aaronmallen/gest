@@ -11,6 +11,8 @@ pub mod composites;
 pub mod layout;
 /// Markdown-to-styled-terminal renderer.
 pub mod markdown;
+/// Consolidated theme tokens for the new components system.
+pub mod style;
 /// Theming subsystem: color constants, palette abstraction, and semantic style tokens.
 pub mod theming;
 /// Terminal measurement and ANSI-stripping helpers.

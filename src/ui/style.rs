@@ -13,8 +13,6 @@ use yansi::{Color, Style};
 /// Process-wide resolved theme, set once during startup.
 static THEME: OnceLock<Theme> = OnceLock::new();
 
-// ── Token key list ───────────────────────────────────────────────────
-
 /// Every known token key, used to drive palette cascading.
 pub const ALL_TOKENS: &[&str] = &[
   "artifact.detail.label",
@@ -134,8 +132,6 @@ pub const ALL_TOKENS: &[&str] = &[
   "task.list.title.cancelled",
 ];
 
-// ── Palette ──────────────────────────────────────────────────────────
-
 /// Semantic palette slots that style tokens can reference.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Palette {
@@ -202,8 +198,6 @@ impl Palette {
     }
   }
 }
-
-// ── Theme ────────────────────────────────────────────────────────────
 
 /// Semantic style tokens for all UI elements.
 ///
@@ -835,7 +829,6 @@ fn palette_for_token(key: &str) -> Option<Palette> {
   use Palette::*;
 
   match key {
-    // ── Artifact ──────────────────────────────────────────────
     "artifact.detail.label" => Some(TextMuted),
     "artifact.detail.separator" => Some(Border),
     "artifact.detail.value" => Some(Text),
@@ -844,7 +837,6 @@ fn palette_for_token(key: &str) -> Option<Palette> {
     "artifact.list.title" => Some(Text),
     "artifact.list.title.archived" => Some(TextDim),
 
-    // ── Banner ───────────────────────────────────────────────
     "banner.author" => Some(Text),
     "banner.author.name" => Some(Accent),
     "banner.gradient.end" => None,
@@ -858,36 +850,29 @@ fn palette_for_token(key: &str) -> Option<Palette> {
     "banner.version.date" => Some(Primary),
     "banner.version.revision" => Some(Success),
 
-    // ── Border ───────────────────────────────────────────────
     "border" => Some(Border),
 
-    // ── Config ───────────────────────────────────────────────
     "config.heading" => Some(Primary),
     "config.label" => Some(TextMuted),
     "config.no_overrides" => Some(TextDim),
     "config.value" => Some(Text),
 
-    // ── Core ─────────────────────────────────────────────────
     "emphasis" => Some(Primary),
     "error" => Some(Error),
 
-    // ── ID ───────────────────────────────────────────────────
     "id.prefix" => Some(Primary),
     "id.rest" => Some(TextMuted),
 
-    // ── Indicators ───────────────────────────────────────────
     "indicator.blocked" => Some(Error),
     "indicator.blocked_by.id" => Some(Primary),
     "indicator.blocked_by.label" => Some(TextMuted),
     "indicator.blocking" => Some(Warning),
 
-    // ── Init ─────────────────────────────────────────────────
     "init.command.prefix" => Some(Border),
     "init.label" => Some(TextMuted),
     "init.section" => Some(TextMuted),
     "init.value" => Some(Text),
 
-    // ── Iteration detail ─────────────────────────────────────
     "iteration.detail.count.blocked" => Some(Error),
     "iteration.detail.count.done" => Some(Success),
     "iteration.detail.count.in_progress" => Some(Warning),
@@ -895,7 +880,6 @@ fn palette_for_token(key: &str) -> Option<Palette> {
     "iteration.detail.label" => Some(TextMuted),
     "iteration.detail.value" => Some(Text),
 
-    // ── Iteration graph ──────────────────────────────────────
     "iteration.graph.branch" => Some(Border),
     "iteration.graph.phase.icon" => Some(Primary),
     "iteration.graph.phase.label" => Some(Primary),
@@ -903,20 +887,16 @@ fn palette_for_token(key: &str) -> Option<Palette> {
     "iteration.graph.separator" => Some(Border),
     "iteration.graph.title" => Some(Text),
 
-    // ── Iteration list ───────────────────────────────────────
     "iteration.list.summary" => Some(TextMuted),
     "iteration.list.title" => Some(Text),
 
-    // ── Iteration status ──────────────────────────────────────
     "iteration.status.label" => Some(TextMuted),
     "iteration.status.progress" => Some(Primary),
     "iteration.status.value" => Some(Text),
 
-    // ── List ─────────────────────────────────────────────────
     "list.heading" => Some(Primary),
     "list.summary" => Some(TextMuted),
 
-    // ── Log ──────────────────────────────────────────────────
     "log.debug" => Some(PrimaryLight),
     "log.error" => Some(Error),
     "log.info" => Some(Primary),
@@ -924,7 +904,6 @@ fn palette_for_token(key: &str) -> Option<Palette> {
     "log.trace" => Some(TextDim),
     "log.warn" => Some(Warning),
 
-    // ── Markdown ─────────────────────────────────────────────
     "markdown.alert.caution.border" => Some(Error),
     "markdown.alert.important.border" => None,
     "markdown.alert.note.border" => Some(Primary),
@@ -941,61 +920,49 @@ fn palette_for_token(key: &str) -> Option<Palette> {
     "markdown.rule" => Some(Border),
     "markdown.strong" => None,
 
-    // ── Meta ───────────────────────────────────────────────
     "meta.not_set" => Some(TextDim),
     "meta.value" => Some(Text),
 
-    // ── Messages ─────────────────────────────────────────────
     "message.created.label" => Some(Text),
     "message.success.icon" => Some(Success),
     "message.updated.label" => Some(Text),
 
-    // ── Migrate ───────────────────────────────────────────────
     "migrate.count" => Some(Primary),
 
-    // ── Muted ────────────────────────────────────────────────
     "muted" => Some(TextMuted),
 
-    // ── Note ──────────────────────────────────────────────────
     "note.detail.label" => Some(TextMuted),
     "note.detail.separator" => Some(Border),
     "note.detail.value" => Some(Text),
     "note.list.body" => Some(TextMuted),
     "note.list.id" => Some(Primary),
 
-    // ── Project ──────────────────────────────────────────────
     "project.list.root" => Some(Text),
     "project.show.value" => Some(Text),
 
-    // ── Search ───────────────────────────────────────────────
     "search.expand.separator" => Some(Border),
     "search.no_results.hint" => Some(TextDim),
     "search.query" => Some(Text),
     "search.summary" => Some(TextMuted),
     "search.type.label" => Some(TextMuted),
 
-    // ── Serve ─────────────────────────────────────────────────
     "serve.url" => Some(Primary),
 
-    // ── Status ───────────────────────────────────────────────
     "status.cancelled" => Some(TextDim),
     "status.done" => Some(Success),
     "status.in_progress" => Some(Warning),
     "status.open" => Some(Text),
 
-    // ── Success / Tag ────────────────────────────────────────
     "success" => Some(Success),
     "tag" => Some(Primary),
     "tag.list.count" => Some(TextMuted),
     "tag.list.heading" => Some(Primary),
 
-    // ── Task detail ──────────────────────────────────────────
     "task.detail.label" => Some(TextMuted),
     "task.detail.separator" => Some(Border),
     "task.detail.title" => Some(Text),
     "task.detail.value" => Some(Text),
 
-    // ── Task list ────────────────────────────────────────────
     "task.list.icon.cancelled" => Some(TextDim),
     "task.list.icon.done" => Some(Success),
     "task.list.icon.in_progress" => Some(Warning),

@@ -41,7 +41,7 @@ impl Command {
       })
       .collect();
 
-    println!("{}", ProjectListView::new(entries, prefix_len));
+    crate::io::pager::page(&format!("{}\n", ProjectListView::new(entries, prefix_len)), context)?;
 
     Ok(())
   }

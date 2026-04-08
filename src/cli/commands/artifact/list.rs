@@ -74,7 +74,7 @@ impl Command {
       });
     }
 
-    println!("{}", ArtifactListView::new(entries, prefix_len));
+    crate::io::pager::page(&format!("{}\n", ArtifactListView::new(entries, prefix_len)), context)?;
 
     Ok(())
   }

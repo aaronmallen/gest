@@ -95,7 +95,7 @@ impl Command {
       });
     }
 
-    println!("{}", IterationListView::new(entries, prefix_len));
+    crate::io::pager::page(&format!("{}\n", IterationListView::new(entries, prefix_len)), context)?;
 
     Ok(())
   }

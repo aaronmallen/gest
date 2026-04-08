@@ -37,19 +37,22 @@ impl Command {
     }
 
     if notes.is_empty() {
-      println!("  no notes");
+      crate::io::pager::page("  no notes\n", context)?;
       return Ok(());
     }
 
+    use std::fmt::Write;
+    let mut output = String::new();
     for (i, note) in notes.iter().enumerate() {
       if i > 0 {
-        println!();
+        output.push('\n');
       }
       let fields = FieldList::new()
         .field("id", note.id().short())
         .field("body", note.body().to_string());
-      println!("{fields}");
+      let _ = writeln!(output, "{fields}");
     }
+    crate::io::pager::page(&output, context)?;
 
     Ok(())
   }

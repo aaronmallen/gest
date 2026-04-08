@@ -89,7 +89,7 @@ impl Command {
       });
     }
 
-    println!("{}", TaskListView::new(entries, prefix_len));
+    crate::io::pager::page(&format!("{}\n", TaskListView::new(entries, prefix_len)), context)?;
 
     Ok(())
   }

@@ -67,7 +67,7 @@ impl Command {
       iteration_prefix_len,
     )
     .expanded(self.expand);
-    println!("{view}");
+    crate::io::pager::page(&format!("{view}\n"), context)?;
 
     Ok(())
   }

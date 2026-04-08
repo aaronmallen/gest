@@ -45,13 +45,16 @@ impl Command {
     }
 
     if tags.is_empty() {
-      println!("  no tags");
+      crate::io::pager::page("  no tags\n", context)?;
       return Ok(());
     }
 
+    let mut output = String::new();
     for tag in &tags {
-      println!("  #{}", tag.label());
+      use std::fmt::Write;
+      let _ = writeln!(output, "  #{}", tag.label());
     }
+    crate::io::pager::page(&output, context)?;
 
     Ok(())
   }

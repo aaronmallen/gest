@@ -207,7 +207,10 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     let path = entry.path();
     if path.is_file() && path.extension().is_some_and(|ext| ext == "yaml") {
       let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-      if !alive_tasks.contains(stem) {
+      // Tombstoned files are intentional delete markers; leave them in
+      // place so downstream clones pick up the deletion on their next
+      // import.
+      if !alive_tasks.contains(stem) && !yaml::is_tombstoned_yaml_file(&path) {
         let relative = paths::relative(gest_dir, &path).unwrap_or_default();
         std::fs::remove_file(&path)?;
         conn

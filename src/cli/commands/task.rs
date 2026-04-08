@@ -3,6 +3,7 @@ mod cancel;
 mod claim;
 mod complete;
 mod create;
+mod delete;
 mod link;
 mod list;
 mod meta;
@@ -36,6 +37,9 @@ enum Sub {
   /// Create a new task.
   #[command(visible_alias = "new")]
   Create(create::Command),
+  /// Delete a task and its dependent rows.
+  #[command(visible_alias = "rm")]
+  Delete(delete::Command),
   /// Link a task to another entity.
   Link(link::Command),
   /// List tasks.
@@ -66,6 +70,7 @@ impl Command {
       Sub::Claim(cmd) => cmd.call(context).await,
       Sub::Complete(cmd) => cmd.call(context).await,
       Sub::Create(cmd) => cmd.call(context).await,
+      Sub::Delete(cmd) => cmd.call(context).await,
       Sub::Link(cmd) => cmd.call(context).await,
       Sub::List(cmd) => cmd.call(context).await,
       Sub::Meta(cmd) => cmd.call(context).await,

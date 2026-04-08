@@ -48,7 +48,6 @@ pub fn tombstone_iteration(gest_dir: Option<&Path>, id: &Id, deleted_at: DateTim
 
 /// Tombstone the on-disk file for a task. No-op if `gest_dir` is `None` or
 /// the file is missing.
-#[allow(dead_code)]
 pub fn tombstone_task(gest_dir: Option<&Path>, id: &Id, deleted_at: DateTime<Utc>) -> Result<(), Error> {
   tombstone_yaml(gest_dir.map(|d| paths::task_path(d, id)).as_deref(), deleted_at)
 }

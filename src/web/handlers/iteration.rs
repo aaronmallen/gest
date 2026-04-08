@@ -250,7 +250,7 @@ async fn build_iteration_board(
   let mut cancelled = Vec::new();
   for t in tasks {
     match t.status.as_str() {
-      "in_progress" => in_progress.push(t),
+      "in-progress" => in_progress.push(t),
       "done" => done.push(t),
       "cancelled" => cancelled.push(t),
       _ => open.push(t),
@@ -433,6 +433,87 @@ mod tests {
 
     std::mem::forget(tmp);
     AppState::new(store, project_id)
+  }
+
+  mod build_iteration_board {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::store::{
+      model::{Project, iteration, primitives::Id},
+      repo,
+    };
+
+    #[tokio::test]
+    async fn it_buckets_tasks_by_status_including_in_progress() {
+      let (store_arc, tmp) = store::open_temp().await.unwrap();
+      let conn = store_arc.connect().await.unwrap();
+      let project = Project::new("/tmp/web-iter-board".into());
+      conn
+        .execute(
+          "INSERT INTO projects (id, root, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
+          [
+            project.id().to_string(),
+            project.root().to_string_lossy().into_owned(),
+            project.created_at().to_rfc3339(),
+            project.updated_at().to_rfc3339(),
+          ],
+        )
+        .await
+        .unwrap();
+      let project_id = project.id().clone();
+      std::mem::forget(tmp);
+
+      let iter = repo::iteration::create(
+        &conn,
+        &project_id,
+        &iteration::New {
+          title: "Sprint".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+
+      for (title, status) in [
+        ("Open task", "open"),
+        ("In progress task", "in-progress"),
+        ("Done task", "done"),
+        ("Cancelled task", "cancelled"),
+      ] {
+        let task_id = Id::new();
+        let params: [String; 4] = [
+          task_id.to_string(),
+          project_id.to_string(),
+          title.to_string(),
+          status.to_string(),
+        ];
+        conn
+          .execute(
+            "INSERT INTO tasks (id, project_id, title, status) VALUES (?1, ?2, ?3, ?4)",
+            params,
+          )
+          .await
+          .unwrap();
+        repo::iteration::add_task(&conn, iter.id(), &task_id, 0).await.unwrap();
+      }
+
+      let state = AppState::new(store_arc, project_id);
+      let (_iter, open, in_progress, done, cancelled) =
+        build_iteration_board(&state, &iter.id().to_string()).await.unwrap();
+
+      assert_eq!(open.len(), 1);
+      assert_eq!(open[0].title, "Open task");
+
+      assert_eq!(in_progress.len(), 1);
+      assert_eq!(in_progress[0].title, "In progress task");
+
+      assert_eq!(done.len(), 1);
+      assert_eq!(done[0].title, "Done task");
+
+      assert_eq!(cancelled.len(), 1);
+      assert_eq!(cancelled[0].title, "Cancelled task");
+    }
   }
 
   mod iteration_detail_timeline {

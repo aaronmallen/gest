@@ -57,10 +57,12 @@ async fn main() {
   if verbosity.is_none() {
     log::set_max_level(settings.log().level().into());
   }
+  log::info!("config loaded");
 
   style::set_global(Theme::from_config(&settings));
 
   let store = store::open(&settings).await.unwrap_or_else(die);
+  log::info!("store opened");
   let (project_id, gest_dir) = resolve_project(&store).await;
 
   // Configure transparent sync in the store layer
@@ -80,6 +82,7 @@ async fn main() {
     store: store.clone(),
   };
 
+  log::info!("command dispatched");
   if let Err(e) = app.call(&context).await {
     die::<()>(e);
   }

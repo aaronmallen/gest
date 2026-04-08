@@ -1,7 +1,7 @@
 //! The `self-update` subcommand — downloads and installs the latest release from GitHub.
 
 use clap::Args;
-use self_update::backends::github::Update;
+use self_update::{backends::github::Update, update::ReleaseUpdate};
 
 use crate::{AppContext, cli::Error, ui::components::SuccessMessage};
 
@@ -34,7 +34,21 @@ impl Command {
         builder.target_version_tag(&format!("v{version}"));
       }
 
-      builder.build().and_then(|updater| updater.update())
+      let updater: Box<dyn ReleaseUpdate> = builder.build()?;
+
+      let target_version = match target.as_deref() {
+        Some(version) => version.to_string(),
+        None => updater.get_latest_release()?.version,
+      };
+
+      if target_version != current_version {
+        println!(
+          "review the changelog: https://gest.aaronmallen.dev/changelog#{}",
+          changelog_anchor(&target_version)
+        );
+      }
+
+      updater.update()
     })
     .await
     .map_err(std::io::Error::other)?
@@ -51,5 +65,25 @@ impl Command {
     }
 
     Ok(())
+  }
+}
+
+/// Build the changelog anchor fragment for a given semver version (e.g. `0.5.1` → `v0-5-1`).
+fn changelog_anchor(version: &str) -> String {
+  format!("v{}", version.replace('.', "-"))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  mod changelog_anchor {
+    use super::*;
+
+    #[test]
+    fn it_replaces_dots_with_dashes_and_prefixes_v() {
+      assert_eq!(changelog_anchor("0.5.1"), "v0-5-1");
+      assert_eq!(changelog_anchor("1.0.0"), "v1-0-0");
+    }
   }
 }

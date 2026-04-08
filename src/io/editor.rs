@@ -3,10 +3,13 @@ use std::{io::Error as IoError, path::Path, process::Command};
 /// Errors that can occur when launching an external editor.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+  /// The editor process exited with a non-zero status or was terminated by a signal.
   #[error("Editor '{0}' exited with {1}")]
   EditorFailed(String, String),
+  /// Neither `$EDITOR` nor `$VISUAL` is set and no fallback could be resolved.
   #[error("No editor configured: set $EDITOR or $VISUAL")]
   EditorNotFound,
+  /// An underlying I/O error occurred while reading or writing the temp file.
   #[error(transparent)]
   Io(#[from] IoError),
 }

@@ -4,7 +4,9 @@ use std::process::Command;
 
 /// Author identity resolved from git config.
 pub struct GitAuthor {
+  /// Email address from `user.email`, or `None` when unset.
   pub email: Option<String>,
+  /// Display name from `user.name` or the `$USER` fallback.
   pub name: String,
 }
 

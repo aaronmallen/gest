@@ -1,4 +1,9 @@
-/// User-configurable color and text style definitions.
+//! Layered configuration loading and typed settings for the gest CLI.
+//!
+//! Settings are merged from a global config file, per-directory config files
+//! walked from filesystem root down to `$CWD`, and `GEST_`-prefixed environment
+//! variables (highest precedence).
+
 pub mod colors;
 /// Database connection settings (URL or individual components).
 mod database;

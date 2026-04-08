@@ -19,11 +19,17 @@ use yansi::Paint;
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LevelFilter {
+  /// Emit debug, info, warn, and error records.
   Debug,
+  /// Emit error records only.
   Error,
+  /// Emit info, warn, and error records.
   Info,
+  /// Suppress all log output.
   Off,
+  /// Emit every record, including trace-level diagnostics.
   Trace,
+  /// Emit warn and error records (the default).
   #[default]
   Warn,
 }

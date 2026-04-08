@@ -7,6 +7,8 @@ pub mod env;
 mod loader;
 /// Log-related configuration (level filtering).
 mod log;
+/// Pager-related configuration (`[pager]` table).
+mod pager;
 /// Web server configuration (`[serve]` table).
 mod serve;
 /// Storage-related configuration (data directory resolution).
@@ -46,6 +48,9 @@ pub struct Settings {
   /// Settings for log output (`[log]` table).
   #[get = "pub"]
   log: log::Settings,
+  /// Settings for the pager helper (`[pager]` table).
+  #[get = "pub"]
+  pager: pager::Settings,
   /// Settings for the built-in web dashboard (`[serve]` table).
   #[get = "pub"]
   serve: serve::Settings,

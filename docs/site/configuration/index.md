@@ -123,6 +123,13 @@ The `[serve]` config section was removed in v0.5.0. Web server options like
 |---------|--------|----------|--------------------------------------------------------------------------------------|
 | `level` | string | `"warn"` | Log level filter. Valid values: `"error"`, `"warn"`, `"info"`, `"debug"`, `"trace"`. |
 
+### `[pager]`
+
+| Key       | Type    | Default | Description                                                                                                     |
+|-----------|---------|---------|-----------------------------------------------------------------------------------------------------------------|
+| `enabled` | boolean | `true`  | Whether long output is piped through a pager. Set to `false` to always print directly to stdout.                |
+| `command` | string  | _none_  | Optional pager command override (e.g. `"less -FR"`). An empty string is treated as unset and disables override. |
+
 ### `[colors]`
 
 The `[colors]` section controls terminal UI colors through palette slots and

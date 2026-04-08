@@ -69,6 +69,7 @@ pub struct ReloadSocketGuard {
 
 #[cfg(unix)]
 impl ReloadSocketGuard {
+  /// Create a guard that will unlink `path` when dropped.
   pub fn new(path: PathBuf) -> Self {
     Self {
       path,

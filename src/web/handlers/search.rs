@@ -16,11 +16,13 @@ use crate::{
   web::{AppState, handlers::log_err},
 };
 
+/// Query parameters for the JSON search API.
 #[derive(Deserialize)]
 pub struct ApiSearchParams {
   q: Option<String>,
 }
 
+/// Query parameters for the HTML search page.
 #[derive(Deserialize)]
 pub struct SearchQuery {
   q: Option<String>,

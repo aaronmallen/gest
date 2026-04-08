@@ -27,6 +27,7 @@ use crate::{
   },
 };
 
+/// Form body for task create submissions.
 #[derive(Deserialize)]
 pub struct TaskForm {
   description: Option<String>,
@@ -34,6 +35,7 @@ pub struct TaskForm {
   title: String,
 }
 
+/// Query parameters for the task list view (status tab selection).
 #[derive(Deserialize)]
 pub struct TaskListParams {
   status: Option<String>,

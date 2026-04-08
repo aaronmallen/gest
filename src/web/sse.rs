@@ -1,3 +1,5 @@
+//! Server-sent events endpoint that pushes reload pings to connected browser tabs.
+
 use std::convert::Infallible;
 
 use axum::{

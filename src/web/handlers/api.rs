@@ -12,6 +12,7 @@ use crate::web::markdown;
 /// Request body for the render-markdown endpoint.
 #[derive(Deserialize)]
 pub struct RenderMarkdownBody {
+  /// Raw Markdown source to render.
   pub body: String,
 }
 

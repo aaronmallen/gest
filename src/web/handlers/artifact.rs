@@ -22,6 +22,7 @@ use crate::{
   },
 };
 
+/// Form body for artifact create and edit submissions.
 #[derive(Deserialize)]
 pub struct ArtifactForm {
   body: Option<String>,
@@ -29,6 +30,7 @@ pub struct ArtifactForm {
   title: String,
 }
 
+/// Query parameters for the artifact list view (status tab selection).
 #[derive(Deserialize)]
 pub struct ArtifactListParams {
   status: Option<String>,

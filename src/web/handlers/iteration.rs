@@ -27,6 +27,7 @@ use crate::{
   },
 };
 
+/// Query parameters for the iteration list view (status tab selection).
 #[derive(Deserialize)]
 pub struct IterationListParams {
   status: Option<String>,

@@ -1,3 +1,5 @@
+//! Shared application state handed to every axum handler.
+
 use std::sync::Arc;
 
 use getset::Getters;

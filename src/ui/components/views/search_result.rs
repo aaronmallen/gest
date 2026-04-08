@@ -1,3 +1,5 @@
+//! Single-hit search result view rendering entity type, ID, title, and optional body.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::{Paint, Style};

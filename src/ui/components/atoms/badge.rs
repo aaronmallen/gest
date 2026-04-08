@@ -1,3 +1,5 @@
+//! Short styled text fragment atom, typically used for inline tags or status chips.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::{Paint, Style};

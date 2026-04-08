@@ -1,3 +1,5 @@
+//! Headed list molecule with a summary line and pre-rendered rows.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::Paint;
@@ -10,6 +12,7 @@ pub struct Component<'a> {
 }
 
 impl<'a> Component<'a> {
+  /// Create a grouped list with the given heading and summary line.
   pub fn new(heading: &'a str, summary: impl Into<String>) -> Self {
     Self {
       heading,

@@ -1,3 +1,5 @@
+//! Single-iteration detail view composing title, phase count, and task status breakdown.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::Paint;
@@ -18,6 +20,7 @@ pub struct Component {
 }
 
 impl Component {
+  /// Create a detail view for the iteration with its title, phase count, and task status totals.
   pub fn new(id: impl Into<String>, title: impl Into<String>, phase_count: usize, counts: TaskCounts) -> Self {
     Self {
       id: id.into(),
@@ -99,10 +102,15 @@ impl Display for Component {
 
 /// Aggregated task status counts for an iteration summary.
 pub struct TaskCounts {
+  /// Number of tasks currently blocked by another task.
   pub blocked: usize,
+  /// Number of tasks marked as done.
   pub done: usize,
+  /// Number of tasks currently in progress.
   pub in_progress: usize,
+  /// Number of tasks still open and not yet started.
   pub open: usize,
+  /// Total number of tasks across all statuses.
   pub total: usize,
 }
 

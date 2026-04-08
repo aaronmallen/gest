@@ -1,3 +1,5 @@
+//! Grouped search results view rendering task, artifact, and iteration sections.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::Paint;

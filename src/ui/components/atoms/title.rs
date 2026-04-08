@@ -1,3 +1,5 @@
+//! Styled title atom with optional truncation and column padding.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::{Paint, Style};

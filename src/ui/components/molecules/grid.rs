@@ -20,6 +20,7 @@ pub struct Component {
 }
 
 impl Component {
+  /// Create an empty grid with default spacing of 2 columns.
   pub fn new() -> Self {
     Self {
       max_width: None,

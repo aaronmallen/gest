@@ -1,3 +1,5 @@
+//! Single-task detail view composing status, priority, links, tags, and a markdown body section.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::Paint;
@@ -31,6 +33,7 @@ pub struct Component<'a> {
 }
 
 impl<'a> Component<'a> {
+  /// Create a detail view for a task with the given id, title, and status.
   pub fn new(id: &'a str, title: &'a str, status: &'a str) -> Self {
     Self {
       assigned: None,

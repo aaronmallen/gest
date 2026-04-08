@@ -1,3 +1,5 @@
+//! Tag list atom rendering `#`-prefixed labels.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::{Paint, Style};

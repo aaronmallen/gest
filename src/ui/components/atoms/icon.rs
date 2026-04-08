@@ -1,3 +1,5 @@
+//! Unicode glyph indicator atom used for task status and blocking state.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::{Paint, Style};

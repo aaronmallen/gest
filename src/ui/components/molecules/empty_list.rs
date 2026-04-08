@@ -1,3 +1,5 @@
+//! Placeholder molecule shown in place of an empty list view.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::Paint;

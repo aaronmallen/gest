@@ -9,8 +9,11 @@ use crate::ui::components::{
 
 /// A single iteration entry for the list view.
 pub struct IterationEntry {
+  /// Short ID string displayed as the leading column.
   pub id: String,
+  /// Pre-rendered summary fragment (e.g. task count breakdown) shown after the title.
   pub summary: String,
+  /// Iteration title rendered in the title column.
   pub title: String,
 }
 
@@ -21,6 +24,7 @@ pub struct Component {
 }
 
 impl Component {
+  /// Create a list view from the entries, using `prefix_len` highlighted chars in each ID.
   pub fn new(entries: Vec<IterationEntry>, prefix_len: usize) -> Self {
     Self {
       entries,

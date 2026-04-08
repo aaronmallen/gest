@@ -11,9 +11,13 @@ use crate::ui::components::atoms::Id;
 
 /// A task entry for the graph.
 pub struct GraphTask {
+  /// Short ID used to render the task's highlighted two-tone identifier.
   pub id_short: String,
+  /// Phase number used to group tasks under `── phase N ──` headers.
   pub phase: u32,
+  /// Task status, used to select the row icon and color.
   pub status: String,
+  /// Task title rendered after the ID.
   pub title: String,
 }
 
@@ -25,6 +29,7 @@ pub struct Component {
 }
 
 impl Component {
+  /// Create a graph view for the given iteration title and task list.
   pub fn new(iteration_title: impl Into<String>, tasks: Vec<GraphTask>) -> Self {
     Self {
       iteration_title: iteration_title.into(),

@@ -1,3 +1,5 @@
+//! Startup banner molecule with gradient ASCII art and optional author/version lines.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::{Color, Paint, Style};

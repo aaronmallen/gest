@@ -1,3 +1,5 @@
+//! Horizontal rule atom with optional centered label.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::{Paint, Style};

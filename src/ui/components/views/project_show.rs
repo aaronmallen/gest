@@ -16,6 +16,7 @@ pub struct Component {
 }
 
 impl Component {
+  /// Create a show view for a project with the given id and root path.
   pub fn new(id: impl Into<String>, root: impl Into<String>) -> Self {
     Self {
       id: id.into(),

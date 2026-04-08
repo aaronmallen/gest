@@ -1,3 +1,5 @@
+//! Single-artifact detail view composing metadata fields and a markdown body section.
+
 use std::fmt::{self, Display, Formatter};
 
 use super::super::atoms::{Id, Label, Separator, Tag, Value};
@@ -27,6 +29,7 @@ struct NoteView {
 }
 
 impl Component {
+  /// Create a detail view for the artifact with the given id and title.
   pub fn new(id: impl Into<String>, title: impl Into<String>) -> Self {
     Self {
       body: None,
@@ -73,6 +76,7 @@ impl Component {
     self
   }
 
+  /// Sets the tags displayed beneath the title.
   pub fn tags(mut self, tags: Vec<String>) -> Self {
     self.tags = tags;
     self

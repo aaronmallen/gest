@@ -135,16 +135,27 @@ pub const ALL_TOKENS: &[&str] = &[
 /// Semantic palette slots that style tokens can reference.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Palette {
+  /// Attention-grabbing highlight color used for emphasis and brand accents.
   Accent,
+  /// Subtle color used for rules, separators, and box borders.
   Border,
+  /// Color reserved for error states and destructive actions.
   Error,
+  /// The dominant brand color used for headings, links, and primary UI chrome.
   Primary,
+  /// A darker shade of [`Primary`](Self::Primary) for borders and inset surfaces.
   PrimaryDark,
+  /// A lighter shade of [`Primary`](Self::Primary) for debug-level accents.
   PrimaryLight,
+  /// Color for success states and positive confirmations.
   Success,
+  /// Default foreground color for body text.
   Text,
+  /// A dimmer text shade used for inactive or deprioritized content.
   TextDim,
+  /// A muted text shade used for labels, hints, and secondary content.
   TextMuted,
+  /// Color reserved for warning states and in-progress indicators.
   Warning,
 }
 

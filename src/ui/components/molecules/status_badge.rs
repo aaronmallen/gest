@@ -1,3 +1,5 @@
+//! Status icon-plus-label molecule used in task rows and detail views.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::{Paint, Style};
@@ -11,6 +13,7 @@ pub struct Component<'a> {
 }
 
 impl<'a> Component<'a> {
+  /// Create a status badge for the given status string (e.g. `"open"`, `"in-progress"`).
   pub fn new(status: &'a str) -> Self {
     Self {
       show_text: true,

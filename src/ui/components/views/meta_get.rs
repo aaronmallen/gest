@@ -10,6 +10,7 @@ pub struct Component {
 }
 
 impl Component {
+  /// Create a metadata value view wrapping the given string.
   pub fn new(value: impl Into<String>) -> Self {
     Self {
       value: value.into(),

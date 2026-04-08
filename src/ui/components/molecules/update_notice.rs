@@ -1,3 +1,5 @@
+//! Update-available notice molecule displayed beneath the startup banner.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::Paint;

@@ -9,7 +9,9 @@ use crate::ui::components::{
 
 /// A single project entry for the list view.
 pub struct ProjectEntry {
+  /// Short ID string displayed as the leading column.
   pub id: String,
+  /// Absolute root path of the project.
   pub root: String,
 }
 
@@ -20,6 +22,7 @@ pub struct Component {
 }
 
 impl Component {
+  /// Create a list view from the entries, using `prefix_len` highlighted chars in each ID.
   pub fn new(entries: Vec<ProjectEntry>, prefix_len: usize) -> Self {
     Self {
       entries,

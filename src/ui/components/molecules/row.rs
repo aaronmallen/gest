@@ -13,6 +13,7 @@ pub struct Component {
 }
 
 impl Component {
+  /// Create an empty row with default spacing of 2 columns.
   pub fn new() -> Self {
     Self {
       columns: Vec::new(),

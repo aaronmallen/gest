@@ -9,12 +9,19 @@ use crate::ui::components::{
 
 /// A single task entry for the list view.
 pub struct TaskEntry {
+  /// Short ID of the task blocking this one, if any; swaps the row icon to blocked.
   pub blocked_by: Option<String>,
+  /// Whether this task blocks others, which renders a `blocking` indicator.
   pub blocking: bool,
+  /// Short ID string displayed as the leading column.
   pub id: String,
+  /// Optional priority level rendered as a `[P<n>]` badge.
   pub priority: Option<u8>,
+  /// Task status string driving icon, title styling, and status badge.
   pub status: String,
+  /// Tag labels rendered as `#tag` chips at the end of the row.
   pub tags: Vec<String>,
+  /// Task title rendered in the title column.
   pub title: String,
 }
 
@@ -25,6 +32,7 @@ pub struct Component {
 }
 
 impl Component {
+  /// Create a list view from the entries, using `prefix_len` highlighted chars in each ID.
   pub fn new(entries: Vec<TaskEntry>, prefix_len: usize) -> Self {
     Self {
       entries,

@@ -9,9 +9,13 @@ use crate::ui::components::{
 
 /// A single artifact entry for the list view.
 pub struct ArtifactEntry {
+  /// Whether the artifact is archived, which dims its row and appends a badge.
   pub archived: bool,
+  /// Short ID string displayed as the leading column.
   pub id: String,
+  /// Tag labels rendered as `#tag` chips after the title.
   pub tags: Vec<String>,
+  /// Artifact title rendered in the title column.
   pub title: String,
 }
 
@@ -22,6 +26,7 @@ pub struct Component {
 }
 
 impl Component {
+  /// Create a list view from the entries, using `prefix_len` highlighted chars in each ID.
   pub fn new(entries: Vec<ArtifactEntry>, prefix_len: usize) -> Self {
     Self {
       entries,

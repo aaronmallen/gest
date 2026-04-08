@@ -1,3 +1,5 @@
+//! Inline blocked/blocking relationship indicators molecule for task rows.
+
 use std::fmt::{self, Display, Formatter};
 
 use yansi::Paint;
@@ -12,6 +14,7 @@ pub struct Component<'a> {
 }
 
 impl<'a> Component<'a> {
+  /// Create an empty indicators block with no blocking relationships set.
   pub fn new() -> Self {
     Self {
       blocked_by: Vec::new(),

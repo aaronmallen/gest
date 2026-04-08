@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, path::Path};
 use chrono::Utc;
 use libsql::Connection;
 
-use super::{Error, digest};
+use super::{Error, digest, paths};
 use crate::store::model::{artifact, iteration, note, primitives::Id, task};
 
 /// Export all project data to the `.gest/` directory as JSON and markdown files.
@@ -48,7 +48,7 @@ async fn export_artifacts(conn: &Connection, project_id: &Id, gest_dir: &Path) -
   // Write artifacts metadata JSON (without body, since body is #[serde(skip)])
   let json = serde_json::to_string_pretty(&artifacts)?;
   let path = gest_dir.join("artifacts.json");
-  write_if_changed(conn, project_id, &path, json.as_bytes()).await?;
+  write_if_changed(conn, project_id, gest_dir, &path, json.as_bytes()).await?;
 
   // Write each artifact body as a standalone markdown file, keyed by ID prefix
   let artifacts_dir = gest_dir.join("artifacts");
@@ -61,14 +61,14 @@ async fn export_artifacts(conn: &Connection, project_id: &Id, gest_dir: &Path) -
       artifact.id().short(),
       md_path.display()
     );
-    write_if_changed(conn, project_id, &md_path, artifact.body().as_bytes()).await?;
+    write_if_changed(conn, project_id, gest_dir, &md_path, artifact.body().as_bytes()).await?;
     index.insert(filename, artifact.title().to_string());
   }
 
   // Write an index mapping filenames to titles so humans can find files
   let index_json = serde_json::to_string_pretty(&index)?;
   let index_path = artifacts_dir.join("index.json");
-  write_if_changed(conn, project_id, &index_path, index_json.as_bytes()).await?;
+  write_if_changed(conn, project_id, gest_dir, &index_path, index_json.as_bytes()).await?;
 
   log::debug!("sync export: wrote {} artifacts", artifacts.len());
   Ok(())
@@ -91,7 +91,7 @@ async fn export_iterations(conn: &Connection, project_id: &Id, gest_dir: &Path) 
 
   let json = serde_json::to_string_pretty(&iterations)?;
   let path = gest_dir.join("iterations.json");
-  write_if_changed(conn, project_id, &path, json.as_bytes()).await?;
+  write_if_changed(conn, project_id, gest_dir, &path, json.as_bytes()).await?;
 
   log::debug!("sync export: wrote {} iterations", iterations.len());
   Ok(())
@@ -118,7 +118,7 @@ async fn export_notes(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
 
   let json = serde_json::to_string_pretty(&task_notes)?;
   let path = gest_dir.join("task_notes.json");
-  write_if_changed(conn, project_id, &path, json.as_bytes()).await?;
+  write_if_changed(conn, project_id, gest_dir, &path, json.as_bytes()).await?;
   log::debug!("sync export: wrote {} task notes", task_notes.len());
 
   // Export artifact notes
@@ -141,7 +141,7 @@ async fn export_notes(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
 
   let json = serde_json::to_string_pretty(&artifact_notes)?;
   let path = gest_dir.join("artifact_notes.json");
-  write_if_changed(conn, project_id, &path, json.as_bytes()).await?;
+  write_if_changed(conn, project_id, gest_dir, &path, json.as_bytes()).await?;
   log::debug!("sync export: wrote {} artifact notes", artifact_notes.len());
 
   Ok(())
@@ -164,22 +164,39 @@ async fn export_tasks(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
 
   let json = serde_json::to_string_pretty(&tasks)?;
   let path = gest_dir.join("tasks.json");
-  write_if_changed(conn, project_id, &path, json.as_bytes()).await?;
+  write_if_changed(conn, project_id, gest_dir, &path, json.as_bytes()).await?;
 
   log::debug!("sync export: wrote {} tasks", tasks.len());
   Ok(())
 }
 
 /// Write content to a file only if the digest has changed since last sync.
-async fn write_if_changed(conn: &Connection, project_id: &Id, path: &Path, content: &[u8]) -> Result<(), Error> {
+///
+/// `gest_dir` is the project's `.gest/` root; `path` must live inside it. The
+/// `sync_digests` cache is keyed by `(project_id, relative_path)` where
+/// `relative_path` is `path` minus the `gest_dir` prefix, so the cache stays
+/// portable across checkouts.
+async fn write_if_changed(
+  conn: &Connection,
+  project_id: &Id,
+  gest_dir: &Path,
+  path: &Path,
+  content: &[u8],
+) -> Result<(), Error> {
   let new_digest = digest::compute(content);
-  let path_str = path.to_string_lossy();
+  let relative_path = paths::relative(gest_dir, path).ok_or_else(|| {
+    Error::Io(std::io::Error::other(format!(
+      "path {} is outside {}",
+      path.display(),
+      gest_dir.display()
+    )))
+  })?;
 
   // Check if the digest matches what we last wrote
   let mut rows = conn
     .query(
-      "SELECT digest FROM sync_digests WHERE file_path = ?1 AND project_id = ?2",
-      [path_str.as_ref().to_string(), project_id.to_string()],
+      "SELECT digest FROM sync_digests WHERE relative_path = ?1 AND project_id = ?2",
+      [relative_path.clone(), project_id.to_string()],
     )
     .await?;
 
@@ -197,12 +214,12 @@ async fn write_if_changed(conn: &Connection, project_id: &Id, path: &Path, conte
 
   conn
     .execute(
-      "INSERT INTO sync_digests (file_path, project_id, digest, synced_at) \
+      "INSERT INTO sync_digests (project_id, relative_path, digest, synced_at) \
         VALUES (?1, ?2, ?3, ?4) \
-        ON CONFLICT(file_path) DO UPDATE SET digest = ?3, synced_at = ?4",
+        ON CONFLICT(project_id, relative_path) DO UPDATE SET digest = ?3, synced_at = ?4",
       [
-        path_str.as_ref().to_string(),
         project_id.to_string(),
+        relative_path,
         new_digest,
         Utc::now().to_rfc3339(),
       ],

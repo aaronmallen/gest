@@ -20,6 +20,7 @@ mod m00013_create_transactions;
 mod m00014_create_sync_digests;
 mod m00015_extend_transaction_events;
 mod m00016_add_transaction_author;
+mod m00017_recreate_sync_digests_repo_relative;
 
 use libsql::{Connection, Error as DbError};
 
@@ -51,6 +52,7 @@ const MIGRATIONS: &[Migration] = &[
   m00014_create_sync_digests::MIGRATION,
   m00015_extend_transaction_events::MIGRATION,
   m00016_add_transaction_author::MIGRATION,
+  m00017_recreate_sync_digests_repo_relative::MIGRATION,
 ];
 
 /// Run all pending migrations against the given connection.

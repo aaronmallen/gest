@@ -1,6 +1,7 @@
 //! CLI entry point and command dispatch for `gest`.
 
 mod commands;
+pub mod limit;
 pub mod meta_args;
 pub mod web_notify;
 

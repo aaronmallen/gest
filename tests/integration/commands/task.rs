@@ -5,6 +5,7 @@ mod when_claiming;
 mod when_completing;
 mod when_creating;
 mod when_deleting_notes;
+mod when_limiting;
 mod when_linking;
 mod when_listing;
 mod when_listing_notes;

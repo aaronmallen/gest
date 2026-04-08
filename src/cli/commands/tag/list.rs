@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, limit::LimitArgs},
   store::{model::primitives::EntityType, repo},
   ui::json,
 };
@@ -16,6 +16,8 @@ pub struct Command {
   /// Show only tags attached to iterations.
   #[arg(long, conflicts_with_all = ["task", "artifact"])]
   iteration: bool,
+  #[command(flatten)]
+  limit: LimitArgs,
   /// Show only tags attached to tasks.
   #[arg(long, conflicts_with_all = ["artifact", "iteration"])]
   task: bool,
@@ -26,10 +28,11 @@ pub struct Command {
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
     let conn = context.store().connect().await?;
-    let tags = match self.entity_type_filter() {
+    let mut tags = match self.entity_type_filter() {
       Some(entity_type) => repo::tag::by_entity_type(&conn, entity_type).await?,
       None => repo::tag::all(&conn).await?,
     };
+    self.limit.apply(&mut tags);
 
     if self.output.json {
       let json = serde_json::to_string_pretty(&tags)?;

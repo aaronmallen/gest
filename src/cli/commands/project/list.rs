@@ -2,31 +2,44 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, limit::LimitArgs},
   store::repo,
-  ui::components::{ProjectEntry, ProjectListView, min_unique_prefix},
+  ui::{
+    components::{ProjectEntry, ProjectListView, min_unique_prefix},
+    json,
+  },
 };
 
 /// List all known projects.
 #[derive(Args, Debug)]
 pub struct Command {
-  /// Emit output as JSON.
-  #[arg(long)]
-  json: bool,
+  #[command(flatten)]
+  limit: LimitArgs,
+  #[command(flatten)]
+  output: json::Flags,
 }
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
     let conn = context.store().connect().await?;
-    let projects = repo::project::all(&conn).await?;
+    let mut projects = repo::project::all(&conn).await?;
+    self.limit.apply(&mut projects);
 
-    if self.json {
+    let id_shorts: Vec<String> = projects.iter().map(|p| p.id().short()).collect();
+
+    if self.output.json {
       let json = serde_json::to_string_pretty(&projects)?;
       println!("{json}");
       return Ok(());
     }
 
-    let id_shorts: Vec<String> = projects.iter().map(|p| p.id().short()).collect();
+    if self.output.quiet {
+      for id in &id_shorts {
+        println!("{id}");
+      }
+      return Ok(());
+    }
+
     let prefix_len = {
       let refs: Vec<&str> = id_shorts.iter().map(String::as_str).collect();
       min_unique_prefix(&refs)

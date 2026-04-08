@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, limit::LimitArgs},
   store::{model::primitives::EntityType, repo},
   ui::{components::FieldList, json},
 };
@@ -13,6 +13,8 @@ pub struct Command {
   /// The task ID or prefix.
   id: String,
   #[command(flatten)]
+  limit: LimitArgs,
+  #[command(flatten)]
   output: json::Flags,
 }
 
@@ -21,7 +23,8 @@ impl Command {
     let conn = context.store().connect().await?;
     let task_id = repo::resolve::resolve_id(&conn, "tasks", &self.id).await?;
 
-    let notes = repo::note::for_entity(&conn, EntityType::Task, &task_id).await?;
+    let mut notes = repo::note::for_entity(&conn, EntityType::Task, &task_id).await?;
+    self.limit.apply(&mut notes);
 
     if self.output.json {
       let json = serde_json::to_string_pretty(&notes)?;

@@ -2,6 +2,7 @@
 
 /// Reusable UI components for terminal output.
 pub mod components;
+/// Shared output-mode (`--json`/`--quiet`/`--raw`) flags for command structs.
 pub mod json;
 /// Markdown-to-styled-terminal renderer.
 pub mod markdown;

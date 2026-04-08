@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, limit::LimitArgs},
   store::{
     model::{
       primitives::{EntityType, TaskStatus},
@@ -25,6 +25,8 @@ pub struct Command {
   /// Filter by assigned author name.
   #[arg(long)]
   assigned_to: Option<String>,
+  #[command(flatten)]
+  limit: LimitArgs,
   /// Filter by status.
   #[arg(long, short)]
   status: Option<TaskStatus>,
@@ -47,7 +49,8 @@ impl Command {
       tag: self.tag.clone(),
     };
 
-    let tasks = repo::task::all(&conn, project_id, &filter).await?;
+    let mut tasks = repo::task::all(&conn, project_id, &filter).await?;
+    self.limit.apply(&mut tasks);
 
     let id_shorts: Vec<String> = tasks.iter().map(|t| t.id().short().to_string()).collect();
 

@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, limit::LimitArgs},
   store::{
     model::{artifact::Filter, primitives::EntityType},
     repo,
@@ -22,6 +22,8 @@ pub struct Command {
   /// Show only archived artifacts.
   #[arg(long, visible_alias = "archived-only")]
   archived: bool,
+  #[command(flatten)]
+  limit: LimitArgs,
   /// Filter by tag.
   #[arg(long, short)]
   tag: Option<String>,
@@ -40,7 +42,8 @@ impl Command {
       tag: self.tag.clone(),
     };
 
-    let artifacts = repo::artifact::all(&conn, project_id, &filter).await?;
+    let mut artifacts = repo::artifact::all(&conn, project_id, &filter).await?;
+    self.limit.apply(&mut artifacts);
 
     let id_shorts: Vec<String> = artifacts.iter().map(|a| a.id().short().to_string()).collect();
 

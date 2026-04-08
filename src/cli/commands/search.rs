@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, limit::LimitArgs},
   store::{repo, search_query},
   ui::components::SearchResults,
 };
@@ -18,6 +18,8 @@ pub struct Command {
   /// Emit results as JSON.
   #[arg(short, long)]
   json: bool,
+  #[command(flatten)]
+  limit: LimitArgs,
   /// Include resolved/archived entities.
   #[arg(short = 'a', long = "all")]
   show_all: bool,
@@ -29,7 +31,10 @@ impl Command {
     let conn = context.store().connect().await?;
 
     let parsed = search_query::parse(&self.query);
-    let results = repo::search::query(&conn, project_id, &parsed, self.show_all).await?;
+    let mut results = repo::search::query(&conn, project_id, &parsed, self.show_all).await?;
+    self.limit.apply(&mut results.tasks);
+    self.limit.apply(&mut results.artifacts);
+    self.limit.apply(&mut results.iterations);
 
     if self.json {
       let json_value = serde_json::json!({

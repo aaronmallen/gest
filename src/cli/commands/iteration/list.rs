@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, limit::LimitArgs},
   store::{
     model::{iteration::Filter, primitives::IterationStatus},
     repo,
@@ -22,6 +22,8 @@ pub struct Command {
   /// Only show iterations that have unclaimed (open) tasks.
   #[arg(long)]
   has_available: bool,
+  #[command(flatten)]
+  limit: LimitArgs,
   /// Filter by status.
   #[arg(long, short)]
   status: Option<IterationStatus>,
@@ -44,7 +46,8 @@ impl Command {
       tag: self.tag.clone(),
     };
 
-    let iterations = repo::iteration::all(&conn, project_id, &filter).await?;
+    let mut iterations = repo::iteration::all(&conn, project_id, &filter).await?;
+    self.limit.apply(&mut iterations);
 
     let id_shorts: Vec<String> = iterations.iter().map(|i| i.id().short().to_string()).collect();
 

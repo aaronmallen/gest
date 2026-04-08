@@ -19,9 +19,11 @@ use std::{
   path::{Path, PathBuf},
 };
 
+use libsql::Connection;
 use serde::{Serialize, de::DeserializeOwned};
 
-use super::Error;
+use super::{Error, digest, paths};
+use crate::store::model::primitives::Id;
 
 /// Read and YAML-deserialize a file into `T`.
 ///
@@ -53,6 +55,43 @@ pub fn write<T: Serialize>(path: &Path, value: &T) -> Result<(), Error> {
     content.push('\n');
   }
   fs::write(path, content)?;
+  Ok(())
+}
+
+/// Serialize `value`, write it to `path`, and update the `sync_digests` cache.
+///
+/// If the cached digest for `(project_id, relative_to(path))` already matches
+/// the new content, the file is left untouched and the cache is unchanged.
+/// This is the standard write path for every per-entity sync adapter.
+pub async fn write_cached<T: Serialize>(
+  conn: &Connection,
+  project_id: &Id,
+  gest_dir: &Path,
+  path: &Path,
+  value: &T,
+) -> Result<(), Error> {
+  let mut serialized = yaml_serde::to_string(value)?;
+  if !serialized.ends_with('\n') {
+    serialized.push('\n');
+  }
+  let new_digest = digest::compute(serialized.as_bytes());
+  let relative = paths::relative(gest_dir, path).ok_or_else(|| {
+    Error::Io(std::io::Error::other(format!(
+      "path {} is outside {}",
+      path.display(),
+      gest_dir.display()
+    )))
+  })?;
+
+  if digest::is_unchanged(conn, project_id, &relative, &new_digest).await? {
+    return Ok(());
+  }
+
+  if let Some(parent) = path.parent() {
+    fs::create_dir_all(parent)?;
+  }
+  fs::write(path, serialized.as_bytes())?;
+  digest::record(conn, project_id, &relative, &new_digest).await?;
   Ok(())
 }
 

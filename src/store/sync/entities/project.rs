@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::store::{
   model::primitives::Id,
-  sync::{Error, digest, paths, yaml},
+  sync::{Error, paths, yaml},
 };
 
 /// On-disk wrapper for `.gest/project.yaml`.
@@ -124,20 +124,7 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
   };
 
   let path = paths::project_path(gest_dir);
-  let relative = paths::relative(gest_dir, &path).unwrap_or_default();
-  let mut serialized = yaml_serde::to_string(&file)?;
-  if !serialized.ends_with('\n') {
-    serialized.push('\n');
-  }
-  let new_digest = digest::compute(serialized.as_bytes());
-
-  if digest::is_unchanged(conn, project_id, &relative, &new_digest).await? {
-    return Ok(());
-  }
-
-  yaml::write(&path, &file)?;
-  digest::record(conn, project_id, &relative, &new_digest).await?;
-  Ok(())
+  yaml::write_cached(conn, project_id, gest_dir, &path, &file).await
 }
 
 #[cfg(test)]

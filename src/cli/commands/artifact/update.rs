@@ -40,6 +40,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("artifact update: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
 
@@ -94,6 +95,7 @@ impl Command {
     };
     let short_id = artifact.id().short();
     self.output.print_entity(&artifact, &short_id, || {
+      log::info!("updated artifact");
       SuccessMessage::new("updated artifact")
         .id(artifact.id().short())
         .prefix_len(prefix_len)

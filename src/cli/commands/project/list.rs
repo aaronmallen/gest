@@ -21,6 +21,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("project list: entry");
     let conn = context.store().connect().await?;
     let mut projects = repo::project::all(&conn).await?;
     self.limit.apply(&mut projects);

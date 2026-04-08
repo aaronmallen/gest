@@ -16,6 +16,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("config show: entry");
     let settings = context.settings();
 
     self.output.print_entity(settings, "config", || {

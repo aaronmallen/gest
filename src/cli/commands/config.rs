@@ -25,6 +25,7 @@ enum Sub {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("config: entry");
     match &self.subcommand {
       Sub::Get(cmd) => cmd.call(context).await,
       Sub::Set(cmd) => cmd.call(context).await,

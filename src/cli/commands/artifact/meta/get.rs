@@ -21,6 +21,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("artifact meta get: entry");
     let conn = context.store().connect().await?;
     let id = repo::resolve::resolve_id(&conn, "artifacts", &self.id).await?;
     let artifact = repo::artifact::find_by_id(&conn, id)

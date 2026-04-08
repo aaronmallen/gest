@@ -16,6 +16,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("project attach: entry");
     let id: Id = self
       .id
       .parse()

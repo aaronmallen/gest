@@ -18,6 +18,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("artifact archive: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
 
@@ -44,6 +45,7 @@ impl Command {
     let prefix_len = repo::artifact::shortest_all_prefix(&conn, project_id).await?;
     let short_id = artifact.id().short();
     self.output.print_entity(&artifact, &short_id, || {
+      log::info!("archived artifact");
       SuccessMessage::new("archived artifact")
         .id(artifact.id().short())
         .prefix_len(prefix_len)

@@ -23,6 +23,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("task block: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
 
@@ -53,6 +54,7 @@ impl Command {
 
     let short_id = source_id.short();
     self.output.print_entity(&rel, &short_id, || {
+      log::info!("linked task");
       SuccessMessage::new("linked task")
         .id(source_id.short())
         .prefix_len(prefix_len)

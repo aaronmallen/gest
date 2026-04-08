@@ -27,6 +27,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("tag list: entry");
     let conn = context.store().connect().await?;
     let mut tags = match self.entity_type_filter() {
       Some(entity_type) => repo::tag::by_entity_type(&conn, entity_type).await?,

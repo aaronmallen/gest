@@ -31,6 +31,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("task note add: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
     let task_id = repo::resolve::resolve_id(&conn, "tasks", &self.id).await?;
@@ -70,6 +71,7 @@ impl Command {
 
     let short_id = note.id().short();
     self.output.print_entity(&note, &short_id, || {
+      log::info!("added note");
       SuccessMessage::new("added note")
         .id(note.id().short())
         .field("task", task_id.short())

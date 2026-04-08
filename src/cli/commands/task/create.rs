@@ -64,6 +64,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("task create: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
 
@@ -141,6 +142,7 @@ impl Command {
     };
 
     let short_id = task.id().short();
+    log::info!("created task {short_id}");
     self.output.print_entity(&task, &short_id, || {
       let mut message = SuccessMessage::new("created task")
         .id(task.id().short())
@@ -179,6 +181,7 @@ impl Command {
       count += 1;
     }
 
+    log::info!("batch created {count} tasks");
     let message = SuccessMessage::new("batch created").field("count", count.to_string());
     println!("{message}");
     Ok(())

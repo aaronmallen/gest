@@ -15,6 +15,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("init: entry");
     let cwd = std::env::current_dir()?;
 
     if self.local {

@@ -10,6 +10,7 @@ pub struct Command;
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("project detach: entry");
     let cwd = std::env::current_dir()?;
     let conn = context.store().connect().await?;
 

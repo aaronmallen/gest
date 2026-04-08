@@ -21,6 +21,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("iteration cancel: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
 
@@ -53,6 +54,7 @@ impl Command {
 
     let short_id = iteration.id().short();
     self.output.print_entity(&iteration, &short_id, || {
+      log::info!("cancelled iteration");
       SuccessMessage::new("cancelled iteration")
         .id(iteration.id().short())
         .prefix_len(prefix_len)

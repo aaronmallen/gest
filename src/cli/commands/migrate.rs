@@ -31,6 +31,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("migrate: entry");
     let source = match &self.path {
       Some(p) => p.clone(),
       None => {

@@ -47,6 +47,7 @@ enum Sub {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("artifact: entry");
     match &self.subcommand {
       Sub::Archive(cmd) => cmd.call(context).await,
       Sub::Create(cmd) => cmd.call(context).await,

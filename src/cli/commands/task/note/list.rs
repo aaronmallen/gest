@@ -20,6 +20,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("task note list: entry");
     let conn = context.store().connect().await?;
     let task_id = repo::resolve::resolve_id(&conn, "tasks", &self.id).await?;
 

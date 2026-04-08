@@ -18,6 +18,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("task show: entry");
     let conn = context.store().connect().await?;
 
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;

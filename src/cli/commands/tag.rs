@@ -25,6 +25,7 @@ enum Sub {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("tag: entry");
     match &self.subcommand {
       None => list::Command::default().call(context).await,
       Some(Sub::Add(cmd)) => cmd.call(context).await,

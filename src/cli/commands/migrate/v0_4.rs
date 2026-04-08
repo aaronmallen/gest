@@ -56,6 +56,14 @@ pub async fn run(context: &AppContext, source: &Path) -> Result<(), Error> {
   migrate_artifacts(&conn, &project_id, source, &mut counts).await?;
   migrate_iterations(&conn, &project_id, source, &mut counts, &task_id_map).await?;
 
+  log::info!(
+    "migrated {} tasks, {} artifacts, {} iterations, {} notes, {} relationships",
+    counts.tasks,
+    counts.artifacts,
+    counts.iterations,
+    counts.notes,
+    counts.relationships,
+  );
   println!(
     "migrated {} tasks, {} artifacts, {} iterations, {} notes, {} relationships",
     counts.tasks, counts.artifacts, counts.iterations, counts.notes, counts.relationships,

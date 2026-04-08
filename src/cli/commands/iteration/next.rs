@@ -34,6 +34,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("iteration next: entry");
     if self.agent.is_some() && !self.claim {
       eprintln!("--agent requires --claim");
       std::process::exit(1);

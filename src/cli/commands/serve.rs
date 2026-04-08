@@ -23,6 +23,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("serve: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let serve_config = context.settings().serve();
 

@@ -70,6 +70,11 @@ impl App {
 
     let result = command.call(context).await;
 
+    match &result {
+      Ok(()) => log::debug!("command succeeded"),
+      Err(e) => log::debug!("command failed: {e}"),
+    }
+
     if result.is_ok() {
       let tx_after = latest_transaction_id(context).await?;
       if tx_after != tx_before {

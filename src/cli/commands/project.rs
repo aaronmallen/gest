@@ -28,6 +28,7 @@ enum Sub {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("project: entry");
     match &self.subcommand {
       Some(Sub::Attach(command)) => command.call(context).await,
       Some(Sub::Detach(command)) => command.call(context).await,

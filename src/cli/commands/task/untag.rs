@@ -20,6 +20,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("task untag: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
     let id = repo::resolve::resolve_id(&conn, "tasks", &self.id).await?;
@@ -56,6 +57,7 @@ impl Command {
 
     let short_id = id.short();
     self.output.print_delete(|| {
+      log::info!("untagged task");
       SuccessMessage::new("untagged task")
         .id(short_id.clone())
         .prefix_len(prefix_len)

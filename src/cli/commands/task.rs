@@ -59,6 +59,7 @@ enum Sub {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("task: entry");
     match &self.subcommand {
       Sub::Block(cmd) => cmd.call(context).await,
       Sub::Cancel(cmd) => cmd.call(context).await,

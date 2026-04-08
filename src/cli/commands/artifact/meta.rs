@@ -31,6 +31,7 @@ enum Sub {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("artifact meta: entry");
     match &self.subcommand {
       Some(Sub::Get(cmd)) => cmd.call(context).await,
       Some(Sub::Set(cmd)) => cmd.call(context).await,

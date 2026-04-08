@@ -28,6 +28,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("task claim: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
 
@@ -78,6 +79,7 @@ impl Command {
 
     let short_id = task.id().short();
     self.output.print_entity(&task, &short_id, || {
+      log::info!("claimed task");
       SuccessMessage::new("claimed task")
         .id(task.id().short())
         .prefix_len(prefix_len)

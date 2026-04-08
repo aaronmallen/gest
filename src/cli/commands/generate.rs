@@ -22,6 +22,7 @@ enum Sub {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("generate: entry");
     match &self.subcommand {
       Sub::Completions(cmd) => cmd.call(context).await,
       Sub::ManPages(cmd) => cmd.call(context).await,

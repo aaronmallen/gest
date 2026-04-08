@@ -20,6 +20,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("iteration remove: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
 
@@ -43,6 +44,7 @@ impl Command {
     .await?;
 
     self.output.print_delete(|| {
+      log::info!("removed task from iteration");
       SuccessMessage::new("removed task from iteration")
         .field("task", task_id.short())
         .field("iteration", iteration_id.short())

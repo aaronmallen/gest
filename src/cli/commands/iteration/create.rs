@@ -39,6 +39,7 @@ pub struct Command {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("iteration create: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
 
@@ -88,6 +89,7 @@ impl Command {
     };
 
     let short_id = iteration.id().short();
+    log::info!("created iteration {short_id}");
     self.output.print_entity(&iteration, &short_id, || {
       SuccessMessage::new("created iteration")
         .id(iteration.id().short())

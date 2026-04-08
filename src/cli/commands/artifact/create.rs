@@ -67,6 +67,7 @@ struct BatchRecord {
 
 impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
+    log::debug!("artifact create: entry");
     if self.batch {
       return self.call_batch(context).await;
     }
@@ -119,6 +120,7 @@ impl Command {
 
     let prefix_len = repo::artifact::shortest_active_prefix(&conn, project_id).await?;
     let short_id = artifact.id().short();
+    log::info!("created artifact {short_id}");
     self.output.print_entity(&artifact, &short_id, || {
       SuccessMessage::new("created artifact")
         .id(artifact.id().short())
@@ -193,6 +195,7 @@ impl Command {
       count += 1;
     }
 
+    log::info!("batch created {count} artifacts");
     let message = SuccessMessage::new("batch created artifacts").field("count", count.to_string());
     println!("{message}");
     Ok(())

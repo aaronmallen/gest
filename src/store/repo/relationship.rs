@@ -1,3 +1,4 @@
+use chrono::Utc;
 use libsql::{Connection, Error as DbError};
 
 use crate::store::model::{
@@ -17,7 +18,7 @@ pub enum Error {
   Model(#[from] ModelError),
 }
 
-const SELECT_COLUMNS: &str = "id, rel_type, source_id, source_type, target_id, target_type";
+const SELECT_COLUMNS: &str = "id, rel_type, source_id, source_type, target_id, target_type, created_at, updated_at";
 
 /// Create a new relationship between two entities.
 pub async fn create(
@@ -30,9 +31,10 @@ pub async fn create(
 ) -> Result<Model, Error> {
   log::debug!("repo::relationship::create");
   let id = Id::new();
+  let now = Utc::now().to_rfc3339();
   conn
     .execute(
-      &format!("INSERT INTO relationships ({SELECT_COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"),
+      &format!("INSERT INTO relationships ({SELECT_COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"),
       [
         id.to_string(),
         rel_type.to_string(),
@@ -40,6 +42,8 @@ pub async fn create(
         source_type.to_string(),
         target_id.to_string(),
         target_type.to_string(),
+        now.clone(),
+        now,
       ],
     )
     .await?;

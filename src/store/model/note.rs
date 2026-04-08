@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use getset::{CopyGetters, Getters};
 use libsql::Row;
 use serde::{Deserialize, Serialize};
 
@@ -8,50 +9,26 @@ use super::{
 };
 
 /// A note attached to an entity.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, CopyGetters, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  #[get = "pub"]
   author_id: Option<Id>,
+  #[get = "pub"]
   body: String,
+  #[get = "pub"]
   created_at: DateTime<Utc>,
+  #[get = "pub"]
   entity_id: Id,
+  #[getset(get_copy = "pub")]
   entity_type: EntityType,
+  #[get = "pub"]
   id: Id,
+  #[get = "pub"]
   updated_at: DateTime<Utc>,
 }
 
-impl Model {
-  /// The author who created this note.
-  pub fn author_id(&self) -> Option<&Id> {
-    self.author_id.as_ref()
-  }
-
-  /// The note's content.
-  pub fn body(&self) -> &str {
-    &self.body
-  }
-
-  /// When this note was first created.
-  pub fn created_at(&self) -> &DateTime<Utc> {
-    &self.created_at
-  }
-
-  /// The type of entity this note is attached to.
-  #[cfg(test)]
-  pub fn entity_type(&self) -> EntityType {
-    self.entity_type
-  }
-
-  /// The unique identifier for this note.
-  pub fn id(&self) -> &Id {
-    &self.id
-  }
-
-  /// When this note was last modified.
-  pub fn updated_at(&self) -> &DateTime<Utc> {
-    &self.updated_at
-  }
-}
-
+/// Converts a database row into a [`Model`].
+///
 /// Expects columns in order: `id`, `entity_id`, `entity_type`, `author_id`, `body`,
 /// `created_at`, `updated_at`.
 impl TryFrom<Row> for Model {

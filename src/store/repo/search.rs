@@ -248,8 +248,8 @@ async fn query_artifacts(
 
   let where_clause = qb.conditions.join(" AND ");
   let sql = format!(
-    "SELECT id, project_id, archived_at, body, created_at, \
-      metadata, title, updated_at \
+    "SELECT id, project_id, title, body, metadata, \
+      archived_at, created_at, updated_at \
       FROM artifacts WHERE {where_clause} ORDER BY created_at DESC"
   );
 
@@ -282,8 +282,8 @@ async fn query_iterations(
 
   let where_clause = qb.conditions.join(" AND ");
   let sql = format!(
-    "SELECT id, project_id, completed_at, created_at, description, \
-      metadata, status, title, updated_at \
+    "SELECT id, project_id, title, status, description, \
+      metadata, completed_at, created_at, updated_at \
       FROM iterations WHERE {where_clause} ORDER BY created_at DESC"
   );
 
@@ -315,8 +315,8 @@ async fn query_tasks(
 
   let where_clause = qb.conditions.join(" AND ");
   let sql = format!(
-    "SELECT id, project_id, assigned_to, created_at, description, \
-      metadata, priority, resolved_at, status, title, updated_at \
+    "SELECT id, project_id, title, priority, status, description, \
+      assigned_to, metadata, resolved_at, created_at, updated_at \
       FROM tasks WHERE {where_clause} ORDER BY created_at DESC"
   );
 

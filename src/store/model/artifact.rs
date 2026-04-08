@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use getset::Getters;
 use libsql::Row;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -6,74 +7,49 @@ use serde_json::Value;
 use super::{Error, primitives::Id};
 
 /// A persistent document (spec, ADR, design doc, etc.) within a project.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  #[get = "pub"]
   archived_at: Option<DateTime<Utc>>,
   #[serde(skip)]
+  #[get = "pub"]
   body: String,
+  #[get = "pub"]
   created_at: DateTime<Utc>,
+  #[get = "pub"]
   id: Id,
+  #[get = "pub"]
   metadata: Value,
+  #[get = "pub"]
   project_id: Id,
+  #[get = "pub"]
   title: String,
+  #[get = "pub"]
   updated_at: DateTime<Utc>,
 }
 
 impl Model {
-  /// When this artifact was archived, if at all.
-  pub fn archived_at(&self) -> Option<&DateTime<Utc>> {
-    self.archived_at.as_ref()
-  }
-
-  /// The artifact's markdown body content.
-  pub fn body(&self) -> &str {
-    &self.body
-  }
-
-  /// When this artifact was first created.
-  pub fn created_at(&self) -> &DateTime<Utc> {
-    &self.created_at
-  }
-
-  /// The unique identifier for this artifact.
-  pub fn id(&self) -> &Id {
-    &self.id
-  }
-
   /// Whether this artifact is archived.
   pub fn is_archived(&self) -> bool {
     self.archived_at.is_some()
   }
-
-  /// Custom metadata stored as JSON.
-  pub fn metadata(&self) -> &Value {
-    &self.metadata
-  }
-
-  /// The artifact's title.
-  pub fn title(&self) -> &str {
-    &self.title
-  }
-
-  /// When this artifact was last modified.
-  pub fn updated_at(&self) -> &DateTime<Utc> {
-    &self.updated_at
-  }
 }
 
-/// Expects columns in order: `id`, `project_id`, `archived_at`, `body`, `created_at`,
-/// `metadata`, `title`, `updated_at`.
+/// Converts a database row into a [`Model`].
+///
+/// Expects columns in order: `id`, `project_id`, `title`, `body`, `metadata`,
+/// `archived_at`, `created_at`, `updated_at`.
 impl TryFrom<Row> for Model {
   type Error = Error;
 
   fn try_from(row: Row) -> Result<Self, Self::Error> {
     let id: String = row.get(0)?;
     let project_id: String = row.get(1)?;
-    let archived_at: Option<String> = row.get(2)?;
+    let title: String = row.get(2)?;
     let body: String = row.get(3)?;
-    let created_at: String = row.get(4)?;
-    let metadata: String = row.get(5)?;
-    let title: String = row.get(6)?;
+    let metadata: String = row.get(4)?;
+    let archived_at: Option<String> = row.get(5)?;
+    let created_at: String = row.get(6)?;
     let updated_at: String = row.get(7)?;
 
     let archived_at = archived_at

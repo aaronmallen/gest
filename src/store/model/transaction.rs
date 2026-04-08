@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use getset::Getters;
 use libsql::Row;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -6,46 +7,36 @@ use serde_json::Value;
 use super::{Error, primitives::Id};
 
 /// A recorded command execution for undo support.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  #[get = "pub"]
   author_id: Option<Id>,
+  #[get = "pub"]
   command: String,
+  #[get = "pub"]
   created_at: DateTime<Utc>,
+  #[get = "pub"]
   id: Id,
+  #[get = "pub"]
   project_id: Id,
+  #[get = "pub"]
   undone_at: Option<DateTime<Utc>>,
 }
 
-impl Model {
-  /// The command string that was executed.
-  pub fn command(&self) -> &str {
-    &self.command
-  }
-
-  /// The unique identifier for this transaction.
-  pub fn id(&self) -> &Id {
-    &self.id
-  }
-
-  /// When this transaction was undone, if at all.
-  #[cfg(test)]
-  pub fn undone_at(&self) -> Option<&DateTime<Utc>> {
-    self.undone_at.as_ref()
-  }
-}
-
-/// Expects columns in order: `id`, `project_id`, `command`, `created_at`,
-/// `undone_at`, `author_id`.
+/// Converts a database row into a [`Model`].
+///
+/// Expects columns in order: `id`, `project_id`, `author_id`, `command`,
+/// `undone_at`, `created_at`.
 impl TryFrom<Row> for Model {
   type Error = Error;
 
   fn try_from(row: Row) -> Result<Self, Self::Error> {
     let id: String = row.get(0)?;
     let project_id: String = row.get(1)?;
-    let command: String = row.get(2)?;
-    let created_at: String = row.get(3)?;
+    let author_id: Option<String> = row.get(2)?;
+    let command: String = row.get(3)?;
     let undone_at: Option<String> = row.get(4)?;
-    let author_id: Option<String> = row.get(5)?;
+    let created_at: String = row.get(5)?;
 
     let author_id = author_id
       .map(|s| s.parse::<Id>())
@@ -76,44 +67,34 @@ impl TryFrom<Row> for Model {
 }
 
 /// A single change recorded within a transaction for undo replay.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Event {
+  #[get = "pub"]
   before_data: Option<Value>,
+  #[get = "pub"]
   created_at: DateTime<Utc>,
+  #[get = "pub"]
   event_type: String,
+  #[get = "pub"]
   id: Id,
+  #[get = "pub"]
   new_value: Option<String>,
+  #[get = "pub"]
   old_value: Option<String>,
+  #[get = "pub"]
   row_id: String,
+  #[get = "pub"]
   semantic_type: Option<String>,
+  #[get = "pub"]
   table_name: String,
+  #[get = "pub"]
   transaction_id: Id,
 }
 
-impl Event {
-  /// The state of the row before the change, for undo replay.
-  pub fn before_data(&self) -> Option<&Value> {
-    self.before_data.as_ref()
-  }
-
-  /// The type of change (e.g. "created", "modified", "deleted").
-  pub fn event_type(&self) -> &str {
-    &self.event_type
-  }
-
-  /// The ID of the row that was changed.
-  pub fn row_id(&self) -> &str {
-    &self.row_id
-  }
-
-  /// The database table that was modified.
-  pub fn table_name(&self) -> &str {
-    &self.table_name
-  }
-}
-
-/// Expects columns in order: `id`, `transaction_id`, `before_data`, `created_at`,
-/// `event_type`, `row_id`, `table_name`, `semantic_type`, `old_value`, `new_value`.
+/// Converts a database row into an [`Event`].
+///
+/// Expects columns in order: `id`, `transaction_id`, `before_data`, `event_type`,
+/// `row_id`, `table_name`, `semantic_type`, `old_value`, `new_value`, `created_at`.
 impl TryFrom<Row> for Event {
   type Error = Error;
 
@@ -121,13 +102,13 @@ impl TryFrom<Row> for Event {
     let id: String = row.get(0)?;
     let transaction_id: String = row.get(1)?;
     let before_data: Option<String> = row.get(2)?;
-    let created_at: String = row.get(3)?;
-    let event_type: String = row.get(4)?;
-    let row_id: String = row.get(5)?;
-    let table_name: String = row.get(6)?;
-    let semantic_type: Option<String> = row.get(7)?;
-    let old_value: Option<String> = row.get(8)?;
-    let new_value: Option<String> = row.get(9)?;
+    let event_type: String = row.get(3)?;
+    let row_id: String = row.get(4)?;
+    let table_name: String = row.get(5)?;
+    let semantic_type: Option<String> = row.get(6)?;
+    let old_value: Option<String> = row.get(7)?;
+    let new_value: Option<String> = row.get(8)?;
+    let created_at: String = row.get(9)?;
 
     let before_data = before_data
       .map(|s| serde_json::from_str(&s).map_err(|e| Error::InvalidValue(e.to_string())))

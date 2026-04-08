@@ -25,8 +25,8 @@ pub enum Error {
 }
 
 const SELECT_COLUMNS: &str = "\
-  id, project_id, completed_at, created_at, description, \
-  metadata, status, title, updated_at";
+  id, project_id, title, status, description, \
+  metadata, completed_at, created_at, updated_at";
 
 /// A task's summary info within an iteration context.
 pub struct IterationTaskRow {
@@ -50,8 +50,13 @@ pub async fn add_task(conn: &Connection, iteration_id: &Id, task_id: &Id, phase:
   log::debug!("repo::iteration::add_task");
   conn
     .execute(
-      "INSERT OR IGNORE INTO iteration_tasks (iteration_id, task_id, phase) VALUES (?1, ?2, ?3)",
-      libsql::params![iteration_id.to_string(), task_id.to_string(), phase as i64],
+      "INSERT OR IGNORE INTO iteration_tasks (iteration_id, task_id, phase, created_at) VALUES (?1, ?2, ?3, ?4)",
+      libsql::params![
+        iteration_id.to_string(),
+        task_id.to_string(),
+        phase as i64,
+        Utc::now().to_rfc3339(),
+      ],
     )
     .await?;
   Ok(())
@@ -119,16 +124,16 @@ pub async fn create(conn: &Connection, project_id: &Id, new: &New) -> Result<Mod
     .execute(
       &format!(
         "INSERT INTO iterations ({SELECT_COLUMNS}) \
-          VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, ?8)"
+          VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, ?7, ?8)"
       ),
       libsql::params![
         id.to_string(),
         project_id.to_string(),
-        now.to_rfc3339(),
+        new.title.clone(),
+        IterationStatus::default().to_string(),
         new.description.clone(),
         metadata,
-        IterationStatus::default().to_string(),
-        new.title.clone(),
+        now.to_rfc3339(),
         now.to_rfc3339(),
       ],
     )

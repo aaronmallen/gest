@@ -27,6 +27,7 @@ struct AuthorFile {
   email: Option<String>,
   author_type: AuthorType,
   created_at: DateTime<Utc>,
+  updated_at: DateTime<Utc>,
 }
 
 /// Import every `author/*.yaml` file under `gest_dir` into SQLite.
@@ -53,7 +54,7 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
   let mut alive: HashSet<String> = HashSet::new();
   let mut rows = conn
     .query(
-      "SELECT id, name, email, author_type, created_at FROM authors ORDER BY id",
+      "SELECT id, name, email, author_type, created_at, updated_at FROM authors ORDER BY id",
       (),
     )
     .await?;
@@ -63,6 +64,7 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     let email: Option<String> = row.get(2).ok();
     let author_type_str: String = row.get(3)?;
     let created_at_str: String = row.get(4)?;
+    let updated_at_str: String = row.get(5)?;
 
     let id: Id = id_str
       .parse()
@@ -73,6 +75,9 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     let created_at = DateTime::parse_from_rfc3339(&created_at_str)
       .map_err(|e| Error::Io(std::io::Error::other(e.to_string())))?
       .with_timezone(&Utc);
+    let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)
+      .map_err(|e| Error::Io(std::io::Error::other(e.to_string())))?
+      .with_timezone(&Utc);
 
     let file = AuthorFile {
       deleted_at: None,
@@ -81,6 +86,7 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
       email,
       author_type,
       created_at,
+      updated_at,
     };
     let path = paths::author_path(gest_dir, &id);
     yaml::write_cached(conn, project_id, gest_dir, &path, &file).await?;
@@ -95,14 +101,15 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
 async fn upsert(conn: &Connection, file: &AuthorFile) -> Result<(), Error> {
   conn
     .execute(
-      "INSERT INTO authors (id, name, email, author_type, created_at) VALUES (?1, ?2, ?3, ?4, ?5) \
-        ON CONFLICT(id) DO UPDATE SET name = ?2, email = ?3, author_type = ?4",
+      "INSERT INTO authors (id, author_type, name, email, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
+        ON CONFLICT(id) DO UPDATE SET author_type = ?2, name = ?3, email = ?4, updated_at = ?6",
       libsql::params![
         file.id.to_string(),
+        file.author_type.to_string(),
         file.name.clone(),
         file.email.clone(),
-        file.author_type.to_string(),
         file.created_at.to_rfc3339(),
+        file.updated_at.to_rfc3339(),
       ],
     )
     .await?;

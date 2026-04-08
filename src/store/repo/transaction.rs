@@ -22,7 +22,7 @@ pub enum Error {
   NothingToUndo,
 }
 
-const SELECT_COLUMNS: &str = "id, project_id, command, created_at, undone_at, author_id";
+const SELECT_COLUMNS: &str = "id, project_id, author_id, command, undone_at, created_at";
 
 /// Begin a new transaction for the given command.
 pub async fn begin(conn: &Connection, project_id: &Id, command: &str) -> Result<Model, Error> {
@@ -46,14 +46,14 @@ pub async fn begin_with_author(
   };
   conn
     .execute(
-      "INSERT INTO transactions (id, project_id, command, created_at, author_id) \
+      "INSERT INTO transactions (id, project_id, author_id, command, created_at) \
         VALUES (?1, ?2, ?3, ?4, ?5)",
       libsql::params![
         id.to_string(),
         project_id.to_string(),
+        author,
         command.to_string(),
         now.to_rfc3339(),
-        author,
       ],
     )
     .await?;
@@ -189,8 +189,8 @@ pub async fn record_semantic_event(
   conn
     .execute(
       "INSERT INTO transaction_events \
-        (id, transaction_id, before_data, event_type, row_id, table_name, semantic_type, old_value, new_value) \
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        (id, transaction_id, before_data, event_type, row_id, table_name, semantic_type, old_value, new_value, created_at) \
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
       libsql::params![
         id.to_string(),
         transaction_id.to_string(),
@@ -201,6 +201,7 @@ pub async fn record_semantic_event(
         semantic,
         old,
         new,
+        Utc::now().to_rfc3339(),
       ],
     )
     .await?;
@@ -290,8 +291,8 @@ pub async fn undo(conn: &Connection, transaction_id: &Id) -> Result<String, Erro
   // Get all events in reverse order
   let mut rows = conn
     .query(
-      "SELECT id, transaction_id, before_data, created_at, event_type, row_id, table_name, \
-        semantic_type, old_value, new_value \
+      "SELECT id, transaction_id, before_data, event_type, row_id, table_name, \
+        semantic_type, old_value, new_value, created_at \
         FROM transaction_events WHERE transaction_id = ?1 ORDER BY created_at DESC",
       [transaction_id.to_string()],
     )
@@ -304,7 +305,7 @@ pub async fn undo(conn: &Connection, transaction_id: &Id) -> Result<String, Erro
 
   // Replay each event
   for event in &events {
-    match event.event_type() {
+    match event.event_type().as_str() {
       "created" => {
         // Undo a create by deleting the row
         let sql = format!("DELETE FROM {} WHERE id = ?1", event.table_name());

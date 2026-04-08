@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use getset::Getters;
 use libsql::Row;
 use serde::{Deserialize, Serialize};
 
@@ -10,26 +11,19 @@ use super::{Error, primitives::Id};
 ///
 /// Each project is uniquely identified by its [`root`](Model::root) path and
 /// is assigned a stable [`Id`] at creation time.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  #[get = "pub"]
   created_at: DateTime<Utc>,
+  #[get = "pub"]
   id: Id,
+  #[get = "pub"]
   root: PathBuf,
+  #[get = "pub"]
   updated_at: DateTime<Utc>,
 }
 
 impl Model {
-  /// Create a new project with a fresh [`Id`] and timestamps set to now.
-  pub fn new(root: PathBuf) -> Self {
-    let now = Utc::now();
-    Self {
-      created_at: now,
-      id: Id::new(),
-      root,
-      updated_at: now,
-    }
-  }
-
   /// Reconstruct a project from a synced `.gest/project.yaml` file.
   ///
   /// The id and timestamps come from the synced file (so collaborators share
@@ -43,24 +37,15 @@ impl Model {
     }
   }
 
-  /// When this project was first created.
-  pub fn created_at(&self) -> &DateTime<Utc> {
-    &self.created_at
-  }
-
-  /// The unique identifier for this project.
-  pub fn id(&self) -> &Id {
-    &self.id
-  }
-
-  /// The absolute path to the project root directory.
-  pub fn root(&self) -> &PathBuf {
-    &self.root
-  }
-
-  /// When this project was last modified.
-  pub fn updated_at(&self) -> &DateTime<Utc> {
-    &self.updated_at
+  /// Create a new project with a fresh [`Id`] and timestamps set to now.
+  pub fn new(root: PathBuf) -> Self {
+    let now = Utc::now();
+    Self {
+      created_at: now,
+      id: Id::new(),
+      root,
+      updated_at: now,
+    }
   }
 }
 

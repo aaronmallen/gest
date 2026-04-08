@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use getset::{CopyGetters, Getters};
 use libsql::Row;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -9,76 +10,44 @@ use super::{
 };
 
 /// A time-boxed collection of tasks within a project.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, CopyGetters, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  #[get = "pub"]
   completed_at: Option<DateTime<Utc>>,
+  #[get = "pub"]
   created_at: DateTime<Utc>,
+  #[get = "pub"]
   description: String,
+  #[get = "pub"]
   id: Id,
+  #[get = "pub"]
   metadata: Value,
+  #[get = "pub"]
   project_id: Id,
+  #[getset(get_copy = "pub")]
   status: IterationStatus,
+  #[get = "pub"]
   title: String,
+  #[get = "pub"]
   updated_at: DateTime<Utc>,
 }
 
-impl Model {
-  /// When this iteration was completed, if at all.
-  #[cfg(test)]
-  pub fn completed_at(&self) -> Option<&DateTime<Utc>> {
-    self.completed_at.as_ref()
-  }
-
-  /// When this iteration was first created.
-  pub fn created_at(&self) -> &DateTime<Utc> {
-    &self.created_at
-  }
-
-  /// The iteration's description.
-  pub fn description(&self) -> &str {
-    &self.description
-  }
-
-  /// The unique identifier for this iteration.
-  pub fn id(&self) -> &Id {
-    &self.id
-  }
-
-  /// Custom metadata stored as JSON.
-  pub fn metadata(&self) -> &Value {
-    &self.metadata
-  }
-
-  /// The iteration's current lifecycle status.
-  pub fn status(&self) -> IterationStatus {
-    self.status
-  }
-
-  /// The iteration's title.
-  pub fn title(&self) -> &str {
-    &self.title
-  }
-
-  /// When this iteration was last modified.
-  pub fn updated_at(&self) -> &DateTime<Utc> {
-    &self.updated_at
-  }
-}
-
-/// Expects columns in order: `id`, `project_id`, `completed_at`, `created_at`,
-/// `description`, `metadata`, `status`, `title`, `updated_at`.
+/// Converts a database row into a [`Model`].
+///
+/// Expects columns in order: `id`, `project_id`, `title`, `status`, `description`,
+/// `metadata`, `completed_at`, `created_at`, `updated_at`.
 impl TryFrom<Row> for Model {
   type Error = Error;
 
   fn try_from(row: Row) -> Result<Self, Self::Error> {
     let id: String = row.get(0)?;
     let project_id: String = row.get(1)?;
-    let completed_at: Option<String> = row.get(2)?;
-    let created_at: String = row.get(3)?;
+    let title: String = row.get(2)?;
+    let status: String = row.get(3)?;
     let description: String = row.get(4)?;
     let metadata: String = row.get(5)?;
-    let status: String = row.get(6)?;
-    let title: String = row.get(7)?;
+    let completed_at: Option<String> = row.get(6)?;
+    let created_at: String = row.get(7)?;
     let updated_at: String = row.get(8)?;
 
     let completed_at = completed_at

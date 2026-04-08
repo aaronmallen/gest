@@ -51,12 +51,12 @@ pub async fn attach_workspace(
   let ws = ProjectWorkspace::new(path.into(), project_id.clone());
   conn
     .execute(
-      "INSERT INTO project_workspaces (id, path, project_id, created_at, updated_at) \
+      "INSERT INTO project_workspaces (id, project_id, path, created_at, updated_at) \
         VALUES (?1, ?2, ?3, ?4, ?5)",
       [
         ws.id().to_string(),
-        ws.path().to_string_lossy().into_owned(),
         ws.project_id().to_string(),
+        ws.path().to_string_lossy().into_owned(),
         ws.created_at().to_rfc3339(),
         ws.updated_at().to_rfc3339(),
       ],
@@ -376,14 +376,14 @@ mod tests {
       let ws = ProjectWorkspace::new(PathBuf::from("/tmp/my-workspace"), project.id().clone());
       let params: [String; 5] = [
         ws.id().to_string(),
-        ws.path().to_string_lossy().into_owned(),
         ws.project_id().to_string(),
+        ws.path().to_string_lossy().into_owned(),
         ws.created_at().to_rfc3339(),
         ws.updated_at().to_rfc3339(),
       ];
       conn
         .execute(
-          "INSERT INTO project_workspaces (id, path, project_id, created_at, updated_at) \
+          "INSERT INTO project_workspaces (id, project_id, path, created_at, updated_at) \
           VALUES (?1, ?2, ?3, ?4, ?5)",
           params,
         )

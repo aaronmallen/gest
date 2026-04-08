@@ -7,6 +7,7 @@ pub const MIGRATION: Migration = Migration {
       iteration_id TEXT NOT NULL REFERENCES iterations(id),
       task_id      TEXT NOT NULL REFERENCES tasks(id),
       phase        INTEGER NOT NULL DEFAULT 1,
+      created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
       PRIMARY KEY (iteration_id, task_id)
     );
     CREATE INDEX idx_iteration_tasks_task_id ON iteration_tasks (task_id);

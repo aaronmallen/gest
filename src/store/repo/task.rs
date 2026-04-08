@@ -25,8 +25,8 @@ pub enum Error {
 }
 
 const SELECT_COLUMNS: &str = "\
-  id, project_id, assigned_to, created_at, description, \
-  metadata, priority, resolved_at, status, title, updated_at";
+  id, project_id, title, priority, status, description, \
+  assigned_to, metadata, resolved_at, created_at, updated_at";
 
 /// Return tasks for a project, applying the given filter.
 pub async fn all(conn: &Connection, project_id: &Id, filter: &Filter) -> Result<Vec<Model>, Error> {
@@ -106,14 +106,14 @@ pub async fn create(conn: &Connection, project_id: &Id, new: &New) -> Result<Mod
       libsql::params![
         id.to_string(),
         project_id.to_string(),
-        assigned_to,
-        now.to_rfc3339(),
-        new.description.clone(),
-        metadata,
-        priority,
-        resolved_at,
-        status.to_string(),
         new.title.clone(),
+        priority,
+        status.to_string(),
+        new.description.clone(),
+        assigned_to,
+        metadata,
+        resolved_at,
+        now.to_rfc3339(),
         now.to_rfc3339(),
       ],
     )

@@ -1,9 +1,12 @@
+use chrono::Utc;
 use libsql::{Connection, Error as DbError};
 
 use crate::store::model::{
   Error as ModelError, Tag,
   primitives::{EntityType, Id},
 };
+
+const SELECT_COLUMNS: &str = "id, label, created_at, updated_at";
 
 /// Errors that can occur in tag repository operations.
 #[derive(Debug, thiserror::Error)]
@@ -19,7 +22,9 @@ pub enum Error {
 /// Return all tags ordered by label.
 pub async fn all(conn: &Connection) -> Result<Vec<Tag>, Error> {
   log::debug!("repo::tag::all");
-  let mut rows = conn.query("SELECT id, label FROM tags ORDER BY label", ()).await?;
+  let mut rows = conn
+    .query(&format!("SELECT {SELECT_COLUMNS} FROM tags ORDER BY label"), ())
+    .await?;
 
   let mut tags = Vec::new();
   while let Some(row) = rows.next().await? {
@@ -34,8 +39,13 @@ pub async fn attach(conn: &Connection, entity_type: EntityType, entity_id: &Id, 
   let tag = find_or_create(conn, label).await?;
   conn
     .execute(
-      "INSERT OR IGNORE INTO entity_tags (entity_type, entity_id, tag_id) VALUES (?1, ?2, ?3)",
-      [entity_type.to_string(), entity_id.to_string(), tag.id().to_string()],
+      "INSERT OR IGNORE INTO entity_tags (entity_type, entity_id, tag_id, created_at) VALUES (?1, ?2, ?3, ?4)",
+      [
+        entity_type.to_string(),
+        entity_id.to_string(),
+        tag.id().to_string(),
+        Utc::now().to_rfc3339(),
+      ],
     )
     .await?;
   Ok(tag)
@@ -46,7 +56,7 @@ pub async fn by_entity_type(conn: &Connection, entity_type: EntityType) -> Resul
   log::debug!("repo::tag::by_entity_type");
   let mut rows = conn
     .query(
-      "SELECT DISTINCT t.id, t.label FROM tags t \
+      "SELECT DISTINCT t.id, t.label, t.created_at, t.updated_at FROM tags t \
         INNER JOIN entity_tags et ON et.tag_id = t.id \
         WHERE et.entity_type = ?1 \
         ORDER BY t.label",
@@ -66,8 +76,13 @@ pub async fn create(conn: &Connection, tag: &Tag) -> Result<Tag, Error> {
   log::debug!("repo::tag::create");
   conn
     .execute(
-      "INSERT INTO tags (id, label) VALUES (?1, ?2)",
-      [tag.id().to_string(), tag.label().to_string()],
+      &format!("INSERT INTO tags ({SELECT_COLUMNS}) VALUES (?1, ?2, ?3, ?4)"),
+      [
+        tag.id().to_string(),
+        tag.label().clone(),
+        tag.created_at().to_rfc3339(),
+        tag.updated_at().to_rfc3339(),
+      ],
     )
     .await?;
 
@@ -108,7 +123,10 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<T
   log::debug!("repo::tag::find_by_id");
   let id = id.into();
   let mut rows = conn
-    .query("SELECT id, label FROM tags WHERE id = ?1", [id.to_string()])
+    .query(
+      &format!("SELECT {SELECT_COLUMNS} FROM tags WHERE id = ?1"),
+      [id.to_string()],
+    )
     .await?;
 
   match rows.next().await? {
@@ -121,7 +139,10 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<T
 pub async fn find_by_label(conn: &Connection, label: &str) -> Result<Option<Tag>, Error> {
   log::debug!("repo::tag::find_by_label");
   let mut rows = conn
-    .query("SELECT id, label FROM tags WHERE label = ?1", [label.to_string()])
+    .query(
+      &format!("SELECT {SELECT_COLUMNS} FROM tags WHERE label = ?1"),
+      [label.to_string()],
+    )
     .await?;
 
   match rows.next().await? {

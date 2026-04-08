@@ -25,8 +25,8 @@ pub enum Error {
 }
 
 const SELECT_COLUMNS: &str = "\
-  id, project_id, archived_at, body, created_at, \
-  metadata, title, updated_at";
+  id, project_id, title, body, metadata, \
+  archived_at, created_at, updated_at";
 
 /// Return artifacts for a project, applying the given filter.
 pub async fn all(conn: &Connection, project_id: &Id, filter: &Filter) -> Result<Vec<Model>, Error> {
@@ -96,15 +96,15 @@ pub async fn create(conn: &Connection, project_id: &Id, new: &New) -> Result<Mod
     .execute(
       &format!(
         "INSERT INTO artifacts ({SELECT_COLUMNS}) \
-          VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7)"
+          VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7)"
       ),
       libsql::params![
         id.to_string(),
         project_id.to_string(),
-        new.body.clone(),
-        now.to_rfc3339(),
-        metadata,
         new.title.clone(),
+        new.body.clone(),
+        metadata,
+        now.to_rfc3339(),
         now.to_rfc3339(),
       ],
     )

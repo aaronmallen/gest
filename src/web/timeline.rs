@@ -152,7 +152,7 @@ async fn build_event_display(conn: &Connection, event: SemanticEvent) -> EventDi
 
 /// Build a [`NoteItem`] for a single note.
 async fn build_note_item(conn: &Connection, note: note::Model) -> NoteItem {
-  let (author_name, author_gravatar, author_is_agent) = resolve_author(conn, note.author_id()).await;
+  let (author_name, author_gravatar, author_is_agent) = resolve_author(conn, note.author_id().as_ref()).await;
 
   NoteItem {
     author_gravatar,
@@ -179,8 +179,8 @@ async fn resolve_author(conn: &Connection, author_id: Option<&Id>) -> (Option<St
   match author_id {
     Some(aid) => match repo::author::find_by_id(conn, aid.clone()).await {
       Ok(Some(author)) => (
-        Some(author.name().to_string()),
-        gravatar::url(author.email()),
+        Some(author.name().clone()),
+        gravatar::url(author.email().as_deref()),
         author.author_type() == AuthorType::Agent,
       ),
       _ => (None, None, false),

@@ -168,7 +168,7 @@ impl Command {
 
     if self.json {
       let json_out = json!({
-        "assigned_to": task.assigned_to().map(|a| a.to_string()),
+        "assigned_to": task.assigned_to().as_ref().map(|a| a.to_string()),
         "id": task.id().to_string(),
         "phase": phase,
         "priority": task.priority(),
@@ -198,7 +198,11 @@ impl Command {
       )
       .field(
         "assigned to",
-        task.assigned_to().map(|a| a.short()).unwrap_or_else(|| "-".to_string()),
+        task
+          .assigned_to()
+          .as_ref()
+          .map(|a| a.short())
+          .unwrap_or_else(|| "-".to_string()),
       );
 
     println!("{fields}");

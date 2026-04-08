@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use getset::Getters;
 use libsql::Row;
 use serde::{Deserialize, Serialize};
 
@@ -11,12 +12,17 @@ use super::{Error, primitives::Id};
 /// Workspaces represent distinct working directories within a project. Each
 /// workspace is tied to exactly one project via [`project_id`](Model::project_id)
 /// and is uniquely constrained on the `(path, project_id)` pair.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  #[get = "pub"]
   created_at: DateTime<Utc>,
+  #[get = "pub"]
   id: Id,
+  #[get = "pub"]
   path: PathBuf,
+  #[get = "pub"]
   project_id: Id,
+  #[get = "pub"]
   updated_at: DateTime<Utc>,
 }
 
@@ -32,43 +38,18 @@ impl Model {
       updated_at: now,
     }
   }
-
-  /// When this workspace was first created.
-  pub fn created_at(&self) -> &DateTime<Utc> {
-    &self.created_at
-  }
-
-  /// The unique identifier for this workspace.
-  pub fn id(&self) -> &Id {
-    &self.id
-  }
-
-  /// The absolute path to this workspace directory.
-  pub fn path(&self) -> &PathBuf {
-    &self.path
-  }
-
-  /// The [`Id`] of the [`super::Project`] this workspace belongs to.
-  pub fn project_id(&self) -> &Id {
-    &self.project_id
-  }
-
-  /// When this workspace was last modified.
-  pub fn updated_at(&self) -> &DateTime<Utc> {
-    &self.updated_at
-  }
 }
 
 /// Converts a database row into a [`Model`].
 ///
-/// Expects columns in order: `id`, `path`, `project_id`, `created_at`, `updated_at`.
+/// Expects columns in order: `id`, `project_id`, `path`, `created_at`, `updated_at`.
 impl TryFrom<Row> for Model {
   type Error = Error;
 
   fn try_from(row: Row) -> Result<Self, Self::Error> {
     let id: String = row.get(0)?;
-    let path: String = row.get(1)?;
-    let project_id: String = row.get(2)?;
+    let project_id: String = row.get(1)?;
+    let path: String = row.get(2)?;
     let created_at: String = row.get(3)?;
     let updated_at: String = row.get(4)?;
 

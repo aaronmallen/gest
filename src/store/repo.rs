@@ -1,6 +1,7 @@
 /// Data-access repositories for domain models.
 pub mod artifact;
 pub mod author;
+pub mod entity;
 pub mod iteration;
 pub mod note;
 pub mod project;

@@ -345,18 +345,21 @@ pub async fn undo(conn: &Connection, transaction_id: &Id) -> Result<String, Erro
         }
       }
       "deleted" => {
-        // Undo a delete by re-inserting from before_data
+        // Undo a delete by re-inserting from before_data. NULL values must be
+        // passed through as SQL NULL rather than an empty string so that
+        // nullable FK columns (e.g. `tasks.assigned_to`) do not spuriously
+        // violate constraints on replay.
         if let Some(before) = event.before_data()
           && let Some(obj) = before.as_object()
         {
           let keys: Vec<&str> = obj.keys().map(|k| k.as_str()).collect();
           let placeholders: Vec<String> = (1..=keys.len()).map(|i| format!("?{i}")).collect();
-          let values: Vec<String> = obj
+          let values: Vec<Value> = obj
             .values()
             .map(|v| match v {
-              JsonValue::String(s) => s.clone(),
-              JsonValue::Null => String::new(),
-              other => other.to_string(),
+              JsonValue::Null => Value::Null,
+              JsonValue::String(s) => Value::from(s.clone()),
+              other => Value::from(other.to_string()),
             })
             .collect();
           let sql = format!(
@@ -365,9 +368,7 @@ pub async fn undo(conn: &Connection, transaction_id: &Id) -> Result<String, Erro
             keys.join(", "),
             placeholders.join(", ")
           );
-          conn
-            .execute(&sql, libsql::params_from_iter(values.iter().map(|s| s.as_str())))
-            .await?;
+          conn.execute(&sql, libsql::params_from_iter(values)).await?;
         }
       }
       _ => {}

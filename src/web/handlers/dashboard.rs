@@ -16,7 +16,7 @@ use crate::{
     },
     repo,
   },
-  web::AppState,
+  web::{AppState, handlers::log_err},
 };
 
 #[derive(Template)]
@@ -55,18 +55,18 @@ struct NotFoundTemplate;
 
 /// Dashboard page showing project summary.
 pub async fn dashboard(State(state): State<AppState>) -> Result<Html<String>, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state.store().connect().await.map_err(log_err("dashboard"))?;
   let pid = state.project_id();
 
   let tasks = repo::task::all(&conn, pid, &task::Filter::all())
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("dashboard"))?;
   let artifacts = repo::artifact::all(&conn, pid, &Default::default())
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("dashboard"))?;
   let iterations = repo::iteration::all(&conn, pid, &iteration::Filter::all())
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("dashboard"))?;
 
   let (
     active_iteration_count,
@@ -93,23 +93,23 @@ pub async fn dashboard(State(state): State<AppState>) -> Result<Html<String>, St
     open_count,
     task_count,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("dashboard"))?))
 }
 
 /// Dashboard content fragment for live reload.
 pub async fn dashboard_fragment(State(state): State<AppState>) -> Result<Html<String>, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state.store().connect().await.map_err(log_err("dashboard_fragment"))?;
   let pid = state.project_id();
 
   let tasks = repo::task::all(&conn, pid, &task::Filter::all())
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("dashboard_fragment"))?;
   let artifacts = repo::artifact::all(&conn, pid, &Default::default())
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("dashboard_fragment"))?;
   let iterations = repo::iteration::all(&conn, pid, &iteration::Filter::all())
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("dashboard_fragment"))?;
 
   let (
     active_iteration_count,
@@ -136,7 +136,7 @@ pub async fn dashboard_fragment(State(state): State<AppState>) -> Result<Html<St
     open_count,
     task_count,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("dashboard_fragment"))?))
 }
 
 /// Fallback handler for unmatched routes.

@@ -13,7 +13,7 @@ use crate::{
     model::{artifact, iteration, task},
     repo, search_query,
   },
-  web::AppState,
+  web::{AppState, handlers::log_err},
 };
 
 #[derive(Deserialize)]
@@ -108,7 +108,7 @@ pub async fn api_search(State(state): State<AppState>, Query(params): Query<ApiS
 
 /// Search page.
 pub async fn search(State(state): State<AppState>, Query(params): Query<SearchQuery>) -> Result<Html<String>, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state.store().connect().await.map_err(log_err("search"))?;
   let query = params.q.unwrap_or_default();
 
   let (tasks, artifacts, iterations) = if query.is_empty() {
@@ -117,7 +117,7 @@ pub async fn search(State(state): State<AppState>, Query(params): Query<SearchQu
     let parsed = search_query::parse(&query);
     let results = repo::search::query(&conn, state.project_id(), &parsed, true)
       .await
-      .map_err(|e| e.to_string())?;
+      .map_err(log_err("search"))?;
     (results.tasks, results.artifacts, results.iterations)
   };
 
@@ -127,5 +127,5 @@ pub async fn search(State(state): State<AppState>, Query(params): Query<SearchQu
     query,
     tasks,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("search"))?))
 }

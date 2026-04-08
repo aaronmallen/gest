@@ -16,6 +16,7 @@ use crate::{
   web::{
     AppState,
     forms::{self, ExistingLink, NoteFormData},
+    handlers::log_err,
     markdown,
     note_display::{self, NoteDisplay},
     timeline::{self, TimelineItem},
@@ -99,13 +100,14 @@ struct ArtifactRow {
 
 /// Archive an artifact.
 pub async fn artifact_archive(State(state): State<AppState>, Path(id): Path<String>) -> Result<Redirect, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  log::debug!("artifact_archive: artifact={id}");
+  let conn = state.store().connect().await.map_err(log_err("artifact_archive"))?;
   let artifact_id = repo::resolve::resolve_id(&conn, "artifacts", &id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("artifact_archive"))?;
   repo::artifact::archive(&conn, &artifact_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("artifact_archive"))?;
 
   let _ = state.reload_tx().send(());
   Ok(Redirect::to("/artifacts"))
@@ -119,7 +121,7 @@ pub async fn artifact_create_form() -> Result<Html<String>, String> {
     tags: String::new(),
     error: None,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("artifact_create_form"))?))
 }
 
 /// Handle artifact creation from form.
@@ -127,7 +129,12 @@ pub async fn artifact_create_submit(
   State(state): State<AppState>,
   Form(form): Form<ArtifactForm>,
 ) -> Result<Redirect, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  log::debug!("artifact_create_submit: title={}", form.title);
+  let conn = state
+    .store()
+    .connect()
+    .await
+    .map_err(log_err("artifact_create_submit"))?;
 
   let new = artifact::New {
     title: form.title,
@@ -136,14 +143,14 @@ pub async fn artifact_create_submit(
   };
   let artifact = repo::artifact::create(&conn, state.project_id(), &new)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("artifact_create_submit"))?;
 
   // Attach tags
   if let Some(tags_str) = &form.tags {
     for label in forms::parse_tags(tags_str) {
       repo::tag::attach(&conn, EntityType::Artifact, artifact.id(), &label)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(log_err("artifact_create_submit"))?;
     }
   }
 
@@ -161,7 +168,7 @@ pub async fn artifact_detail(State(state): State<AppState>, Path(id): Path<Strin
     notes,
     timeline_items,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("artifact_detail"))?))
 }
 
 /// Artifact detail fragment (SSE live reload).
@@ -177,27 +184,30 @@ pub async fn artifact_detail_fragment(
     notes,
     timeline_items,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("artifact_detail_fragment"))?))
 }
 
 /// Artifact edit form.
 pub async fn artifact_edit_form(State(state): State<AppState>, Path(id): Path<String>) -> Result<Html<String>, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state.store().connect().await.map_err(log_err("artifact_edit_form"))?;
   let artifact_id = repo::resolve::resolve_id(&conn, "artifacts", &id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("artifact_edit_form"))?;
   let artifact = repo::artifact::find_by_id(&conn, artifact_id.clone())
     .await
-    .map_err(|e| e.to_string())?
-    .ok_or_else(|| format!("artifact not found: {id}"))?;
+    .map_err(log_err("artifact_edit_form"))?
+    .ok_or_else(|| {
+      log::error!("artifact_edit_form: artifact not found: {id}");
+      format!("artifact not found: {id}")
+    })?;
 
   let tags = repo::tag::for_entity(&conn, EntityType::Artifact, &artifact_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("artifact_edit_form"))?;
 
   let rels = repo::relationship::for_entity(&conn, EntityType::Artifact, &artifact_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("artifact_edit_form"))?;
   let existing_links = forms::build_existing_links_for_entity(&artifact_id, EntityType::Artifact, &rels);
 
   let tmpl = ArtifactEditTemplate {
@@ -208,7 +218,7 @@ pub async fn artifact_edit_form(State(state): State<AppState>, Path(id): Path<St
     error: None,
     existing_links,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("artifact_edit_form"))?))
 }
 
 /// Artifact list page.
@@ -223,7 +233,7 @@ pub async fn artifact_list(
     archived_count,
     current_status,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("artifact_list"))?))
 }
 
 /// Artifact list fragment (SSE live reload).
@@ -238,7 +248,7 @@ pub async fn artifact_list_fragment(
     archived_count,
     current_status,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("artifact_list_fragment"))?))
 }
 
 /// Add a note to an artifact.
@@ -247,10 +257,11 @@ pub async fn artifact_note_add(
   Path(id): Path<String>,
   Form(form): Form<NoteFormData>,
 ) -> Result<Redirect, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  log::debug!("artifact_note_add: artifact={id}");
+  let conn = state.store().connect().await.map_err(log_err("artifact_note_add"))?;
   let artifact_id = repo::resolve::resolve_id(&conn, "artifacts", &id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("artifact_note_add"))?;
 
   let new = note::New {
     body: form.body,
@@ -258,7 +269,7 @@ pub async fn artifact_note_add(
   };
   repo::note::create(&conn, EntityType::Artifact, &artifact_id, &new)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("artifact_note_add"))?;
 
   let _ = state.reload_tx().send(());
   Ok(Redirect::to(&format!("/artifacts/{artifact_id}")))
@@ -270,10 +281,11 @@ pub async fn artifact_update(
   Path(id): Path<String>,
   body: Bytes,
 ) -> Result<Redirect, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  log::debug!("artifact_update: artifact={id}");
+  let conn = state.store().connect().await.map_err(log_err("artifact_update"))?;
   let artifact_id = repo::resolve::resolve_id(&conn, "artifacts", &id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("artifact_update"))?;
 
   // Parse form fields from raw body
   let mut title = String::new();
@@ -296,16 +308,16 @@ pub async fn artifact_update(
   };
   repo::artifact::update(&conn, &artifact_id, &patch)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("artifact_update"))?;
 
   // Re-sync tags: detach all, then re-attach
   repo::tag::detach_all(&conn, EntityType::Artifact, &artifact_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("artifact_update"))?;
   for label in forms::parse_tags(&tags_str) {
     repo::tag::attach(&conn, EntityType::Artifact, &artifact_id, &label)
       .await
-      .map_err(|e| e.to_string())?;
+      .map_err(log_err("artifact_update"))?;
   }
 
   // Sync relationships
@@ -329,21 +341,28 @@ async fn build_artifact_detail_data(
   ),
   String,
 > {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state
+    .store()
+    .connect()
+    .await
+    .map_err(log_err("build_artifact_detail_data"))?;
   let artifact_id = repo::resolve::resolve_id(&conn, "artifacts", id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_artifact_detail_data"))?;
   let artifact = repo::artifact::find_by_id(&conn, artifact_id.clone())
     .await
-    .map_err(|e| e.to_string())?
-    .ok_or_else(|| format!("artifact not found: {id}"))?;
+    .map_err(log_err("build_artifact_detail_data"))?
+    .ok_or_else(|| {
+      log::error!("build_artifact_detail_data: artifact not found: {id}");
+      format!("artifact not found: {id}")
+    })?;
 
   let tags = repo::tag::for_entity(&conn, EntityType::Artifact, &artifact_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_artifact_detail_data"))?;
   let raw_notes = repo::note::for_entity(&conn, EntityType::Artifact, &artifact_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_artifact_detail_data"))?;
 
   let body_html = markdown::render_markdown_to_html(artifact.body());
   let notes = note_display::build_note_displays(&conn, raw_notes).await;
@@ -357,7 +376,11 @@ async fn build_artifact_list_data(
   state: &AppState,
   status: Option<String>,
 ) -> Result<(Vec<ArtifactRow>, usize, usize, String), String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state
+    .store()
+    .connect()
+    .await
+    .map_err(log_err("build_artifact_list_data"))?;
 
   // Fetch all artifacts to compute counts
   let all_artifacts = repo::artifact::all(
@@ -369,7 +392,7 @@ async fn build_artifact_list_data(
     },
   )
   .await
-  .map_err(|e| e.to_string())?;
+  .map_err(log_err("build_artifact_list_data"))?;
 
   let open_count = all_artifacts.iter().filter(|a| !a.is_archived()).count();
   let archived_count = all_artifacts.iter().filter(|a| a.is_archived()).count();
@@ -391,13 +414,13 @@ async fn build_artifact_list_data(
 
   let artifacts = repo::artifact::all(&conn, state.project_id(), &filter)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_artifact_list_data"))?;
 
   let mut rows = Vec::with_capacity(artifacts.len());
   for a in artifacts {
     let tags = repo::tag::for_entity(&conn, EntityType::Artifact, a.id())
       .await
-      .map_err(|e| e.to_string())?;
+      .map_err(log_err("build_artifact_list_data"))?;
     rows.push(ArtifactRow {
       artifact: a,
       tags,

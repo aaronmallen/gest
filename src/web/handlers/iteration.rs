@@ -22,6 +22,7 @@ use crate::{
   },
   web::{
     AppState,
+    handlers::log_err,
     timeline::{self, TimelineItem},
   },
 };
@@ -117,7 +118,7 @@ pub async fn iteration_board(State(state): State<AppState>, Path(id): Path<Strin
     done_tasks,
     cancelled_tasks,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("iteration_board"))?))
 }
 
 /// Iteration board fragment (for SSE live reload).
@@ -135,7 +136,7 @@ pub async fn iteration_board_fragment(
     done_tasks,
     cancelled_tasks,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("iteration_board_fragment"))?))
 }
 
 /// Iteration detail page.
@@ -151,7 +152,7 @@ pub async fn iteration_detail(State(state): State<AppState>, Path(id): Path<Stri
     status_counts,
     timeline_items,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("iteration_detail"))?))
 }
 
 /// Iteration detail fragment (for SSE live reload).
@@ -170,7 +171,7 @@ pub async fn iteration_detail_fragment(
     status_counts,
     timeline_items,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("iteration_detail_fragment"))?))
 }
 
 /// Iteration list page.
@@ -188,7 +189,7 @@ pub async fn iteration_list(
     cancelled_count,
     current_status,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("iteration_list"))?))
 }
 
 /// Iteration list fragment (for SSE live reload).
@@ -206,7 +207,7 @@ pub async fn iteration_list_fragment(
     cancelled_count,
     current_status,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("iteration_list_fragment"))?))
 }
 
 /// Build iteration board data from an iteration id.
@@ -223,18 +224,25 @@ async fn build_iteration_board(
   ),
   String,
 > {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state
+    .store()
+    .connect()
+    .await
+    .map_err(log_err("build_iteration_board"))?;
   let iter_id = repo::resolve::resolve_id(&conn, "iterations", id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_iteration_board"))?;
   let iteration = repo::iteration::find_by_id(&conn, iter_id.clone())
     .await
-    .map_err(|e| e.to_string())?
-    .ok_or_else(|| format!("iteration not found: {id}"))?;
+    .map_err(log_err("build_iteration_board"))?
+    .ok_or_else(|| {
+      log::error!("build_iteration_board: iteration not found: {id}");
+      format!("iteration not found: {id}")
+    })?;
 
   let tasks = repo::iteration::tasks_with_phase(&conn, &iter_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_iteration_board"))?;
 
   let mut open = Vec::new();
   let mut in_progress = Vec::new();
@@ -267,24 +275,31 @@ async fn build_iteration_detail(
   ),
   String,
 > {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state
+    .store()
+    .connect()
+    .await
+    .map_err(log_err("build_iteration_detail"))?;
   let iter_id = repo::resolve::resolve_id(&conn, "iterations", id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_iteration_detail"))?;
   let iteration = repo::iteration::find_by_id(&conn, iter_id.clone())
     .await
-    .map_err(|e| e.to_string())?
-    .ok_or_else(|| format!("iteration not found: {id}"))?;
+    .map_err(log_err("build_iteration_detail"))?
+    .ok_or_else(|| {
+      log::error!("build_iteration_detail: iteration not found: {id}");
+      format!("iteration not found: {id}")
+    })?;
 
   let tags = repo::tag::for_entity(&conn, EntityType::Iteration, &iter_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_iteration_detail"))?;
   let tasks = repo::iteration::tasks_with_phase(&conn, &iter_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_iteration_detail"))?;
   let status_counts = repo::iteration::task_status_counts(&conn, &iter_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_iteration_detail"))?;
 
   // Group tasks by phase
   let mut phase_map: BTreeMap<u32, Vec<IterationTaskRow>> = BTreeMap::new();
@@ -309,12 +324,12 @@ async fn build_iteration_list(
   state: &AppState,
   status_param: &Option<String>,
 ) -> Result<(Vec<IterationRow>, usize, usize, usize, String), String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state.store().connect().await.map_err(log_err("build_iteration_list"))?;
 
   // Fetch all iterations to compute counts
   let all_iterations = repo::iteration::all(&conn, state.project_id(), &iteration::Filter::all())
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_iteration_list"))?;
 
   let active_count = all_iterations
     .iter()
@@ -343,19 +358,19 @@ async fn build_iteration_list(
 
   let iterations = repo::iteration::all(&conn, state.project_id(), &filter)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_iteration_list"))?;
 
   let mut rows = Vec::with_capacity(iterations.len());
   for it in iterations {
     let tags = repo::tag::for_entity(&conn, EntityType::Iteration, it.id())
       .await
-      .map_err(|e| e.to_string())?;
+      .map_err(log_err("build_iteration_list"))?;
     let counts = repo::iteration::task_status_counts(&conn, it.id())
       .await
-      .map_err(|e| e.to_string())?;
+      .map_err(log_err("build_iteration_list"))?;
     let max_phase = repo::iteration::max_phase(&conn, it.id())
       .await
-      .map_err(|e| e.to_string())?;
+      .map_err(log_err("build_iteration_list"))?;
     rows.push(IterationRow {
       task_count: counts.total,
       phase_count: max_phase.unwrap_or(0),

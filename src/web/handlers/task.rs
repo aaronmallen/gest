@@ -21,6 +21,7 @@ use crate::{
   web::{
     AppState,
     forms::{self, ExistingLink, NoteFormData},
+    handlers::log_err,
     markdown,
     note_display::{self, NoteDisplay},
     timeline::{self, TimelineItem},
@@ -125,10 +126,11 @@ pub async fn note_add(
   Path(id): Path<String>,
   Form(form): Form<NoteFormData>,
 ) -> Result<Redirect, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  log::debug!("note_add: task={id}");
+  let conn = state.store().connect().await.map_err(log_err("note_add"))?;
   let task_id = repo::resolve::resolve_id(&conn, "tasks", &id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("note_add"))?;
 
   let new = note::New {
     body: form.body,
@@ -136,7 +138,7 @@ pub async fn note_add(
   };
   repo::note::create(&conn, EntityType::Task, &task_id, &new)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("note_add"))?;
 
   let _ = state.reload_tx().send(());
   Ok(Redirect::to(&format!("/tasks/{}", task_id)))
@@ -145,12 +147,13 @@ pub async fn note_add(
 /// Task create form.
 pub async fn task_create_form() -> Result<Html<String>, String> {
   let tmpl = TaskCreateTemplate;
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("task_create_form"))?))
 }
 
 /// Handle task creation from form.
 pub async fn task_create_submit(State(state): State<AppState>, Form(form): Form<TaskForm>) -> Result<Redirect, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  log::debug!("task_create_submit: title={}", form.title);
+  let conn = state.store().connect().await.map_err(log_err("task_create_submit"))?;
   let new = task::New {
     description: form.description.unwrap_or_default(),
     priority: form.priority,
@@ -159,21 +162,24 @@ pub async fn task_create_submit(State(state): State<AppState>, Form(form): Form<
   };
   let task = repo::task::create(&conn, state.project_id(), &new)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("task_create_submit"))?;
   let _ = state.reload_tx().send(());
   Ok(Redirect::to(&format!("/tasks/{}", task.id())))
 }
 
 /// Task detail page.
 pub async fn task_detail(State(state): State<AppState>, Path(id): Path<String>) -> Result<Html<String>, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state.store().connect().await.map_err(log_err("task_detail"))?;
   let task_id = repo::resolve::resolve_id(&conn, "tasks", &id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("task_detail"))?;
   let task = repo::task::find_by_id(&conn, task_id.clone())
     .await
-    .map_err(|e| e.to_string())?
-    .ok_or_else(|| format!("task not found: {id}"))?;
+    .map_err(log_err("task_detail"))?
+    .ok_or_else(|| {
+      log::error!("task_detail: task not found: {id}");
+      format!("task not found: {id}")
+    })?;
 
   let (tags, notes, description_html, is_blocked, blocking, display_links) =
     load_task_detail_data(&conn, &task_id, &task).await?;
@@ -189,7 +195,7 @@ pub async fn task_detail(State(state): State<AppState>, Path(id): Path<String>) 
     display_links,
     timeline_items,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("task_detail"))?))
 }
 
 /// Task detail fragment (for SSE live reload).
@@ -197,14 +203,17 @@ pub async fn task_detail_fragment(
   State(state): State<AppState>,
   Path(id): Path<String>,
 ) -> Result<Html<String>, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state.store().connect().await.map_err(log_err("task_detail_fragment"))?;
   let task_id = repo::resolve::resolve_id(&conn, "tasks", &id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("task_detail_fragment"))?;
   let task = repo::task::find_by_id(&conn, task_id.clone())
     .await
-    .map_err(|e| e.to_string())?
-    .ok_or_else(|| format!("task not found: {id}"))?;
+    .map_err(log_err("task_detail_fragment"))?
+    .ok_or_else(|| {
+      log::error!("task_detail_fragment: task not found: {id}");
+      format!("task not found: {id}")
+    })?;
 
   let (tags, notes, description_html, is_blocked, blocking, display_links) =
     load_task_detail_data(&conn, &task_id, &task).await?;
@@ -220,27 +229,30 @@ pub async fn task_detail_fragment(
     display_links,
     timeline_items,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("task_detail_fragment"))?))
 }
 
 /// Task edit form.
 pub async fn task_edit_form(State(state): State<AppState>, Path(id): Path<String>) -> Result<Html<String>, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state.store().connect().await.map_err(log_err("task_edit_form"))?;
   let task_id = repo::resolve::resolve_id(&conn, "tasks", &id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("task_edit_form"))?;
   let task = repo::task::find_by_id(&conn, task_id.clone())
     .await
-    .map_err(|e| e.to_string())?
-    .ok_or_else(|| format!("task not found: {id}"))?;
+    .map_err(log_err("task_edit_form"))?
+    .ok_or_else(|| {
+      log::error!("task_edit_form: task not found: {id}");
+      format!("task not found: {id}")
+    })?;
 
   let tags = repo::tag::for_entity(&conn, EntityType::Task, &task_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("task_edit_form"))?;
 
   let rels = repo::relationship::for_entity(&conn, EntityType::Task, &task_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("task_edit_form"))?;
   let existing_links = forms::build_existing_links_for_entity(&task_id, EntityType::Task, &rels);
 
   let tmpl = TaskEditTemplate {
@@ -252,7 +264,7 @@ pub async fn task_edit_form(State(state): State<AppState>, Path(id): Path<String
     error: None,
     existing_links,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("task_edit_form"))?))
 }
 
 /// Task list page.
@@ -271,7 +283,7 @@ pub async fn task_list(
     cancelled_count,
     current_status,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("task_list"))?))
 }
 
 /// Task list fragment (for SSE live reload).
@@ -290,7 +302,7 @@ pub async fn task_list_fragment(
     cancelled_count,
     current_status,
   };
-  Ok(Html(tmpl.render().map_err(|e| e.to_string())?))
+  Ok(Html(tmpl.render().map_err(log_err("task_list_fragment"))?))
 }
 
 /// Handle task update from edit form.
@@ -299,10 +311,11 @@ pub async fn task_update(
   Path(id): Path<String>,
   body: Bytes,
 ) -> Result<Redirect, String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  log::debug!("task_update: task={id}");
+  let conn = state.store().connect().await.map_err(log_err("task_update"))?;
   let task_id = repo::resolve::resolve_id(&conn, "tasks", &id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("task_update"))?;
 
   // Parse form fields from raw body
   let mut title = String::new();
@@ -325,13 +338,19 @@ pub async fn task_update(
   let status: Option<TaskStatus> = if status_str.is_empty() {
     None
   } else {
-    Some(status_str.parse().map_err(|e: String| e)?)
+    Some(status_str.parse().map_err(|e: String| {
+      log::error!("task_update: invalid status: {e}");
+      e
+    })?)
   };
 
   let priority: Option<Option<u8>> = if priority_str.is_empty() {
     Some(None)
   } else {
-    let val: u8 = priority_str.parse().map_err(|_| "invalid priority".to_owned())?;
+    let val: u8 = priority_str.parse().map_err(|_| {
+      log::error!("task_update: invalid priority: {priority_str}");
+      "invalid priority".to_owned()
+    })?;
     Some(Some(val))
   };
 
@@ -345,17 +364,17 @@ pub async fn task_update(
 
   repo::task::update(&conn, &task_id, &patch)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("task_update"))?;
 
   // Update tags: detach all then re-attach
   repo::tag::detach_all(&conn, EntityType::Task, &task_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("task_update"))?;
 
   for tag in tags_str.split(',').map(|t| t.trim()).filter(|t| !t.is_empty()) {
     repo::tag::attach(&conn, EntityType::Task, &task_id, tag)
       .await
-      .map_err(|e| e.to_string())?;
+      .map_err(log_err("task_update"))?;
   }
 
   // Sync relationships
@@ -403,11 +422,11 @@ async fn build_task_list_data(
   state: &AppState,
   status_param: Option<String>,
 ) -> Result<(Vec<TaskRow>, usize, usize, usize, usize, String), String> {
-  let conn = state.store().connect().await.map_err(|e| e.to_string())?;
+  let conn = state.store().connect().await.map_err(log_err("build_task_list_data"))?;
 
   let all_tasks = repo::task::all(&conn, state.project_id(), &task::Filter::all())
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_task_list_data"))?;
 
   let (open_count, in_progress_count, done_count, cancelled_count) = count_tasks_by_status(&all_tasks);
 
@@ -423,7 +442,7 @@ async fn build_task_list_data(
 
   let tasks = repo::task::all(&conn, state.project_id(), &filter)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("build_task_list_data"))?;
   let rows = build_task_rows(&conn, tasks).await?;
 
   Ok((
@@ -443,10 +462,10 @@ async fn build_task_rows(conn: &Connection, tasks: Vec<task::Model>) -> Result<V
     let task_id = task.id().clone();
     let tags = repo::tag::for_entity(conn, EntityType::Task, &task_id)
       .await
-      .map_err(|e| e.to_string())?;
+      .map_err(log_err("build_task_rows"))?;
     let rels = repo::relationship::for_entity(conn, EntityType::Task, &task_id)
       .await
-      .map_err(|e| e.to_string())?;
+      .map_err(log_err("build_task_rows"))?;
 
     let (is_blocked, blocking, blocked_by_display) = compute_blocking(&task_id, &rels);
 
@@ -516,13 +535,13 @@ async fn load_task_detail_data(
 ) -> Result<(Vec<String>, Vec<NoteDisplay>, String, bool, bool, Vec<DisplayLink>), String> {
   let tags = repo::tag::for_entity(conn, EntityType::Task, task_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("load_task_detail_data"))?;
   let raw_notes = repo::note::for_entity(conn, EntityType::Task, task_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("load_task_detail_data"))?;
   let rels = repo::relationship::for_entity(conn, EntityType::Task, task_id)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(log_err("load_task_detail_data"))?;
 
   let description_html = if task.description().is_empty() {
     String::new()

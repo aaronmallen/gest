@@ -1,5 +1,7 @@
 //! HTTP handlers for the web dashboard, organized by domain.
 
+use std::fmt::Display;
+
 pub mod api;
 pub mod artifact;
 pub mod dashboard;
@@ -22,3 +24,16 @@ pub use task::{
   note_add, task_create_form, task_create_submit, task_detail, task_detail_fragment, task_edit_form, task_list,
   task_list_fragment, task_update,
 };
+
+/// Log an error from a web handler at `error` level and convert it to a string
+/// suitable for use as the handler's response body. Use as a `.map_err` argument:
+///
+/// ```ignore
+/// .map_err(log_err("task_detail"))?
+/// ```
+pub(super) fn log_err<E: Display>(context: &'static str) -> impl FnOnce(E) -> String {
+  move |e| {
+    log::error!("{context}: {e}");
+    e.to_string()
+  }
+}

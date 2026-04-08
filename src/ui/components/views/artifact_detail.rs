@@ -125,7 +125,7 @@ impl Display for Component {
       writeln!(f, "{INDENT}{sep}")?;
       writeln!(f)?;
 
-      let rendered = markdown::render(body);
+      let rendered = markdown::render(body, width.saturating_sub(INDENT.len()));
       for line in rendered.lines() {
         writeln!(f, "{INDENT}{line}")?;
       }

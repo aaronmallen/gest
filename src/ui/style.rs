@@ -78,6 +78,11 @@ pub const ALL_TOKENS: &[&str] = &[
   "log.timestamp",
   "log.trace",
   "log.warn",
+  "markdown.alert.caution.border",
+  "markdown.alert.important.border",
+  "markdown.alert.note.border",
+  "markdown.alert.tip.border",
+  "markdown.alert.warning.border",
   "markdown.blockquote",
   "markdown.blockquote.border",
   "markdown.code.block",
@@ -344,6 +349,16 @@ pub struct Theme {
   log_warn: Style,
 
   #[get = "pub"]
+  markdown_alert_caution_border: Style,
+  #[get = "pub"]
+  markdown_alert_important_border: Style,
+  #[get = "pub"]
+  markdown_alert_note_border: Style,
+  #[get = "pub"]
+  markdown_alert_tip_border: Style,
+  #[get = "pub"]
+  markdown_alert_warning_border: Style,
+  #[get = "pub"]
   markdown_blockquote: Style,
   #[get = "pub"]
   markdown_blockquote_border: Style,
@@ -536,13 +551,18 @@ impl Default for Theme {
       log_trace: Style::new().fg(c(TextDim)),
       log_warn: Style::new().fg(c(Warning)),
 
+      markdown_alert_caution_border: Style::new().fg(c(Error)),
+      markdown_alert_important_border: Style::new().fg(Color::Rgb(155, 89, 182)),
+      markdown_alert_note_border: Style::new().fg(c(Primary)),
+      markdown_alert_tip_border: Style::new().fg(c(Success)),
+      markdown_alert_warning_border: Style::new().fg(c(Warning)),
       markdown_blockquote: Style::new().fg(c(TextMuted)).italic(),
       markdown_blockquote_border: Style::new().fg(c(TextDim)),
       markdown_code_block: Style::new().fg(c(Text)),
       markdown_code_border: Style::new().fg(c(PrimaryDark)),
       markdown_code_inline: Style::new().fg(c(Accent)),
       markdown_emphasis: Style::default().italic(),
-      markdown_heading: Style::new().fg(c(Primary)).bold(),
+      markdown_heading: Style::new().fg(c(Primary)).bold().underline(),
       markdown_link: Style::new().fg(c(Primary)).underline(),
       markdown_rule: Style::new().fg(c(Border)),
       markdown_strong: Style::default().bold(),
@@ -723,6 +743,13 @@ impl Theme {
       "log.trace" => Some(&mut self.log_trace),
       "log.warn" => Some(&mut self.log_warn),
 
+      "markdown.alert.caution.border" | "md.alert.caution.border" => Some(&mut self.markdown_alert_caution_border),
+      "markdown.alert.important.border" | "md.alert.important.border" => {
+        Some(&mut self.markdown_alert_important_border)
+      }
+      "markdown.alert.note.border" | "md.alert.note.border" => Some(&mut self.markdown_alert_note_border),
+      "markdown.alert.tip.border" | "md.alert.tip.border" => Some(&mut self.markdown_alert_tip_border),
+      "markdown.alert.warning.border" | "md.alert.warning.border" => Some(&mut self.markdown_alert_warning_border),
       "markdown.blockquote" | "md.blockquote" => Some(&mut self.markdown_blockquote),
       "markdown.blockquote.border" | "md.blockquote.border" => Some(&mut self.markdown_blockquote_border),
       "markdown.code.block" | "md.code.block" => Some(&mut self.markdown_code_block),
@@ -898,6 +925,11 @@ fn palette_for_token(key: &str) -> Option<Palette> {
     "log.warn" => Some(Warning),
 
     // ── Markdown ─────────────────────────────────────────────
+    "markdown.alert.caution.border" => Some(Error),
+    "markdown.alert.important.border" => None,
+    "markdown.alert.note.border" => Some(Primary),
+    "markdown.alert.tip.border" => Some(Success),
+    "markdown.alert.warning.border" => Some(Warning),
     "markdown.blockquote" => Some(TextMuted),
     "markdown.blockquote.border" => Some(TextDim),
     "markdown.code.block" => Some(Text),
@@ -998,6 +1030,7 @@ mod tests {
         "banner.gradient.end",
         "banner.gradient.start",
         "banner.shadow",
+        "markdown.alert.important.border",
         "markdown.emphasis",
         "markdown.strong",
       ];
@@ -1011,8 +1044,8 @@ mod tests {
     }
 
     #[test]
-    fn it_has_110_token_keys() {
-      assert_eq!(ALL_TOKENS.len(), 110);
+    fn it_has_115_token_keys() {
+      assert_eq!(ALL_TOKENS.len(), 115);
     }
   }
 

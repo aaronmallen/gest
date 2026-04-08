@@ -9,8 +9,10 @@ the entity type in advance. The entity is resolved automatically from the ID pre
 ## Usage
 
 ```text
-gest tag <COMMAND> [OPTIONS]
+gest tag [OPTIONS] [COMMAND]
 ```
+
+Running `gest tag` without a subcommand is equivalent to `gest tag list`.
 
 ## Subcommands
 
@@ -82,18 +84,23 @@ gest tag list [OPTIONS]
 
 ### Options
 
-| Option        | Description                    |
-|---------------|--------------------------------|
-| `--task`      | Show only tags from tasks      |
-| `--artifact`  | Show only tags from artifacts  |
-| `--iteration` | Show only tags from iterations |
+| Option        | Description                              |
+|---------------|------------------------------------------|
+| `--task`      | Show only tags from tasks                |
+| `--artifact`  | Show only tags from artifacts            |
+| `--iteration` | Show only tags from iterations           |
+| `--limit <N>` | Cap the number of items returned         |
+| `-j, --json`  | Emit output as JSON                      |
+| `-q, --quiet` | Suppress normal output                   |
+| `-r, --raw`   | Emit script-friendly plain output        |
 
-Flags can be combined — `--task --artifact` shows tags from both tasks and artifacts.
+Entity-scope flags can be combined — `--task --artifact` shows tags from both tasks and artifacts.
 
 ### Examples
 
 ```sh
-gest tag list                 # all tags across all entity types
-gest tag list --task          # only tags used on tasks
+gest tag list                    # all tags across all entity types
+gest tag list --task             # only tags used on tasks
 gest tag list --task --artifact  # tags from tasks and artifacts
+gest tag list --limit 20 --json  # machine-readable output, capped
 ```

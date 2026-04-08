@@ -17,6 +17,22 @@ fn it_finds_a_task_by_title() {
 }
 
 #[test]
+fn it_respects_no_pager() {
+  let g = GestCmd::new();
+  g.create_task("Searchable narwhal task");
+
+  let output = g
+    .cmd()
+    .args(["--no-pager", "search", "narwhal"])
+    .output()
+    .expect("search --no-pager failed to run");
+
+  assert!(output.status.success(), "search --no-pager exited non-zero");
+  let stdout = String::from_utf8_lossy(&output.stdout);
+  assert!(stdout.contains("Searchable narwhal task"), "got: {stdout}");
+}
+
+#[test]
 fn it_returns_no_results_for_unmatched_query() {
   let g = GestCmd::new();
   g.create_task("Regular task");

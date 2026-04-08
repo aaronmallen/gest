@@ -101,4 +101,50 @@ Order functions and methods within implementation blocks by:
 In test modules, fall back to purely alphabetical ordering when the static/instance/public/private structure doesn't
 apply. See [testing] for test-specific conventions.
 
+## Documentation Comments
+
+Doc comments explain *why* code exists and how it fits together -- not what a reader can already see from the name
+and signature. Keep them concise and idiomatic.
+
+### `//!` vs `///`
+
+- Use `//!` for **module-level** context: what the module does, why it exists, and how its pieces fit together.
+- Use `///` for **items**: structs, enums, traits, functions, methods, and fields.
+
+### One-line summary style
+
+The first line of any doc comment is a single concise sentence. Additional detail follows after a blank line only
+when non-obvious behavior warrants it.
+
+```rust
+// Good
+/// Returns the canonical path to the gest data directory.
+pub fn data_dir() -> PathBuf { ... }
+
+// Bad: restates the name without adding information
+/// Gets the data directory.
+pub fn data_dir() -> PathBuf { ... }
+```
+
+### Avoid name-restating redundancy
+
+Don't write `/// The name of the user` above `pub name: String`. Docs should add information the name alone doesn't
+convey -- constraints, units, invariants, lifetimes, or context.
+
+### `cli/commands/` leaf rule
+
+Single-purpose command leaf files (one `Command` struct, one `call()` impl) do **not** need a `//!` header. The
+command struct's `///` comment carries the description. Subsystem roots (e.g. `cli/commands/artifact.rs`) and
+shared-helper modules **do** get `//!` headers.
+
+### `pub` item coverage
+
+Every `pub` struct, enum, trait, function, method, and field should have a `///` comment. Private items get docs only
+where they genuinely help a reader.
+
+### No divider comments
+
+Don't use Unicode box-drawing dividers or other section separators inside source files. If a file needs visual
+structure beyond normal item grouping, consider splitting it.
+
 [testing]: https://github.com/aaronmallen/gest/blob/main/docs/dev/testing.md

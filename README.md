@@ -5,30 +5,24 @@
 [![GitHub Sponsors][sponsor-badge]][sponsor-link]
 [![Discord][discord-badge]][discord-link]
 
-Manage agent-generated artifacts and task backlogs alongside your project.
-
 > [!WARNING]
-> Gest is in early development. Commands, file formats, and configuration may change without notice between releases.
+> Gest is pre-1.0; expect breaking changes between minor versions until 1.0.
 
 Gest is a lightweight task and artifact tracker built for AI-assisted development. It structures agent-generated work
 into **phased iterations with dependency tracking**, so independent tasks can be dispatched to separate agents
 concurrently — turning sequential, single-context-window workflows into parallel execution pipelines.
 
-Data is stored as plain files — TOML for tasks, Markdown with YAML frontmatter for artifacts — right inside your repo.
-No database, no server, no accounts.
-
-Full documentation is available at <https://gest.aaronmallen.dev>.
-
 ## Quick Start
 
 ```sh
-gest init # initialize global store
+gest init                                      # register the current repo as a project
 gest task create "Implement auth middleware"
 gest artifact create --source auth-spec.md
+gest iteration create "Ship auth"
 gest search "auth"
 ```
 
-Use `gest init --local` to store data inside the repo (`.gest/`) instead of the global data directory.
+Open the web dashboard at any time with `gest serve` (defaults to <http://localhost:2300>).
 
 ## Parallel Execution
 
@@ -52,65 +46,36 @@ gest iteration graph <iteration-id>
 ```
 
 The iteration graph shows exactly which tasks can run now and which are waiting. Agents read the graph, pick up
-unblocked tasks, and mark them done — the remaining work automatically unblocks.
+unblocked tasks via `gest iteration next --claim`, and mark them done — remaining work automatically unblocks.
 
-### Agent Orchestration
+### Sharing a project across worktrees
 
-Built-in orchestration commands let multiple agents claim and execute tasks concurrently without conflicts:
-
-```sh
-gest iteration list --has-available            # find iterations with claimable work
-gest iteration next <id> --claim --agent bot1  # atomically claim the next task
-gest iteration status <id> --json              # check progress across all phases
-gest iteration advance <id>                    # move to the next phase
-```
-
-`iteration next` exits with code 2 when no tasks remain, so scripts can distinguish "idle" from "error".
-
-## Web Dashboard
-
-Gest includes a built-in web dashboard for browsing and managing your project's tasks, artifacts, and iterations
-without leaving the browser. Run `gest serve` to start it:
+When dispatching parallel agents into separate git worktrees or jj workspaces, attach each workspace to the same
+project so all agents read and write the same task and artifact data:
 
 ```sh
-gest serve                    # opens http://localhost:2300
+# In the main checkout, capture the project ID:
+gest project
+# → wrolrrvn
+
+# In each new worktree, attach to that project:
+cd ../gest-feature-branch
+gest project attach wrolrrvn
+
+# When the worktree is done, detach before removing it:
+gest project detach
 ```
 
-The dashboard provides:
+## How it works
 
-- **Status overview** — entity counts and status breakdown at a glance
-- **Task and artifact views** — filter, search, and inspect with rendered Markdown
-- **Iteration detail** — tasks grouped by phase with dependency visualization
-- **Kanban board** — drag-and-drop columns mapped to task status
-- **Full-text search** — find anything across tasks and artifacts
-
-## Commands
-
-| Command             | Description                                                    |
-|---------------------|----------------------------------------------------------------|
-| `gest init`         | Initialize gest (`--local` for in-repo `.gest/` directory)     |
-| `gest task`         | Create, list, show, update, tag, link, and manage tasks        |
-| `gest artifact`     | Create, list, show, update, tag, archive, and manage artifacts |
-| `gest iteration`    | Manage iterations (group tasks into phased execution plans)    |
-| `gest tag`          | Add, remove, and list tags across all entity types             |
-| `gest search`       | Search across tasks, artifacts, and iterations                 |
-| `gest undo`         | Undo the most recent mutating command(s)                       |
-| `gest serve`        | Start the web dashboard for browsing and managing entities     |
-| `gest config`       | View and modify configuration                                  |
-| `gest generate`     | Generate shell completions and man pages                       |
-| `gest self-update`  | Update gest to the latest GitHub release                       |
-| `gest version`      | Print version and check for updates                            |
-
-Run `gest --help` or `gest <command> --help` for full details.
-
-## Configuration
-
-Gest loads configuration from global (`~/.config/gest/`) and project-level TOML files. Run `gest config show` to see
-the resolved configuration and its source files.
+Gest keeps your tasks, artifacts, and iterations in a local SQLite database that powers fast queries, full-text
+search, undo, and the web dashboard. Projects can additionally keep a `.gest/` mirror of that data as human-readable
+YAML and Markdown files so it can travel with your code through git — run `gest init --local` to opt in. The on-disk
+mirror is imported on start and exported on exit, keeping both representations in sync without manual steps.
 
 ## Installation
 
-### Quick Install (macOS and Linux)
+### Quick install (macOS and Linux)
 
 ```sh
 curl -fsSL https://gest.aaronmallen.dev/install | sh
@@ -119,14 +84,14 @@ curl -fsSL https://gest.aaronmallen.dev/install | sh
 > [!TIP]
 > This installs `gest` to `~/.local/bin`. Make sure it's in your `PATH`:
 >
->```sh
->export PATH="$HOME/.local/bin:$PATH"
->```
+> ```sh
+> export PATH="$HOME/.local/bin:$PATH"
+> ```
 
 Pin a specific version or change the install directory:
 
 ```sh
-GEST_VERSION=0.0.1 GEST_INSTALL_PATH=/usr/local/bin \
+GEST_VERSION=0.5.0 GEST_INSTALL_PATH=/usr/local/bin \
   curl -fsSL https://gest.aaronmallen.dev/install | sh
 ```
 
@@ -142,9 +107,18 @@ Or with [cargo-binstall] for a pre-built binary:
 cargo binstall gest
 ```
 
+### Upgrading from v0.4.x
+
+v0.5.0 replaced the file-backed store with SQLite. Run `gest migrate` once after upgrading; see the
+[v0.4 → v0.5 migration guide](https://gest.aaronmallen.dev/migration/v0-4-to-v0-5) for details.
+
+## Documentation
+
+Full documentation, guides, and reference are available at <https://gest.aaronmallen.dev>.
+
 ## Status
 
-Early development. See [docs] for design documents and process guides.
+Pre-1.0, under active development. See [docs] for design documents and process guides.
 
 ## License
 

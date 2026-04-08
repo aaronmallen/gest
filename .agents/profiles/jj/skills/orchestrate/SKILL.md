@@ -27,6 +27,14 @@ Extract:
 - Blocking dependencies (`blocked-by` links)
 - Priority ordering within each phase
 
+Also capture the current project ID from the main workspace so dispatched agents can attach to the same project:
+
+```sh
+cargo run -- project --json
+```
+
+Record the `id` field — you will pass it to `gest project attach` in each parallel workspace.
+
 ### 2. Decide Execution Strategy
 
 Analyze the iteration structure to choose the right execution mode:
@@ -70,10 +78,12 @@ For each phase:
 
 3. **If the phase has multiple tasks and parallel execution is enabled:**
 
-   a. **Create workspaces** for each task in the phase:
+   a. **Create workspaces** for each task in the phase and attach each one to the captured project ID so dispatched
+   agents share project identity:
 
    ```sh
    jj workspace add ../gest-<task-id> --name <task-id> -r @
+   (cd ../gest-<task-id> && cargo run -- project attach <project-id>)
    ```
 
    b. **Dispatch** `/implement <task-id>` for each task. Each implementation agent works in its respective workspace
@@ -81,10 +91,11 @@ For each phase:
 
    c. **Wait** for all agents in the phase to complete.
 
-   d. **Tear down workspaces** after the phase completes:
+   d. **Tear down workspaces** after the phase completes. Detach the project before removing the workspace directory:
 
    ```sh
    # For each workspace created in this phase:
+   (cd ../gest-<task-id> && cargo run -- project detach)
    jj workspace forget <task-id>
    rm -rf ../gest-<task-id>
    ```
@@ -144,9 +155,10 @@ After all phases complete:
    jj workspace list
    ```
 
-   If any task workspaces still exist, clean them up:
+   If any task workspaces still exist, detach them from the project and clean them up:
 
    ```sh
+   (cd ../gest-<task-id> && cargo run -- project detach)
    jj workspace forget <task-id>
    rm -rf ../gest-<task-id>
    ```

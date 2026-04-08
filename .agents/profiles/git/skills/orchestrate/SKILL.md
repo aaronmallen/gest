@@ -27,6 +27,14 @@ Extract:
 - Blocking dependencies (`blocked-by` links)
 - Priority ordering within each phase
 
+Also capture the current project ID from the main worktree so dispatched agents can attach to the same project:
+
+```sh
+cargo run -- project --json
+```
+
+Record the `id` field — you will pass it to `gest project attach` in each parallel worktree.
+
 ### 2. Decide Execution Strategy
 
 Analyze the iteration structure to choose the right execution mode:
@@ -70,10 +78,12 @@ For each phase:
 
 3. **If the phase has multiple tasks and parallel execution is enabled:**
 
-   a. **Create worktrees** for each task in the phase:
+   a. **Create worktrees** for each task in the phase and attach each one to the captured project ID so dispatched
+   agents share project identity:
 
    ```sh
    git worktree add -b implement/<task-id> ../gest-<task-id> HEAD
+   (cd ../gest-<task-id> && cargo run -- project attach <project-id>)
    ```
 
    Each worktree gets its own branch (`implement/<task-id>`) based on the current HEAD.
@@ -83,10 +93,11 @@ For each phase:
 
    c. **Wait** for all agents in the phase to complete.
 
-   d. **Tear down worktrees** after the phase completes:
+   d. **Tear down worktrees** after the phase completes. Detach the project before removing the worktree:
 
    ```sh
    # For each worktree created in this phase:
+   (cd ../gest-<task-id> && cargo run -- project detach)
    git worktree remove ../gest-<task-id>
    git branch -d implement/<task-id>
    ```
@@ -150,9 +161,10 @@ After all phases complete:
    git worktree list
    ```
 
-   If any task worktrees still exist, clean them up:
+   If any task worktrees still exist, detach them from the project and clean them up:
 
    ```sh
+   (cd ../gest-<task-id> && cargo run -- project detach)
    git worktree remove ../gest-<task-id>
    git branch -d implement/<task-id>
    ```

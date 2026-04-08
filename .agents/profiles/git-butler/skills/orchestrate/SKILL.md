@@ -13,6 +13,10 @@ Git Butler's virtual branch model does not support parallel worktree isolation. 
 working directory, and multiple worktrees would conflict with Git Butler's state management. Therefore, all tasks are
 executed sequentially regardless of phase structure.
 
+Because every task runs inside the main working directory, there is no separate workspace to bring up or tear down,
+and no `gest project attach` / `gest project detach` calls are needed — the project identity of the main checkout is
+already shared across every dispatched task.
+
 ## Instructions
 
 ### 1. Read the Iteration

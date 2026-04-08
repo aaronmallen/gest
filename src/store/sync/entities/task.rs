@@ -6,7 +6,7 @@
 //! - Task notes are individual files at `task/notes/<note_id>.yaml`. Each
 //!   note carries an `entity_id` referencing its parent task.
 
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use chrono::{DateTime, Utc};
 use libsql::Connection;
@@ -98,6 +98,9 @@ pub async fn read_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
 
 /// Export every task and task note row to per-entity files.
 pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
+  let mut alive_tasks: HashSet<String> = HashSet::new();
+  let mut alive_notes: HashSet<String> = HashSet::new();
+
   // Tasks
   let mut rows = conn
     .query(
@@ -148,6 +151,7 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     };
     let path = paths::task_path(gest_dir, &id);
     yaml::write_cached(conn, project_id, gest_dir, &path, &file).await?;
+    alive_tasks.insert(id.to_string());
   }
 
   // Task notes
@@ -189,6 +193,31 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     };
     let path = paths::task_note_path(gest_dir, &id);
     yaml::write_cached(conn, project_id, gest_dir, &path, &file).await?;
+    alive_notes.insert(id.to_string());
+  }
+
+  // Clean up files for tasks/notes that no longer exist in SQLite. The notes
+  // directory is a child of the task directory, so prune notes first to avoid
+  // walking newly-deleted files when pruning tasks.
+  let task_dir = gest_dir.join(paths::TASK_DIR);
+  let notes_dir = task_dir.join(paths::NOTES_DIR);
+  yaml::cleanup_orphans(conn, project_id, gest_dir, &notes_dir, "yaml", &alive_notes).await?;
+  // Walk only direct children of task_dir, skipping the notes subdirectory.
+  for entry in std::fs::read_dir(&task_dir).into_iter().flatten().flatten() {
+    let path = entry.path();
+    if path.is_file() && path.extension().is_some_and(|ext| ext == "yaml") {
+      let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+      if !alive_tasks.contains(stem) {
+        let relative = paths::relative(gest_dir, &path).unwrap_or_default();
+        std::fs::remove_file(&path)?;
+        conn
+          .execute(
+            "DELETE FROM sync_digests WHERE relative_path = ?1 AND project_id = ?2",
+            [relative, project_id.to_string()],
+          )
+          .await?;
+      }
+    }
   }
 
   Ok(())

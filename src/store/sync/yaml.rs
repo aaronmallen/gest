@@ -9,10 +9,6 @@
 //! the adapters define: `yaml_serde` honors struct field declaration order,
 //! so listing fields in a fixed sequence is enough to keep diffs clean.
 
-// Phase 2 entity adapters consume these helpers; they're foundation scaffolding
-// until then.
-#![allow(dead_code)]
-
 use std::{
   fs,
   io::ErrorKind,
@@ -92,6 +88,44 @@ pub async fn write_cached<T: Serialize>(
   }
   fs::write(path, serialized.as_bytes())?;
   digest::record(conn, project_id, &relative, &new_digest).await?;
+  Ok(())
+}
+
+/// Remove every file under `dir` whose filename stem is not present in
+/// `alive_ids`, and drop the corresponding `sync_digests` cache entries.
+///
+/// Each per-entity adapter calls this at the end of its `write_all` to clean
+/// up files left over from deleted entities. Without it, the next `import`
+/// would re-insert rows that the user just deleted (because the file is
+/// still on disk).
+pub async fn cleanup_orphans(
+  conn: &Connection,
+  project_id: &Id,
+  gest_dir: &Path,
+  dir: &Path,
+  extension: &str,
+  alive_ids: &std::collections::HashSet<String>,
+) -> Result<(), Error> {
+  for path in walk_files(dir, extension)? {
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    if alive_ids.contains(stem) {
+      continue;
+    }
+    let relative = paths::relative(gest_dir, &path).ok_or_else(|| {
+      Error::Io(std::io::Error::other(format!(
+        "path {} is outside {}",
+        path.display(),
+        gest_dir.display()
+      )))
+    })?;
+    fs::remove_file(&path)?;
+    conn
+      .execute(
+        "DELETE FROM sync_digests WHERE relative_path = ?1 AND project_id = ?2",
+        [relative, project_id.to_string()],
+      )
+      .await?;
+  }
   Ok(())
 }
 

@@ -5,7 +5,7 @@
 //! rows) are embedded in their parent entity files per ADR-0016, not synced
 //! through this module.
 
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use chrono::{DateTime, Utc};
 use libsql::Connection;
@@ -52,6 +52,7 @@ pub async fn read_all(conn: &Connection, _project_id: &Id, gest_dir: &Path) -> R
 
 /// Export every tag row to `tag/<id>.yaml`.
 pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
+  let mut alive: HashSet<String> = HashSet::new();
   let mut rows = conn.query("SELECT id, label FROM tags ORDER BY id", ()).await?;
   while let Some(row) = rows.next().await? {
     let id_str: String = row.get(0)?;
@@ -67,7 +68,11 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     };
     let path = paths::tag_path(gest_dir, &id);
     yaml::write_cached(conn, project_id, gest_dir, &path, &file).await?;
+    alive.insert(id.to_string());
   }
+
+  let dir = gest_dir.join(paths::TAG_DIR);
+  yaml::cleanup_orphans(conn, project_id, gest_dir, &dir, "yaml", &alive).await?;
   Ok(())
 }
 

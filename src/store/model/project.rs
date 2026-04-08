@@ -30,6 +30,19 @@ impl Model {
     }
   }
 
+  /// Reconstruct a project from a synced `.gest/project.yaml` file.
+  ///
+  /// The id and timestamps come from the synced file (so collaborators share
+  /// a stable identity), while `root` is the local checkout path.
+  pub fn from_synced_parts(id: Id, root: PathBuf, created_at: DateTime<Utc>, updated_at: DateTime<Utc>) -> Self {
+    Self {
+      created_at,
+      id,
+      root,
+      updated_at,
+    }
+  }
+
   /// When this project was first created.
   pub fn created_at(&self) -> &DateTime<Utc> {
     &self.created_at

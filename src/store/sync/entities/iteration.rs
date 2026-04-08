@@ -5,7 +5,10 @@
 //!   iteration owns the phase ordering).
 //! - Iteration notes are individual files at `iteration/notes/<note_id>.yaml`.
 
-use std::{collections::BTreeMap, path::Path};
+use std::{
+  collections::{BTreeMap, HashSet},
+  path::Path,
+};
 
 use chrono::{DateTime, Utc};
 use libsql::Connection;
@@ -108,6 +111,9 @@ pub async fn read_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
 
 /// Export every iteration and iteration-note row to per-entity files.
 pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
+  let mut alive_iterations: HashSet<String> = HashSet::new();
+  let mut alive_notes: HashSet<String> = HashSet::new();
+
   let mut rows = conn
     .query(
       "SELECT id, completed_at, created_at, description, metadata, status, title, updated_at \
@@ -147,6 +153,7 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     };
     let path = paths::iteration_path(gest_dir, &id);
     yaml::write_cached(conn, project_id, gest_dir, &path, &file).await?;
+    alive_iterations.insert(id.to_string());
   }
 
   // Iteration notes
@@ -188,6 +195,28 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     };
     let path = paths::iteration_note_path(gest_dir, &id);
     yaml::write_cached(conn, project_id, gest_dir, &path, &file).await?;
+    alive_notes.insert(id.to_string());
+  }
+
+  // Clean up orphaned iteration and iteration-note files.
+  let iteration_dir = gest_dir.join(paths::ITERATION_DIR);
+  let notes_dir = iteration_dir.join(paths::NOTES_DIR);
+  yaml::cleanup_orphans(conn, project_id, gest_dir, &notes_dir, "yaml", &alive_notes).await?;
+  for entry in std::fs::read_dir(&iteration_dir).into_iter().flatten().flatten() {
+    let path = entry.path();
+    if path.is_file() && path.extension().is_some_and(|ext| ext == "yaml") {
+      let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+      if !alive_iterations.contains(stem) {
+        let relative = paths::relative(gest_dir, &path).unwrap_or_default();
+        std::fs::remove_file(&path)?;
+        conn
+          .execute(
+            "DELETE FROM sync_digests WHERE relative_path = ?1 AND project_id = ?2",
+            [relative, project_id.to_string()],
+          )
+          .await?;
+      }
+    }
   }
 
   Ok(())

@@ -12,10 +12,6 @@
 //! attach a `deleted_at` field to an existing payload type without writing a
 //! new wrapper struct by hand.
 
-// Phase 2 entity adapters consume these primitives; they're foundation
-// scaffolding until then.
-#![allow(dead_code)]
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

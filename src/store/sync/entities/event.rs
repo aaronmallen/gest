@@ -13,7 +13,7 @@
 //! carry a `semantic_type` (the audit-log subset) and only the audit-log
 //! columns. The `transaction_id` and `before_data` columns stay local.
 
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use chrono::{DateTime, Utc};
 use libsql::Connection;
@@ -54,17 +54,17 @@ pub async fn read_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
     return Ok(());
   }
 
-  // Create one synthetic transaction to anchor all imported events.
+  // Create one synthetic transaction to anchor all imported events. Mark it
+  // already-undone so it does not appear in the "latest undoable transaction"
+  // query — collaborators' synced events are not part of the local user's
+  // undo history.
   let synthetic_tx = Id::new();
+  let now = Utc::now().to_rfc3339();
   conn
     .execute(
-      "INSERT INTO transactions (id, project_id, command, created_at) \
-        VALUES (?1, ?2, 'sync import', ?3)",
-      [
-        synthetic_tx.to_string(),
-        project_id.to_string(),
-        Utc::now().to_rfc3339(),
-      ],
+      "INSERT INTO transactions (id, project_id, command, created_at, undone_at) \
+        VALUES (?1, ?2, 'sync import', ?3, ?3)",
+      [synthetic_tx.to_string(), project_id.to_string(), now],
     )
     .await?;
 
@@ -114,6 +114,7 @@ pub async fn read_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
 
 /// Export the audit-log subset of `transaction_events` to per-event YAML files.
 pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
+  let mut alive: HashSet<String> = HashSet::new();
   let mut rows = conn
     .query(
       "SELECT te.id, te.table_name, te.row_id, te.event_type, te.semantic_type, te.old_value, te.new_value, te.created_at \
@@ -154,7 +155,11 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     };
     let path = paths::event_path(gest_dir, &id, &created_at);
     yaml::write_cached(conn, project_id, gest_dir, &path, &file).await?;
+    alive.insert(id.to_string());
   }
+
+  let dir = gest_dir.join(paths::EVENT_DIR);
+  yaml::cleanup_orphans(conn, project_id, gest_dir, &dir, "yaml", &alive).await?;
   Ok(())
 }
 

@@ -5,7 +5,7 @@
 //! so a fresh checkout can resolve every author referenced by tasks, notes,
 //! and events.
 
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use chrono::{DateTime, Utc};
 use libsql::Connection;
@@ -50,6 +50,7 @@ pub async fn read_all(conn: &Connection, _project_id: &Id, gest_dir: &Path) -> R
 
 /// Export every author row to `author/<id>.yaml`.
 pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
+  let mut alive: HashSet<String> = HashSet::new();
   let mut rows = conn
     .query(
       "SELECT id, name, email, author_type, created_at FROM authors ORDER BY id",
@@ -83,7 +84,11 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     };
     let path = paths::author_path(gest_dir, &id);
     yaml::write_cached(conn, project_id, gest_dir, &path, &file).await?;
+    alive.insert(id.to_string());
   }
+
+  let dir = gest_dir.join(paths::AUTHOR_DIR);
+  yaml::cleanup_orphans(conn, project_id, gest_dir, &dir, "yaml", &alive).await?;
   Ok(())
 }
 

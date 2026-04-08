@@ -7,7 +7,7 @@
 //! Per ADR-0016 §5 the legacy `artifacts/index.json` aggregate is dropped —
 //! its data folds into per-artifact frontmatter.
 
-use std::{fs, path::Path};
+use std::{collections::HashSet, fs, path::Path};
 
 use chrono::{DateTime, Utc};
 use libsql::Connection;
@@ -91,6 +91,9 @@ pub async fn read_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
 
 /// Export every artifact and artifact note row to per-entity files.
 pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
+  let mut alive_artifacts: HashSet<String> = HashSet::new();
+  let mut alive_notes: HashSet<String> = HashSet::new();
+
   let mut rows = conn
     .query(
       "SELECT id, archived_at, body, created_at, metadata, title, updated_at \
@@ -126,6 +129,7 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     let serialized = compose_artifact_file(&front, &body)?;
     let path = paths::artifact_path(gest_dir, &id);
     write_artifact_file(conn, project_id, gest_dir, &path, &serialized).await?;
+    alive_artifacts.insert(id.to_string());
   }
 
   // Artifact notes
@@ -167,6 +171,28 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     };
     let path = paths::artifact_note_path(gest_dir, &id);
     yaml::write_cached(conn, project_id, gest_dir, &path, &file).await?;
+    alive_notes.insert(id.to_string());
+  }
+
+  // Clean up orphaned artifact and artifact-note files.
+  let artifact_dir = gest_dir.join(paths::ARTIFACT_DIR);
+  let notes_dir = artifact_dir.join(paths::NOTES_DIR);
+  yaml::cleanup_orphans(conn, project_id, gest_dir, &notes_dir, "yaml", &alive_notes).await?;
+  for entry in std::fs::read_dir(&artifact_dir).into_iter().flatten().flatten() {
+    let path = entry.path();
+    if path.is_file() && path.extension().is_some_and(|ext| ext == "md") {
+      let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+      if !alive_artifacts.contains(stem) {
+        let relative = paths::relative(gest_dir, &path).unwrap_or_default();
+        std::fs::remove_file(&path)?;
+        conn
+          .execute(
+            "DELETE FROM sync_digests WHERE relative_path = ?1 AND project_id = ?2",
+            [relative, project_id.to_string()],
+          )
+          .await?;
+      }
+    }
   }
 
   Ok(())

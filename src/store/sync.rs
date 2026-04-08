@@ -1,18 +1,15 @@
 //! Local sync mirror for `.gest/` directories.
 //!
 //! When a project is in local mode (has a `.gest/` directory), this module
-//! handles bidirectional sync between SQLite and per-entity YAML/markdown
-//! files. The legacy shared-file reader/writer remain in place during the
-//! transition; the new per-entity orchestrator under [`orchestrator`] will
-//! replace them once all entity adapters are wired up (see ADR-0016).
+//! handles bidirectional sync between SQLite and the per-entity YAML/markdown
+//! files described in ADR-0016. The orchestrator under [`orchestrator`] walks
+//! every entity adapter under [`entities`] in dependency order.
 
 mod digest;
 mod entities;
 mod orchestrator;
 pub mod paths;
-mod reader;
 mod tombstone;
-mod writer;
 pub mod yaml;
 
 use std::{
@@ -36,7 +33,7 @@ pub enum Error {
   /// A model conversion error.
   #[error(transparent)]
   Model(#[from] crate::store::model::Error),
-  /// A JSON serialization error (used by the legacy shared-file sync).
+  /// A JSON serialization error (used by metadata blobs that remain JSON).
   #[error(transparent)]
   Serialization(#[from] serde_json::Error),
   /// A YAML serialization or deserialization error.
@@ -44,20 +41,14 @@ pub enum Error {
   Yaml(#[from] yaml_serde::Error),
 }
 
-/// Sync state from the filesystem into the database.
-///
-/// Reads JSON files from `.gest/` and imports any that are newer than
-/// their corresponding database rows.
+/// Sync state from `.gest/` into the database.
 pub async fn import(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
-  reader::import_all(conn, project_id, gest_dir).await
+  orchestrator::import_all(conn, project_id, gest_dir).await
 }
 
-/// Sync state from the database out to the filesystem.
-///
-/// Writes JSON files and artifact markdown to `.gest/`, updating
-/// the sync_digests table to track what was written.
+/// Sync state from the database out to `.gest/`.
 pub async fn export(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
-  writer::export_all(conn, project_id, gest_dir).await
+  orchestrator::export_all(conn, project_id, gest_dir).await
 }
 
 /// Perform a full bidirectional sync for a project in local mode.

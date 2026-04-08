@@ -4,7 +4,7 @@
 //! own file at `relationship/<id>.yaml` so that adding or removing a
 //! relationship touches no other file (per ADR-0016 §3 — "per-edge files").
 
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use chrono::{DateTime, Utc};
 use libsql::Connection;
@@ -68,16 +68,17 @@ pub async fn read_all(conn: &Connection, _project_id: &Id, gest_dir: &Path) -> R
 /// whose source or target is a known entity in this project. Two collaborators
 /// adding edges to the same project produce different files and merge cleanly.
 pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
+  let mut alive: HashSet<String> = HashSet::new();
   let mut rows = conn
     .query(
       "SELECT DISTINCT r.id, r.rel_type, r.source_id, r.source_type, r.target_id, r.target_type \
         FROM relationships r \
         WHERE r.source_id IN (SELECT id FROM tasks WHERE project_id = ?1) \
-           OR r.source_id IN (SELECT id FROM artifacts WHERE project_id = ?1) \
-           OR r.source_id IN (SELECT id FROM iterations WHERE project_id = ?1) \
-           OR r.target_id IN (SELECT id FROM tasks WHERE project_id = ?1) \
-           OR r.target_id IN (SELECT id FROM artifacts WHERE project_id = ?1) \
-           OR r.target_id IN (SELECT id FROM iterations WHERE project_id = ?1) \
+          OR r.source_id IN (SELECT id FROM artifacts WHERE project_id = ?1) \
+          OR r.source_id IN (SELECT id FROM iterations WHERE project_id = ?1) \
+          OR r.target_id IN (SELECT id FROM tasks WHERE project_id = ?1) \
+          OR r.target_id IN (SELECT id FROM artifacts WHERE project_id = ?1) \
+          OR r.target_id IN (SELECT id FROM iterations WHERE project_id = ?1) \
         ORDER BY r.id",
       [project_id.to_string()],
     )
@@ -111,7 +112,11 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     };
     let path = paths::relationship_path(gest_dir, &id);
     yaml::write_cached(conn, project_id, gest_dir, &path, &file).await?;
+    alive.insert(id.to_string());
   }
+
+  let dir = gest_dir.join(paths::RELATIONSHIP_DIR);
+  yaml::cleanup_orphans(conn, project_id, gest_dir, &dir, "yaml", &alive).await?;
   Ok(())
 }
 

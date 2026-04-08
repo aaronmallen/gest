@@ -8,10 +8,6 @@
 //! The corresponding repo-relative path (suitable for the `sync_digests` cache
 //! key) is produced by [`relative`], which strips the `gest_dir` prefix.
 
-// Phase 2 entity adapters consume these helpers; they're foundation scaffolding
-// until then.
-#![allow(dead_code)]
-
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Datelike, Utc};

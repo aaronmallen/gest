@@ -19,9 +19,9 @@ pub enum Error {
   /// A row could not be converted into a domain model.
   #[error(transparent)]
   Model(#[from] ModelError),
-  /// A serialization error occurred.
+  /// A YAML serialization error occurred.
   #[error(transparent)]
-  Serialization(#[from] serde_json::Error),
+  Yaml(#[from] yaml_serde::Error),
 }
 
 /// Return all projects ordered by creation time (newest first).
@@ -67,19 +67,21 @@ pub async fn attach_workspace(
 
 /// Create a new project for the given root path.
 ///
-/// If a `.gest/project.json` already exists at the root or any ancestor
-/// directory, the project is read from that file and inserted into the
-/// database. Otherwise a fresh project is generated and, when a `.gest`
-/// directory exists, written back to `project.json`.
+/// If a `.gest/project.yaml` already exists at the root or any ancestor
+/// directory, the project's stable id is read from that file (so collaborators
+/// share the same id) and a row is inserted with the local checkout's path.
+/// Otherwise a fresh project id is generated and `.gest/project.yaml` is
+/// written when a `.gest` directory exists.
 pub async fn create(conn: &Connection, root: impl Into<PathBuf>) -> Result<Project, Error> {
   log::debug!("repo::project::create");
   let root = root.into();
   let gest_dir = find_gest_dir(&root);
 
-  let project = match gest_dir.as_ref().map(|d| d.join("project.json")) {
+  let project = match gest_dir.as_ref().map(|d| d.join("project.yaml")) {
     Some(path) if path.is_file() => {
       let contents = std::fs::read_to_string(&path)?;
-      serde_json::from_str::<Project>(&contents)?
+      let stored: ProjectFile = yaml_serde::from_str(&contents)?;
+      Project::from_synced_parts(stored.id, root.clone(), stored.created_at, stored.updated_at)
     }
     _ => Project::new(root),
   };
@@ -101,11 +103,25 @@ pub async fn create(conn: &Connection, root: impl Into<PathBuf>) -> Result<Proje
     .ok_or_else(|| Error::Model(ModelError::InvalidValue("project not found after insert".into())))?;
 
   if let Some(gest_dir) = gest_dir {
-    let json = serde_json::to_string_pretty(&created)?;
-    std::fs::write(gest_dir.join("project.json"), json)?;
+    let stored = ProjectFile {
+      id: created.id().clone(),
+      created_at: *created.created_at(),
+      updated_at: *created.updated_at(),
+    };
+    let yaml = yaml_serde::to_string(&stored)?;
+    std::fs::write(gest_dir.join("project.yaml"), yaml)?;
   }
 
   Ok(created)
+}
+
+/// On-disk shape of `.gest/project.yaml`. Only fields that should travel with
+/// the repository are persisted; the local checkout `root` lives in SQLite.
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+struct ProjectFile {
+  id: Id,
+  created_at: chrono::DateTime<chrono::Utc>,
+  updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// Detach the workspace for the given path, removing it from its project.
@@ -243,7 +259,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn it_writes_project_json_when_gest_dir_exists() {
+    async fn it_writes_project_yaml_when_gest_dir_exists() {
       let tmp = tempfile::tempdir().unwrap();
       let root = tmp.path().to_path_buf();
       std::fs::create_dir_all(root.join(".gest")).unwrap();
@@ -251,16 +267,15 @@ mod tests {
       let (_store, conn, _tmp) = setup().await;
       let created = create(&conn, &root).await.unwrap();
 
-      let json_path = root.join(".gest/project.json");
-      assert!(json_path.exists());
+      let yaml_path = root.join(".gest/project.yaml");
+      assert!(yaml_path.exists());
 
-      let contents = std::fs::read_to_string(&json_path).unwrap();
-      let deserialized: Project = serde_json::from_str(&contents).unwrap();
-      assert_eq!(&deserialized, &created);
+      let contents = std::fs::read_to_string(&yaml_path).unwrap();
+      assert!(contents.contains(&format!("id: {}", created.id())));
     }
 
     #[tokio::test]
-    async fn it_writes_project_json_when_gest_dir_in_ancestor() {
+    async fn it_writes_project_yaml_when_gest_dir_in_ancestor() {
       let tmp = tempfile::tempdir().unwrap();
       let ancestor = tmp.path().to_path_buf();
       std::fs::create_dir_all(ancestor.join(".gest")).unwrap();
@@ -270,19 +285,24 @@ mod tests {
       let (_store, conn, _tmp) = setup().await;
       create(&conn, &child).await.unwrap();
 
-      let json_path = ancestor.join(".gest/project.json");
-      assert!(json_path.exists());
+      let yaml_path = ancestor.join(".gest/project.yaml");
+      assert!(yaml_path.exists());
     }
 
     #[tokio::test]
-    async fn it_reads_from_file_when_project_json_exists() {
+    async fn it_reads_id_from_file_when_project_yaml_exists() {
       let tmp = tempfile::tempdir().unwrap();
       let root = tmp.path().to_path_buf();
       std::fs::create_dir_all(root.join(".gest")).unwrap();
 
       let existing = Project::new(root.clone());
-      let json = serde_json::to_string_pretty(&existing).unwrap();
-      std::fs::write(root.join(".gest/project.json"), json).unwrap();
+      let stored = ProjectFile {
+        id: existing.id().clone(),
+        created_at: *existing.created_at(),
+        updated_at: *existing.updated_at(),
+      };
+      let yaml = yaml_serde::to_string(&stored).unwrap();
+      std::fs::write(root.join(".gest/project.yaml"), yaml).unwrap();
 
       let (_store, conn, _tmp) = setup().await;
       let created = create(&conn, &root).await.unwrap();
@@ -292,14 +312,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn it_does_not_write_json_when_no_gest_dir() {
+    async fn it_does_not_write_yaml_when_no_gest_dir() {
       let tmp = tempfile::tempdir().unwrap();
       let root = tmp.path().to_path_buf();
 
       let (_store, conn, _tmp) = setup().await;
       create(&conn, &root).await.unwrap();
 
-      assert!(!root.join(".gest/project.json").exists());
+      assert!(!root.join(".gest/project.yaml").exists());
     }
   }
 

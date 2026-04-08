@@ -8,12 +8,16 @@ use super::{Error, primitives::Id};
 /// A deduplicated label that can be attached to any entity.
 #[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  /// When the tag was first inserted.
   #[get = "pub"]
   created_at: DateTime<Utc>,
+  /// Stable identifier assigned at creation.
   #[get = "pub"]
   id: Id,
+  /// Unique case-sensitive label text.
   #[get = "pub"]
   label: String,
+  /// When the tag row was last modified.
   #[get = "pub"]
   updated_at: DateTime<Utc>,
 }

@@ -11,16 +11,22 @@ use super::{
 /// An author who can create notes, events, and other actions.
 #[derive(Clone, CopyGetters, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  /// Whether the author is a human or an automated agent.
   #[getset(get_copy = "pub")]
   author_type: AuthorType,
+  /// When the author was first recorded.
   #[get = "pub"]
   created_at: DateTime<Utc>,
+  /// Optional contact email address.
   #[get = "pub"]
   email: Option<String>,
+  /// Stable identifier assigned at creation.
   #[get = "pub"]
   id: Id,
+  /// Display name.
   #[get = "pub"]
   name: String,
+  /// When the author record was last modified.
   #[get = "pub"]
   updated_at: DateTime<Utc>,
 }

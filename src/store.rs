@@ -1,10 +1,22 @@
+//! SQLite-backed store: connection management, migrations, models, and repos.
+//!
+//! The store opens a per-user libsql database (local file or remote URL),
+//! runs schema migrations at startup, and exposes [`repo`] helpers that
+//! translate between domain [`model`]s and database rows. When a project has
+//! been resolved, [`Db::configure_sync`] wires in transparent import/export
+//! against the project's `.gest/` directory.
+
 /// JSON metadata helpers shared by all `meta` subcommands.
 pub mod meta;
 /// Sequential schema migrations applied at startup.
 pub mod migration;
+/// Domain model types persisted by the store.
 pub mod model;
+/// Repository helpers that read and write domain models.
 pub mod repo;
+/// Parsed representation of search query strings.
 pub mod search_query;
+/// Import and export between the database and a project's `.gest/` directory.
 pub mod sync;
 
 use std::{
@@ -89,10 +101,13 @@ impl Db {
 /// Errors that can occur when opening the database store.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+  /// A configuration value (such as the resolved data directory) could not be read.
   #[error(transparent)]
   Config(#[from] crate::config::Error),
+  /// The underlying libsql driver returned an error.
   #[error(transparent)]
   Database(#[from] DbError),
+  /// Creating or accessing the on-disk database file failed.
   #[error(transparent)]
   Io(#[from] IoError),
 }

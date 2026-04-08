@@ -1,5 +1,8 @@
+//! `entity_tags` join table associating tags with arbitrary entity types.
+
 use super::Migration;
 
+/// Creates the `entity_tags` join table and an index on `tag_id`.
 pub const MIGRATION: Migration = Migration {
   name: "create_entity_tags",
   sql: "

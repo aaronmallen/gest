@@ -13,12 +13,16 @@ use super::{Error, primitives::Id};
 /// is assigned a stable [`Id`] at creation time.
 #[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  /// When the project was first registered.
   #[get = "pub"]
   created_at: DateTime<Utc>,
+  /// Stable identifier shared with collaborators via synced `.gest/project.yaml`.
   #[get = "pub"]
   id: Id,
+  /// Absolute path to the local checkout root.
   #[get = "pub"]
   root: PathBuf,
+  /// When the project record was last modified.
   #[get = "pub"]
   updated_at: DateTime<Utc>,
 }

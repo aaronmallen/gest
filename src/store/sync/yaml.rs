@@ -21,11 +21,11 @@ use serde::{Serialize, de::DeserializeOwned};
 use super::{Error, digest, paths};
 use crate::store::model::primitives::Id;
 
-/// Read and YAML-deserialize a file into `T`.
+/// Read and YAML-deserialize a file into `T`, returning `Ok(None)` if absent.
 ///
-/// Returns `Ok(None)` if the file does not exist; any other I/O or parse error
-/// is propagated. Adapters use this to walk a directory and skip vanished
-/// files without paying special attention to race conditions.
+/// Any other I/O or parse error is propagated. Adapters use this to walk a
+/// directory and skip vanished files without paying special attention to race
+/// conditions.
 pub fn read<T: DeserializeOwned>(path: &Path) -> Result<Option<T>, Error> {
   let content = match fs::read_to_string(path) {
     Ok(content) => content,
@@ -36,9 +36,7 @@ pub fn read<T: DeserializeOwned>(path: &Path) -> Result<Option<T>, Error> {
   Ok(Some(value))
 }
 
-/// Serialize `value` to YAML and write it to `path`.
-///
-/// Serialize `value` and write it to `path`, ensuring a single trailing newline.
+/// Serialize `value` to YAML and write it to `path` with a trailing newline.
 ///
 /// Used by tests; production code uses [`write_cached`] which also updates the
 /// `sync_digests` cache.

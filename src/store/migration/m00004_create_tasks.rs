@@ -1,5 +1,8 @@
+//! `tasks` table representing work items tracked within a project.
+
 use super::Migration;
 
+/// Creates the `tasks` table along with indexes on project and status.
 pub const MIGRATION: Migration = Migration {
   name: "create_tasks",
   sql: "

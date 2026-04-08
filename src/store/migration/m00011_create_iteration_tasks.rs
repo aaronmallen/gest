@@ -1,5 +1,8 @@
+//! `iteration_tasks` join table assigning tasks to iteration phases.
+
 use super::Migration;
 
+/// Creates the `iteration_tasks` join table with an index on `task_id`.
 pub const MIGRATION: Migration = Migration {
   name: "create_iteration_tasks",
   sql: "

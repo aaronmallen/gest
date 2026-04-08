@@ -10,9 +10,12 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "lowercase")]
 #[derive(Default)]
 pub enum Primitive {
+  /// In-progress iteration accepting work (the default).
   #[default]
   Active,
+  /// Terminal: iteration was abandoned before completion.
   Cancelled,
+  /// Terminal: iteration finished successfully.
   Completed,
 }
 

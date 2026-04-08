@@ -1,5 +1,8 @@
+//! `iterations` table grouping tasks into time-boxed units of work.
+
 use super::Migration;
 
+/// Creates the `iterations` table with indexes on project and status.
 pub const MIGRATION: Migration = Migration {
   name: "create_iterations",
   sql: "

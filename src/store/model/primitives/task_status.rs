@@ -10,9 +10,13 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "lowercase")]
 #[derive(Default)]
 pub enum Primitive {
+  /// Terminal: task was abandoned before completion.
   Cancelled,
+  /// Terminal: task was completed successfully.
   Done,
+  /// Actively being worked on.
   InProgress,
+  /// Ready to be picked up (the default).
   #[default]
   Open,
 }

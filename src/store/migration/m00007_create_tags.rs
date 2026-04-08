@@ -1,5 +1,8 @@
+//! `tags` table holding the global set of labels applied to entities.
+
 use super::Migration;
 
+/// Creates the `tags` table keyed by a unique `label`.
 pub const MIGRATION: Migration = Migration {
   name: "create_tags",
   sql: "

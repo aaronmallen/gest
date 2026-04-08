@@ -1,11 +1,8 @@
 //! Per-entity sync adapter for artifacts and their notes.
 //!
 //! - Artifact bodies live at `artifact/<id>.md` as markdown with YAML
-//!   frontmatter holding title, tags, timestamps, and tombstone.
+//!   frontmatter holding title, tags, timestamps, and tombstone (ADR-0016 §5).
 //! - Artifact notes are individual files at `artifact/notes/<note_id>.yaml`.
-//!
-//! Per ADR-0016 §5 the legacy `artifacts/index.json` aggregate is dropped —
-//! its data folds into per-artifact frontmatter.
 
 use std::{collections::HashSet, fs, path::Path};
 

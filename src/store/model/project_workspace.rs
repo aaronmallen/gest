@@ -14,14 +14,19 @@ use super::{Error, primitives::Id};
 /// and is uniquely constrained on the `(path, project_id)` pair.
 #[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  /// When the workspace was first registered.
   #[get = "pub"]
   created_at: DateTime<Utc>,
+  /// Stable identifier assigned at creation.
   #[get = "pub"]
   id: Id,
+  /// Absolute path to the workspace directory.
   #[get = "pub"]
   path: PathBuf,
+  /// Project this workspace belongs to.
   #[get = "pub"]
   project_id: Id,
+  /// When the workspace record was last modified.
   #[get = "pub"]
   updated_at: DateTime<Utc>,
 }

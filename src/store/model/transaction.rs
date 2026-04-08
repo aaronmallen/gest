@@ -9,16 +9,22 @@ use super::{Error, primitives::Id};
 /// A recorded command execution for undo support.
 #[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  /// Author who ran the command, if known.
   #[get = "pub"]
   author_id: Option<Id>,
+  /// Rendered command line as executed.
   #[get = "pub"]
   command: String,
+  /// When the transaction was recorded.
   #[get = "pub"]
   created_at: DateTime<Utc>,
+  /// Stable identifier assigned at creation.
   #[get = "pub"]
   id: Id,
+  /// Project the command ran against.
   #[get = "pub"]
   project_id: Id,
+  /// When the transaction was undone, or `None` if still in effect.
   #[get = "pub"]
   undone_at: Option<DateTime<Utc>>,
 }
@@ -69,24 +75,34 @@ impl TryFrom<Row> for Model {
 /// A single change recorded within a transaction for undo replay.
 #[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Event {
+  /// Full JSON snapshot of the affected row before the change, when captured.
   #[get = "pub"]
   before_data: Option<Value>,
+  /// When the event was recorded.
   #[get = "pub"]
   created_at: DateTime<Utc>,
+  /// Kind of change (e.g. `insert`, `update`, `delete`).
   #[get = "pub"]
   event_type: String,
+  /// Stable identifier assigned at creation.
   #[get = "pub"]
   id: Id,
+  /// Serialized post-change value for single-field updates, when applicable.
   #[get = "pub"]
   new_value: Option<String>,
+  /// Serialized pre-change value for single-field updates, when applicable.
   #[get = "pub"]
   old_value: Option<String>,
+  /// Primary key of the affected row.
   #[get = "pub"]
   row_id: String,
+  /// Optional domain-level column name the change targets.
   #[get = "pub"]
   semantic_type: Option<String>,
+  /// Name of the affected table.
   #[get = "pub"]
   table_name: String,
+  /// Transaction this event belongs to.
   #[get = "pub"]
   transaction_id: Id,
 }

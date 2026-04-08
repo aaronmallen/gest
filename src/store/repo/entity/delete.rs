@@ -39,9 +39,13 @@ pub enum Error {
 /// Per-table counts of rows removed by a [`delete_with_cascade`] call.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct DeleteReport {
+  /// Number of `iteration_tasks` join rows removed.
   pub iteration_tasks: usize,
+  /// Number of attached notes removed.
   pub notes: usize,
+  /// Number of relationships (in either direction) removed.
   pub relationships: usize,
+  /// Number of `entity_tags` attachments removed.
   pub tags: usize,
 }
 

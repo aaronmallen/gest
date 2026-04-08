@@ -1,5 +1,8 @@
+//! `transaction_events` table capturing individual row changes per transaction.
+
 use crate::store::migration::Migration;
 
+/// Creates the `transaction_events` table with an index on `transaction_id`.
 pub const MIGRATION: Migration = Migration {
   name: "create_transaction_events",
   sql: "

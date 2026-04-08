@@ -1,5 +1,8 @@
+//! `notes` table recording free-form comments attached to any entity.
+
 use super::Migration;
 
+/// Creates the `notes` table with an index on `(entity_type, entity_id)`.
 pub const MIGRATION: Migration = Migration {
   name: "create_notes",
   sql: "

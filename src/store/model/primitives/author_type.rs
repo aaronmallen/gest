@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "lowercase")]
 #[derive(Default)]
 pub enum Primitive {
+  /// An automated agent such as an LLM or CI bot.
   Agent,
+  /// A human author (the default).
   #[default]
   Human,
 }

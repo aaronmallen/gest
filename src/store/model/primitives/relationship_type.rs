@@ -9,10 +9,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Primitive {
+  /// Source cannot progress until the target is resolved.
   BlockedBy,
+  /// Source prevents the target from progressing.
   Blocks,
+  /// Source is a child of the target in a parent/child hierarchy.
   ChildOf,
+  /// Source is a parent of the target in a parent/child hierarchy.
   ParentOf,
+  /// Symmetric, loose association between source and target.
   RelatesTo,
 }
 

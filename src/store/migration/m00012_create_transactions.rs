@@ -1,5 +1,8 @@
+//! `transactions` table recording user-facing commands for undo history.
+
 use super::Migration;
 
+/// Creates the `transactions` table with an index on `project_id`.
 pub const MIGRATION: Migration = Migration {
   name: "create_transactions",
   sql: "

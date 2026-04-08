@@ -1,3 +1,10 @@
+//! Domain model types persisted by the store.
+//!
+//! Each submodule defines a `Model` struct mirroring one database table,
+//! together with `New`/`Patch`/`Filter` helper structs where applicable.
+//! `TryFrom<Row>` implementations decode libsql rows into models; conversion
+//! errors surface through [`Error`].
+
 pub(crate) mod artifact;
 pub(crate) mod author;
 pub(crate) mod entity_tag;

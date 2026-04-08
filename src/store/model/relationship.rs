@@ -11,20 +11,28 @@ use super::{
 /// A directed relationship between two entities.
 #[derive(Clone, CopyGetters, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  /// When the relationship was first recorded.
   #[get = "pub"]
   created_at: DateTime<Utc>,
+  /// Stable identifier assigned at creation.
   #[get = "pub"]
   id: Id,
+  /// Semantic kind of relationship (e.g. blocks, parent-of).
   #[getset(get_copy = "pub")]
   rel_type: RelationshipType,
+  /// Identifier of the source (from-side) entity.
   #[get = "pub"]
   source_id: Id,
+  /// Which domain type [`source_id`](Model::source_id) refers to.
   #[getset(get_copy = "pub")]
   source_type: EntityType,
+  /// Identifier of the target (to-side) entity.
   #[get = "pub"]
   target_id: Id,
+  /// Which domain type [`target_id`](Model::target_id) refers to.
   #[getset(get_copy = "pub")]
   target_type: EntityType,
+  /// When the relationship row was last modified.
   #[get = "pub"]
   updated_at: DateTime<Utc>,
 }

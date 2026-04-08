@@ -1,5 +1,8 @@
+//! `authors` table for humans and agents referenced by other records.
+
 use super::Migration;
 
+/// Creates the `authors` table with a unique index on `(name, email)`.
 pub const MIGRATION: Migration = Migration {
   name: "create_authors",
   sql: "

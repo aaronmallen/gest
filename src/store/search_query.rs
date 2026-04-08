@@ -16,16 +16,22 @@ const KNOWN_PREFIXES: &[&str] = &["is", "status", "tag"];
 /// A single filter extracted from the query.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Filter {
+  /// Matches entities whose type equals the given lowercase name (e.g. `task`).
   Is(String),
+  /// Matches entities whose status equals the given lowercase name.
   Status(String),
+  /// Matches entities carrying the given lowercase tag label.
   Tag(String),
 }
 
 /// The result of parsing a search query string.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ParsedQuery {
+  /// Negated filters (prefixed with `-`) that must not match.
   pub exclude: Vec<Filter>,
+  /// Filters that must match; same-type filters OR-combine, different-type AND-combine.
   pub include: Vec<Filter>,
+  /// Free-text tokens to match against entity content.
   pub text: Vec<String>,
 }
 

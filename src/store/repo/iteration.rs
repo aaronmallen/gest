@@ -30,18 +30,27 @@ const SELECT_COLUMNS: &str = "\
 
 /// A task's summary info within an iteration context.
 pub struct IterationTaskRow {
+  /// Truncated task id suitable for display.
   pub id_short: String,
+  /// Phase number within the iteration.
   pub phase: u32,
+  /// Task status string as stored in the database.
   pub status: String,
+  /// Task title.
   pub title: String,
 }
 
 /// Status counts for tasks in an iteration.
 pub struct StatusCounts {
+  /// Number of tasks in the `cancelled` state.
   pub cancelled: i64,
+  /// Number of tasks in the `done` state.
   pub done: i64,
+  /// Number of tasks in the `in-progress` state.
   pub in_progress: i64,
+  /// Number of tasks in the `open` state.
   pub open: i64,
+  /// Total number of tasks across all states.
   pub total: i64,
 }
 

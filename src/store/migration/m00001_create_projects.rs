@@ -1,3 +1,5 @@
+//! Initial `projects` table recording each known project root.
+
 use super::Migration;
 
 /// Creates the `projects` table for tracking project root directories.

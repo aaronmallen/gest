@@ -1,5 +1,8 @@
+//! `relationships` table linking entities via typed directed edges.
+
 use super::Migration;
 
+/// Creates the `relationships` table with source, target, and uniqueness indexes.
 pub const MIGRATION: Migration = Migration {
   name: "create_relationships",
   sql: "

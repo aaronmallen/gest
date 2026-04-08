@@ -212,13 +212,21 @@ pub async fn record_semantic_event(
 /// transaction's author and creation timestamp.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticEvent {
+  /// Author of the parent transaction, if any.
   pub author_id: Option<Id>,
+  /// When the event was recorded.
   pub created_at: chrono::DateTime<Utc>,
+  /// Unique identifier of the event row.
   pub id: Id,
+  /// Post-change value, when applicable.
   pub new_value: Option<String>,
+  /// Pre-change value, when applicable.
   pub old_value: Option<String>,
+  /// Primary key of the row the event refers to.
   pub row_id: String,
+  /// User-facing activity kind (e.g. `created`, `status-change`).
   pub semantic_type: String,
+  /// Name of the table the row belongs to.
   pub table_name: String,
 }
 

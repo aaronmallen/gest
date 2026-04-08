@@ -9,21 +9,29 @@ use super::{Error, primitives::Id};
 /// A persistent document (spec, ADR, design doc, etc.) within a project.
 #[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  /// When the artifact was archived, or `None` if still active.
   #[get = "pub"]
   archived_at: Option<DateTime<Utc>>,
+  /// Markdown body; skipped during serialization because it is stored and synced separately.
   #[serde(skip)]
   #[get = "pub"]
   body: String,
+  /// When the artifact was first inserted.
   #[get = "pub"]
   created_at: DateTime<Utc>,
+  /// Stable identifier assigned at creation.
   #[get = "pub"]
   id: Id,
+  /// Free-form JSON object for user-defined metadata.
   #[get = "pub"]
   metadata: Value,
+  /// Project this artifact belongs to.
   #[get = "pub"]
   project_id: Id,
+  /// Short human-readable title.
   #[get = "pub"]
   title: String,
+  /// When the artifact was last modified.
   #[get = "pub"]
   updated_at: DateTime<Utc>,
 }
@@ -85,23 +93,32 @@ impl TryFrom<Row> for Model {
 /// Parameters for creating a new artifact.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct New {
+  /// Markdown body content.
   pub body: String,
+  /// Optional user-defined metadata merged into the new row.
   pub metadata: Option<Value>,
+  /// Short human-readable title.
   pub title: String,
 }
 
 /// Optional fields for updating an existing artifact.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Patch {
+  /// Replacement markdown body.
   pub body: Option<String>,
+  /// Replacement metadata object; overwrites the stored value when set.
   pub metadata: Option<Value>,
+  /// Replacement title.
   pub title: Option<String>,
 }
 
 /// Criteria for filtering artifacts.
 #[derive(Clone, Debug, Default)]
 pub struct Filter {
+  /// Include archived artifacts alongside active ones.
   pub all: bool,
+  /// Restrict results to archived artifacts only.
   pub only_archived: bool,
+  /// Restrict to artifacts carrying this tag label.
   pub tag: Option<String>,
 }

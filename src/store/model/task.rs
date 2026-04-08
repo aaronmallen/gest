@@ -12,26 +12,37 @@ use super::{
 /// A unit of work within a project.
 #[derive(Clone, CopyGetters, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  /// Author the task is assigned to, if any.
   #[get = "pub"]
   assigned_to: Option<Id>,
+  /// When the task was first created.
   #[get = "pub"]
   created_at: DateTime<Utc>,
+  /// Longer-form description of the work required.
   #[get = "pub"]
   description: String,
+  /// Stable identifier assigned at creation.
   #[get = "pub"]
   id: Id,
+  /// Free-form JSON object for user-defined metadata.
   #[get = "pub"]
   metadata: Value,
+  /// Optional priority score; lower numbers rank first.
   #[getset(get_copy = "pub")]
   priority: Option<u8>,
+  /// Project this task belongs to.
   #[get = "pub"]
   project_id: Id,
+  /// When the task entered a terminal status, or `None` if still open.
   #[get = "pub"]
   resolved_at: Option<DateTime<Utc>>,
+  /// Current lifecycle status.
   #[getset(get_copy = "pub")]
   status: TaskStatus,
+  /// Short human-readable title.
   #[get = "pub"]
   title: String,
+  /// When the task was last modified.
   #[get = "pub"]
   updated_at: DateTime<Utc>,
 }
@@ -97,31 +108,47 @@ impl TryFrom<Row> for Model {
 /// Parameters for creating a new task.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct New {
+  /// Author the new task should be assigned to.
   pub assigned_to: Option<Id>,
+  /// Longer-form description of the work required.
   pub description: String,
+  /// Optional user-defined metadata merged into the new row.
   pub metadata: Option<Value>,
+  /// Optional priority score; lower numbers rank first.
   pub priority: Option<u8>,
+  /// Initial lifecycle status; defaults to [`TaskStatus::default`] when unset.
   pub status: Option<TaskStatus>,
+  /// Short human-readable title.
   pub title: String,
 }
 
 /// Optional fields for updating an existing task.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Patch {
+  /// Replacement assignee; `Some(None)` explicitly clears it.
   pub assigned_to: Option<Option<Id>>,
+  /// Replacement description.
   pub description: Option<String>,
+  /// Replacement metadata object; overwrites the stored value when set.
   pub metadata: Option<Value>,
+  /// Replacement priority; `Some(None)` explicitly clears it.
   pub priority: Option<Option<u8>>,
+  /// New lifecycle status; transitions to terminal states also set `resolved_at`.
   pub status: Option<TaskStatus>,
+  /// Replacement title.
   pub title: Option<String>,
 }
 
 /// Criteria for filtering tasks.
 #[derive(Clone, Debug, Default)]
 pub struct Filter {
+  /// Include tasks in every status, even terminal ones.
   pub all: bool,
+  /// Restrict to tasks assigned to the author matching this name or id prefix.
   pub assigned_to: Option<String>,
+  /// Restrict to tasks in this status.
   pub status: Option<TaskStatus>,
+  /// Restrict to tasks carrying this tag label.
   pub tag: Option<String>,
 }
 

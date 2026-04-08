@@ -1,7 +1,7 @@
 //! Content digest computation and `sync_digests` cache helpers.
 //!
-//! [`compute`] is a thin wrapper over SHA-256 used by both the legacy
-//! shared-file writer and the per-entity adapters. [`is_unchanged`] and
+//! [`compute`] is a thin wrapper over SHA-256 used by the per-entity adapters
+//! to decide whether an on-disk file needs rewriting. [`is_unchanged`] and
 //! [`record`] are the read/write halves of the `sync_digests` cache, keyed by
 //! `(project_id, repo-relative path)`.
 

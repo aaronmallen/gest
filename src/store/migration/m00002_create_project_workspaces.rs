@@ -1,3 +1,5 @@
+//! `project_workspaces` table mapping additional checkouts to a project.
+
 use super::Migration;
 
 /// Creates the `project_workspaces` table and a lookup index on `path`.

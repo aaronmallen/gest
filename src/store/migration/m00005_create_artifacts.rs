@@ -1,5 +1,8 @@
+//! `artifacts` table storing long-form documents attached to a project.
+
 use super::Migration;
 
+/// Creates the `artifacts` table with an index on `project_id`.
 pub const MIGRATION: Migration = Migration {
   name: "create_artifacts",
   sql: "

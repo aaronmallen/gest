@@ -18,8 +18,11 @@ pub enum Error {
 
 /// Results from a cross-entity search.
 pub struct Results {
+  /// Artifacts matching the query.
   pub artifacts: Vec<artifact::Model>,
+  /// Iterations matching the query.
   pub iterations: Vec<iteration::Model>,
+  /// Tasks matching the query.
   pub tasks: Vec<task::Model>,
 }
 

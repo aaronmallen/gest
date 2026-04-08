@@ -11,18 +11,25 @@ use super::{
 /// A note attached to an entity.
 #[derive(Clone, CopyGetters, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  /// Author who wrote the note, if known.
   #[get = "pub"]
   author_id: Option<Id>,
+  /// Markdown body content.
   #[get = "pub"]
   body: String,
+  /// When the note was first created.
   #[get = "pub"]
   created_at: DateTime<Utc>,
+  /// Identifier of the entity the note is attached to.
   #[get = "pub"]
   entity_id: Id,
+  /// Which domain type [`entity_id`](Model::entity_id) refers to.
   #[getset(get_copy = "pub")]
   entity_type: EntityType,
+  /// Stable identifier assigned at creation.
   #[get = "pub"]
   id: Id,
+  /// When the note body was last modified.
   #[get = "pub"]
   updated_at: DateTime<Utc>,
 }
@@ -72,12 +79,15 @@ impl TryFrom<Row> for Model {
 /// Parameters for creating a new note.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct New {
+  /// Author credited with the note, if known.
   pub author_id: Option<Id>,
+  /// Markdown body content.
   pub body: String,
 }
 
 /// Optional fields for updating an existing note.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Patch {
+  /// Replacement markdown body.
   pub body: Option<String>,
 }

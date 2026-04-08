@@ -26,6 +26,7 @@ const SELECT_COLUMNS: &str = "id, project_id, command, created_at, undone_at, au
 
 /// Begin a new transaction for the given command.
 pub async fn begin(conn: &Connection, project_id: &Id, command: &str) -> Result<Model, Error> {
+  log::debug!("repo::transaction::begin");
   begin_with_author(conn, project_id, command, None).await
 }
 
@@ -36,6 +37,7 @@ pub async fn begin_with_author(
   command: &str,
   author_id: Option<&Id>,
 ) -> Result<Model, Error> {
+  log::debug!("repo::transaction::begin_with_author");
   let id = Id::new();
   let now = Utc::now();
   let author: Value = match author_id {
@@ -63,6 +65,7 @@ pub async fn begin_with_author(
 
 /// Find a transaction by its ID.
 pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<Model>, Error> {
+  log::debug!("repo::transaction::find_by_id");
   let id = id.into();
   let mut rows = conn
     .query(
@@ -79,6 +82,7 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<M
 
 /// Return the most recent non-undone transaction for a project.
 pub async fn latest_undoable(conn: &Connection, project_id: &Id) -> Result<Option<Model>, Error> {
+  log::debug!("repo::transaction::latest_undoable");
   let mut rows = conn
     .query(
       &format!(
@@ -98,6 +102,7 @@ pub async fn latest_undoable(conn: &Connection, project_id: &Id) -> Result<Optio
 
 /// Return the N most recent non-undone transactions for a project.
 pub async fn latest_undoable_n(conn: &Connection, project_id: &Id, n: u32) -> Result<Vec<Model>, Error> {
+  log::debug!("repo::transaction::latest_undoable_n");
   let mut rows = conn
     .query(
       &format!(
@@ -130,6 +135,7 @@ pub async fn record_event(
   event_type: &str,
   before_data: Option<&JsonValue>,
 ) -> Result<(), Error> {
+  log::debug!("repo::transaction::record_event");
   record_semantic_event(
     conn,
     transaction_id,
@@ -162,6 +168,7 @@ pub async fn record_semantic_event(
   old_value: Option<&str>,
   new_value: Option<&str>,
 ) -> Result<(), Error> {
+  log::debug!("repo::transaction::record_semantic_event");
   let id = Id::new();
   let before: Value = match before_data {
     Some(d) => Value::from(d.to_string()),
@@ -223,6 +230,7 @@ pub async fn semantic_events_for_row(
   table_name: &str,
   row_id: &Id,
 ) -> Result<Vec<SemanticEvent>, Error> {
+  log::debug!("repo::transaction::semantic_events_for_row");
   let mut rows = conn
     .query(
       "SELECT te.id, te.row_id, te.table_name, te.semantic_type, te.old_value, te.new_value, \
@@ -273,6 +281,7 @@ pub async fn semantic_events_for_row(
 
 /// Undo a transaction by replaying its events in reverse.
 pub async fn undo(conn: &Connection, transaction_id: &Id) -> Result<String, Error> {
+  log::debug!("repo::transaction::undo");
   // Get the transaction
   let tx = find_by_id(conn, transaction_id.clone())
     .await?

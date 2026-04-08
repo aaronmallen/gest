@@ -30,6 +30,7 @@ const SELECT_COLUMNS: &str = "\
 
 /// Return artifacts for a project, applying the given filter.
 pub async fn all(conn: &Connection, project_id: &Id, filter: &Filter) -> Result<Vec<Model>, Error> {
+  log::debug!("repo::artifact::all");
   let mut conditions = vec!["project_id = ?1".to_string()];
   let mut params: Vec<Value> = vec![Value::from(project_id.to_string())];
   let idx = 2;
@@ -62,6 +63,7 @@ pub async fn all(conn: &Connection, project_id: &Id, filter: &Filter) -> Result<
 
 /// Archive an artifact by setting its archived_at timestamp.
 pub async fn archive(conn: &Connection, id: &Id) -> Result<Model, Error> {
+  log::debug!("repo::artifact::archive");
   let now = Utc::now();
   let affected = conn
     .execute(
@@ -81,6 +83,7 @@ pub async fn archive(conn: &Connection, id: &Id) -> Result<Model, Error> {
 
 /// Create a new artifact in the given project.
 pub async fn create(conn: &Connection, project_id: &Id, new: &New) -> Result<Model, Error> {
+  log::debug!("repo::artifact::create");
   let id = Id::new();
   let now = Utc::now();
   let metadata = new
@@ -114,6 +117,7 @@ pub async fn create(conn: &Connection, project_id: &Id, new: &New) -> Result<Mod
 
 /// Delete an artifact by its ID. Returns true if the artifact was deleted.
 pub async fn delete(conn: &Connection, id: &Id) -> Result<bool, Error> {
+  log::debug!("repo::artifact::delete");
   let affected = conn
     .execute("DELETE FROM artifacts WHERE id = ?1", [id.to_string()])
     .await?;
@@ -122,6 +126,7 @@ pub async fn delete(conn: &Connection, id: &Id) -> Result<bool, Error> {
 
 /// Find an artifact by its [`Id`].
 pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<Model>, Error> {
+  log::debug!("repo::artifact::find_by_id");
   let id = id.into();
   let mut rows = conn
     .query(
@@ -139,6 +144,7 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<M
 /// Return the minimum unique prefix length over all active (non-archived)
 /// artifacts in the project.
 pub async fn shortest_active_prefix(conn: &Connection, project_id: &Id) -> Result<usize, Error> {
+  log::debug!("repo::artifact::shortest_active_prefix");
   let ids = collect_ids(
     conn,
     "SELECT id FROM artifacts WHERE project_id = ?1 AND archived_at IS NULL",
@@ -152,6 +158,7 @@ pub async fn shortest_active_prefix(conn: &Connection, project_id: &Id) -> Resul
 /// Return the minimum unique prefix length over every artifact in the project,
 /// including archived rows.
 pub async fn shortest_all_prefix(conn: &Connection, project_id: &Id) -> Result<usize, Error> {
+  log::debug!("repo::artifact::shortest_all_prefix");
   let ids = collect_ids(conn, "SELECT id FROM artifacts WHERE project_id = ?1", project_id).await?;
   let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
   Ok(min_unique_prefix(&refs))
@@ -168,6 +175,7 @@ async fn collect_ids(conn: &Connection, sql: &str, project_id: &Id) -> Result<Ve
 
 /// Update an existing artifact with the given patch.
 pub async fn update(conn: &Connection, id: &Id, patch: &Patch) -> Result<Model, Error> {
+  log::debug!("repo::artifact::update");
   let now = Utc::now();
   let mut sets = vec!["updated_at = ?1".to_string()];
   let mut params: Vec<Value> = vec![Value::from(now.to_rfc3339())];

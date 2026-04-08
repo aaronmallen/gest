@@ -47,6 +47,7 @@ pub struct StatusCounts {
 
 /// Add a task to an iteration at a specific phase.
 pub async fn add_task(conn: &Connection, iteration_id: &Id, task_id: &Id, phase: u32) -> Result<(), Error> {
+  log::debug!("repo::iteration::add_task");
   conn
     .execute(
       "INSERT OR IGNORE INTO iteration_tasks (iteration_id, task_id, phase) VALUES (?1, ?2, ?3)",
@@ -58,6 +59,7 @@ pub async fn add_task(conn: &Connection, iteration_id: &Id, task_id: &Id, phase:
 
 /// Return iterations for a project, applying the given filter.
 pub async fn all(conn: &Connection, project_id: &Id, filter: &Filter) -> Result<Vec<Model>, Error> {
+  log::debug!("repo::iteration::all");
   let mut conditions = vec!["project_id = ?1".to_string()];
   let mut params: Vec<Value> = vec![Value::from(project_id.to_string())];
   let mut idx = 2;
@@ -104,6 +106,7 @@ pub async fn all(conn: &Connection, project_id: &Id, filter: &Filter) -> Result<
 
 /// Create a new iteration in the given project.
 pub async fn create(conn: &Connection, project_id: &Id, new: &New) -> Result<Model, Error> {
+  log::debug!("repo::iteration::create");
   let id = Id::new();
   let now = Utc::now();
   let metadata = new
@@ -138,6 +141,7 @@ pub async fn create(conn: &Connection, project_id: &Id, new: &New) -> Result<Mod
 
 /// Delete an iteration by its ID. Returns true if the iteration was deleted.
 pub async fn delete(conn: &Connection, id: &Id) -> Result<bool, Error> {
+  log::debug!("repo::iteration::delete");
   // Remove task associations first
   conn
     .execute("DELETE FROM iteration_tasks WHERE iteration_id = ?1", [id.to_string()])
@@ -150,6 +154,7 @@ pub async fn delete(conn: &Connection, id: &Id) -> Result<bool, Error> {
 
 /// Find an iteration by its [`Id`].
 pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<Model>, Error> {
+  log::debug!("repo::iteration::find_by_id");
   let id = id.into();
   let mut rows = conn
     .query(
@@ -166,6 +171,7 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<M
 
 /// Get the maximum phase number for an iteration, or None if empty.
 pub async fn max_phase(conn: &Connection, iteration_id: &Id) -> Result<Option<u32>, Error> {
+  log::debug!("repo::iteration::max_phase");
   let mut rows = conn
     .query(
       "SELECT MAX(phase) FROM iteration_tasks WHERE iteration_id = ?1",
@@ -184,6 +190,7 @@ pub async fn max_phase(conn: &Connection, iteration_id: &Id) -> Result<Option<u3
 
 /// Remove a task from an iteration.
 pub async fn remove_task(conn: &Connection, iteration_id: &Id, task_id: &Id) -> Result<bool, Error> {
+  log::debug!("repo::iteration::remove_task");
   let affected = conn
     .execute(
       "DELETE FROM iteration_tasks WHERE iteration_id = ?1 AND task_id = ?2",
@@ -195,6 +202,7 @@ pub async fn remove_task(conn: &Connection, iteration_id: &Id, task_id: &Id) -> 
 
 /// Return task counts grouped by status for an iteration.
 pub async fn task_status_counts(conn: &Connection, iteration_id: &Id) -> Result<StatusCounts, Error> {
+  log::debug!("repo::iteration::task_status_counts");
   let mut rows = conn
     .query(
       "SELECT t.status, COUNT(*) FROM iteration_tasks it \
@@ -228,6 +236,7 @@ pub async fn task_status_counts(conn: &Connection, iteration_id: &Id) -> Result<
 
 /// Return all tasks for an iteration, grouped with their phase and status.
 pub async fn tasks_with_phase(conn: &Connection, iteration_id: &Id) -> Result<Vec<IterationTaskRow>, Error> {
+  log::debug!("repo::iteration::tasks_with_phase");
   let mut rows = conn
     .query(
       "SELECT t.id, t.title, t.status, it.phase FROM iteration_tasks it \
@@ -261,6 +270,7 @@ pub async fn tasks_with_phase(conn: &Connection, iteration_id: &Id) -> Result<Ve
 /// Return the minimum unique prefix length over all active iterations (status
 /// not `completed` or `cancelled`) in the project.
 pub async fn shortest_active_prefix(conn: &Connection, project_id: &Id) -> Result<usize, Error> {
+  log::debug!("repo::iteration::shortest_active_prefix");
   let ids = collect_ids(
     conn,
     "SELECT id FROM iterations WHERE project_id = ?1 AND status NOT IN ('completed', 'cancelled')",
@@ -273,6 +283,7 @@ pub async fn shortest_active_prefix(conn: &Connection, project_id: &Id) -> Resul
 
 /// Return the minimum unique prefix length over every iteration in the project.
 pub async fn shortest_all_prefix(conn: &Connection, project_id: &Id) -> Result<usize, Error> {
+  log::debug!("repo::iteration::shortest_all_prefix");
   let ids = collect_ids(conn, "SELECT id FROM iterations WHERE project_id = ?1", project_id).await?;
   let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
   Ok(min_unique_prefix(&refs))
@@ -289,6 +300,7 @@ async fn collect_ids(conn: &Connection, sql: &str, project_id: &Id) -> Result<Ve
 
 /// Update an existing iteration with the given patch.
 pub async fn update(conn: &Connection, id: &Id, patch: &Patch) -> Result<Model, Error> {
+  log::debug!("repo::iteration::update");
   let now = Utc::now();
   let mut sets = vec!["updated_at = ?1".to_string()];
   let mut params: Vec<Value> = vec![Value::from(now.to_rfc3339())];
@@ -343,6 +355,7 @@ pub async fn update(conn: &Connection, id: &Id, patch: &Patch) -> Result<Model, 
 
 /// Return the current phase of a task within its iteration, if any.
 pub async fn task_phase(conn: &Connection, task_id: &Id) -> Result<Option<u32>, Error> {
+  log::debug!("repo::iteration::task_phase");
   let mut rows = conn
     .query(
       "SELECT phase FROM iteration_tasks WHERE task_id = ?1",
@@ -361,6 +374,7 @@ pub async fn task_phase(conn: &Connection, task_id: &Id) -> Result<Option<u32>, 
 
 /// Update the phase of a task within its iteration.
 pub async fn update_task_phase(conn: &Connection, task_id: &Id, phase: u32) -> Result<(), Error> {
+  log::debug!("repo::iteration::update_task_phase");
   conn
     .execute(
       "UPDATE iteration_tasks SET phase = ?1 WHERE task_id = ?2",

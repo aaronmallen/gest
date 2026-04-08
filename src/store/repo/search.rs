@@ -32,6 +32,7 @@ pub struct Results {
 /// - Free text uses `LIKE` matching on title and description/body
 /// - `show_all=false` excludes resolved tasks and archived artifacts
 pub async fn query(conn: &Connection, project_id: &Id, parsed: &ParsedQuery, show_all: bool) -> Result<Results, Error> {
+  log::debug!("repo::search::query");
   let want_tasks = wants_entity_type(parsed, "task");
   let want_artifacts = wants_entity_type(parsed, "artifact");
   let want_iterations = wants_entity_type(parsed, "iteration");

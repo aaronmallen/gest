@@ -18,6 +18,7 @@ pub enum Error {
 
 /// Return all authors ordered by name.
 pub async fn all(conn: &Connection) -> Result<Vec<Author>, Error> {
+  log::debug!("repo::author::all");
   let mut rows = conn
     .query(
       "SELECT id, author_type, created_at, email, name FROM authors ORDER BY name",
@@ -34,6 +35,7 @@ pub async fn all(conn: &Connection) -> Result<Vec<Author>, Error> {
 
 /// Create a new author and persist it.
 pub async fn create(conn: &Connection, author: &Author) -> Result<Author, Error> {
+  log::debug!("repo::author::create");
   let email: Value = match author.email() {
     Some(e) => Value::from(e.to_string()),
     None => Value::Null,
@@ -58,6 +60,7 @@ pub async fn create(conn: &Connection, author: &Author) -> Result<Author, Error>
 
 /// Find an author by their [`Id`].
 pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<Author>, Error> {
+  log::debug!("repo::author::find_by_id");
   let id = id.into();
   let mut rows = conn
     .query(
@@ -74,6 +77,7 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<A
 
 /// Find an author by name, optionally filtering by email.
 pub async fn find_by_name(conn: &Connection, name: &str, email: Option<&str>) -> Result<Option<Author>, Error> {
+  log::debug!("repo::author::find_by_name");
   let mut rows = if let Some(email) = email {
     conn
       .query(
@@ -105,6 +109,7 @@ pub async fn find_or_create(
   email: Option<&str>,
   author_type: AuthorType,
 ) -> Result<Author, Error> {
+  log::debug!("repo::author::find_or_create");
   if let Some(existing) = find_by_name(conn, name, email).await? {
     return Ok(existing);
   }

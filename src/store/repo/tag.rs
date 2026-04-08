@@ -18,6 +18,7 @@ pub enum Error {
 
 /// Return all tags ordered by label.
 pub async fn all(conn: &Connection) -> Result<Vec<Tag>, Error> {
+  log::debug!("repo::tag::all");
   let mut rows = conn.query("SELECT id, label FROM tags ORDER BY label", ()).await?;
 
   let mut tags = Vec::new();
@@ -29,6 +30,7 @@ pub async fn all(conn: &Connection) -> Result<Vec<Tag>, Error> {
 
 /// Attach a tag to an entity. Creates the tag if it doesn't exist.
 pub async fn attach(conn: &Connection, entity_type: EntityType, entity_id: &Id, label: &str) -> Result<Tag, Error> {
+  log::debug!("repo::tag::attach");
   let tag = find_or_create(conn, label).await?;
   conn
     .execute(
@@ -41,6 +43,7 @@ pub async fn attach(conn: &Connection, entity_type: EntityType, entity_id: &Id, 
 
 /// Return all distinct tags attached to entities of the given type, ordered by label.
 pub async fn by_entity_type(conn: &Connection, entity_type: EntityType) -> Result<Vec<Tag>, Error> {
+  log::debug!("repo::tag::by_entity_type");
   let mut rows = conn
     .query(
       "SELECT DISTINCT t.id, t.label FROM tags t \
@@ -60,6 +63,7 @@ pub async fn by_entity_type(conn: &Connection, entity_type: EntityType) -> Resul
 
 /// Create a new tag with the given label.
 pub async fn create(conn: &Connection, tag: &Tag) -> Result<Tag, Error> {
+  log::debug!("repo::tag::create");
   conn
     .execute(
       "INSERT INTO tags (id, label) VALUES (?1, ?2)",
@@ -74,6 +78,7 @@ pub async fn create(conn: &Connection, tag: &Tag) -> Result<Tag, Error> {
 
 /// Detach a tag from an entity. Does not delete the tag itself.
 pub async fn detach(conn: &Connection, entity_type: EntityType, entity_id: &Id, label: &str) -> Result<bool, Error> {
+  log::debug!("repo::tag::detach");
   let Some(tag) = find_by_label(conn, label).await? else {
     return Ok(false);
   };
@@ -88,6 +93,7 @@ pub async fn detach(conn: &Connection, entity_type: EntityType, entity_id: &Id, 
 
 /// Detach all tags from an entity. Does not delete the tags themselves.
 pub async fn detach_all(conn: &Connection, entity_type: EntityType, entity_id: &Id) -> Result<u64, Error> {
+  log::debug!("repo::tag::detach_all");
   let affected = conn
     .execute(
       "DELETE FROM entity_tags WHERE entity_type = ?1 AND entity_id = ?2",
@@ -99,6 +105,7 @@ pub async fn detach_all(conn: &Connection, entity_type: EntityType, entity_id: &
 
 /// Find a tag by its [`Id`].
 pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<Tag>, Error> {
+  log::debug!("repo::tag::find_by_id");
   let id = id.into();
   let mut rows = conn
     .query("SELECT id, label FROM tags WHERE id = ?1", [id.to_string()])
@@ -112,6 +119,7 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<T
 
 /// Find a tag by its label.
 pub async fn find_by_label(conn: &Connection, label: &str) -> Result<Option<Tag>, Error> {
+  log::debug!("repo::tag::find_by_label");
   let mut rows = conn
     .query("SELECT id, label FROM tags WHERE label = ?1", [label.to_string()])
     .await?;
@@ -124,6 +132,7 @@ pub async fn find_by_label(conn: &Connection, label: &str) -> Result<Option<Tag>
 
 /// Find an existing tag by label or create a new one.
 pub async fn find_or_create(conn: &Connection, label: &str) -> Result<Tag, Error> {
+  log::debug!("repo::tag::find_or_create");
   if let Some(existing) = find_by_label(conn, label).await? {
     return Ok(existing);
   }
@@ -133,6 +142,7 @@ pub async fn find_or_create(conn: &Connection, label: &str) -> Result<Tag, Error
 
 /// Return all tag labels for a specific entity.
 pub async fn for_entity(conn: &Connection, entity_type: EntityType, entity_id: &Id) -> Result<Vec<String>, Error> {
+  log::debug!("repo::tag::for_entity");
   let mut rows = conn
     .query(
       "SELECT t.label FROM tags t \

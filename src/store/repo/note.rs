@@ -28,6 +28,7 @@ const SELECT_COLUMNS: &str = "id, entity_id, entity_type, author_id, body, creat
 
 /// Create a new note on an entity.
 pub async fn create(conn: &Connection, entity_type: EntityType, entity_id: &Id, new: &New) -> Result<Model, Error> {
+  log::debug!("repo::note::create");
   let id = Id::new();
   let now = Utc::now();
   let author_id: Value = match &new.author_id {
@@ -57,6 +58,7 @@ pub async fn create(conn: &Connection, entity_type: EntityType, entity_id: &Id, 
 
 /// Delete a note by its ID. Returns true if the note was deleted.
 pub async fn delete(conn: &Connection, id: &Id) -> Result<bool, Error> {
+  log::debug!("repo::note::delete");
   let affected = conn
     .execute("DELETE FROM notes WHERE id = ?1", [id.to_string()])
     .await?;
@@ -65,6 +67,7 @@ pub async fn delete(conn: &Connection, id: &Id) -> Result<bool, Error> {
 
 /// Find a note by its [`Id`].
 pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<Model>, Error> {
+  log::debug!("repo::note::find_by_id");
   let id = id.into();
   let mut rows = conn
     .query(
@@ -81,6 +84,7 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<M
 
 /// Return all notes for a specific entity, newest first.
 pub async fn for_entity(conn: &Connection, entity_type: EntityType, entity_id: &Id) -> Result<Vec<Model>, Error> {
+  log::debug!("repo::note::for_entity");
   let mut rows = conn
     .query(
       &format!(
@@ -101,6 +105,7 @@ pub async fn for_entity(conn: &Connection, entity_type: EntityType, entity_id: &
 /// Return the minimum unique prefix length over all notes attached to the
 /// given parent artifact.
 pub async fn shortest_prefix(conn: &Connection, artifact_id: &Id) -> Result<usize, Error> {
+  log::debug!("repo::note::shortest_prefix");
   let mut rows = conn
     .query(
       "SELECT id FROM notes WHERE entity_type = 'artifact' AND entity_id = ?1",
@@ -117,6 +122,7 @@ pub async fn shortest_prefix(conn: &Connection, artifact_id: &Id) -> Result<usiz
 
 /// Update an existing note with the given patch.
 pub async fn update(conn: &Connection, id: &Id, patch: &Patch) -> Result<Model, Error> {
+  log::debug!("repo::note::update");
   let now = Utc::now();
   let mut sets = vec!["updated_at = ?1".to_string()];
   let mut params: Vec<Value> = vec![Value::from(now.to_rfc3339())];

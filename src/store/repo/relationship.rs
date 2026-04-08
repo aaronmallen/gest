@@ -28,6 +28,7 @@ pub async fn create(
   target_type: EntityType,
   target_id: &Id,
 ) -> Result<Model, Error> {
+  log::debug!("repo::relationship::create");
   let id = Id::new();
   conn
     .execute(
@@ -50,6 +51,7 @@ pub async fn create(
 
 /// Delete a relationship by its ID. Returns true if deleted.
 pub async fn delete(conn: &Connection, id: &Id) -> Result<bool, Error> {
+  log::debug!("repo::relationship::delete");
   let affected = conn
     .execute("DELETE FROM relationships WHERE id = ?1", [id.to_string()])
     .await?;
@@ -58,6 +60,7 @@ pub async fn delete(conn: &Connection, id: &Id) -> Result<bool, Error> {
 
 /// Find a relationship by its [`Id`].
 pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<Model>, Error> {
+  log::debug!("repo::relationship::find_by_id");
   let id = id.into();
   let mut rows = conn
     .query(
@@ -74,6 +77,7 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<M
 
 /// Return all relationships where the entity is either source or target.
 pub async fn for_entity(conn: &Connection, entity_type: EntityType, entity_id: &Id) -> Result<Vec<Model>, Error> {
+  log::debug!("repo::relationship::for_entity");
   let mut rows = conn
     .query(
       &format!(

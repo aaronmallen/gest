@@ -26,6 +26,7 @@ pub enum Error {
 
 /// Return all projects ordered by creation time (newest first).
 pub async fn all(conn: &Connection) -> Result<Vec<Project>, Error> {
+  log::debug!("repo::project::all");
   let mut rows = conn
     .query(
       "SELECT id, root, created_at, updated_at FROM projects ORDER BY created_at DESC",
@@ -46,6 +47,7 @@ pub async fn attach_workspace(
   project_id: &Id,
   path: impl Into<PathBuf>,
 ) -> Result<ProjectWorkspace, Error> {
+  log::debug!("repo::project::attach_workspace");
   let ws = ProjectWorkspace::new(path.into(), project_id.clone());
   conn
     .execute(
@@ -70,6 +72,7 @@ pub async fn attach_workspace(
 /// database. Otherwise a fresh project is generated and, when a `.gest`
 /// directory exists, written back to `project.json`.
 pub async fn create(conn: &Connection, root: impl Into<PathBuf>) -> Result<Project, Error> {
+  log::debug!("repo::project::create");
   let root = root.into();
   let gest_dir = find_gest_dir(&root);
 
@@ -109,6 +112,7 @@ pub async fn create(conn: &Connection, root: impl Into<PathBuf>) -> Result<Proje
 ///
 /// Returns `true` if a workspace was deleted, `false` if none matched.
 pub async fn detach_workspace(conn: &Connection, path: &Path) -> Result<bool, Error> {
+  log::debug!("repo::project::detach_workspace");
   let path_str = path.to_string_lossy();
   let affected = conn
     .execute("DELETE FROM project_workspaces WHERE path = ?1", [path_str.as_ref()])
@@ -118,6 +122,7 @@ pub async fn detach_workspace(conn: &Connection, path: &Path) -> Result<bool, Er
 
 /// Find a project by its [`Id`].
 pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<Project>, Error> {
+  log::debug!("repo::project::find_by_id");
   let id = id.into();
   let mut rows = conn
     .query(
@@ -137,6 +142,7 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<P
 /// Matches against both the project's root path and any associated workspace
 /// path. Returns the first matching project.
 pub async fn find_by_path(conn: &Connection, path: &Path) -> Result<Option<Project>, Error> {
+  log::debug!("repo::project::find_by_path");
   let path_str = path.to_string_lossy();
 
   let mut rows = conn

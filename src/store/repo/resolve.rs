@@ -66,6 +66,7 @@ async fn query_matches(conn: &Connection, table: &str, prefix: &str, active_only
 /// archived/terminal entity returns the active one with no ambiguity error
 /// or hint.
 pub async fn resolve_id(conn: &Connection, table: &str, prefix: &str) -> Result<Id, Error> {
+  log::debug!("repo::resolve::resolve_id");
   Id::validate_prefix(prefix).map_err(Error::InvalidPrefix)?;
 
   // Phase 1: active set
@@ -134,6 +135,7 @@ async fn collect_entity_matches(
 /// archived/terminal entity returns the active one with no ambiguity error
 /// or hint.
 pub async fn resolve_entity(conn: &Connection, prefix: &str) -> Result<(EntityType, Id), Error> {
+  log::debug!("repo::resolve::resolve_entity");
   Id::validate_prefix(prefix).map_err(Error::InvalidPrefix)?;
 
   // Phase 1: active set

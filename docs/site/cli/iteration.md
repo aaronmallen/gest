@@ -11,24 +11,26 @@ gest iteration <COMMAND> [OPTIONS]
 
 ## Subcommands
 
-| Command                         | Aliases | Description                                        |
-|---------------------------------|---------|----------------------------------------------------|
-| [`add`](#iteration-add)         |         | Add a task to an iteration                         |
-| [`advance`](#iteration-advance) |         | Advance to the next phase                          |
-| [`cancel`](#iteration-cancel)   |         | Cancel an iteration and all its non-terminal tasks |
-| [`create`](#iteration-create)   | `new`   | Create a new iteration                             |
-| [`graph`](#iteration-graph)     |         | Display the phased execution graph                 |
-| [`link`](#iteration-link)       |         | Create a relationship between entities             |
-| [`list`](#iteration-list)       | `ls`    | List iterations with optional filters              |
-| [`meta`](#iteration-meta)       |         | Read or write metadata fields                      |
-| [`next`](#iteration-next)       |         | Find or claim the next available task              |
-| [`remove`](#iteration-remove)   | `rm`    | Remove a task from an iteration                    |
-| [`reopen`](#iteration-reopen)   |         | Reopen a cancelled iteration and restore tasks     |
-| [`show`](#iteration-show)       | `view`  | Display an iteration's details                     |
-| [`status`](#iteration-status)   |         | Display aggregated iteration progress              |
-| [`tag`](#iteration-tag)         |         | Add tags to an iteration                           |
-| [`untag`](#iteration-untag)     |         | Remove tags from an iteration                      |
-| [`update`](#iteration-update)   | `edit`  | Update an iteration's fields                       |
+| Command                           | Aliases | Description                                          |
+|-----------------------------------|---------|------------------------------------------------------|
+| [`add`](#iteration-add)           |         | Add a task to an iteration                           |
+| [`advance`](#iteration-advance)   |         | Advance to the next phase                            |
+| [`cancel`](#iteration-cancel)     |         | Cancel an iteration and all its non-terminal tasks   |
+| [`complete`](#iteration-complete) |         | Mark an iteration as completed                       |
+| [`create`](#iteration-create)     | `new`   | Create a new iteration                               |
+| [`delete`](#iteration-delete)     |         | Delete an iteration and drop its task memberships    |
+| [`graph`](#iteration-graph)       |         | Display the phased execution graph                   |
+| [`link`](#iteration-link)         |         | Create a relationship between entities               |
+| [`list`](#iteration-list)         | `ls`    | List iterations with optional filters                |
+| [`meta`](#iteration-meta)         |         | Read or write metadata fields                        |
+| [`next`](#iteration-next)         |         | Find or claim the next available task                |
+| [`remove`](#iteration-remove)     | `rm`    | Remove a task from an iteration                      |
+| [`reopen`](#iteration-reopen)     |         | Reopen a completed or cancelled iteration            |
+| [`show`](#iteration-show)         | `view`  | Display an iteration's details                       |
+| [`status`](#iteration-status)     |         | Display aggregated iteration progress                |
+| [`tag`](#iteration-tag)           |         | Add tags to an iteration                             |
+| [`untag`](#iteration-untag)       |         | Remove tags from an iteration                        |
+| [`update`](#iteration-update)     | `edit`  | Update an iteration's fields                         |
 
 ---
 
@@ -130,6 +132,37 @@ gest iteration cancel abc123 --json
 
 ---
 
+## iteration complete
+
+Mark an iteration as completed. This is a shortcut for `iteration update <ID> --status completed`
+(though `update` no longer accepts `--status` directly — use `complete` or `cancel` instead).
+
+```text
+gest iteration complete [OPTIONS] <ID>
+```
+
+### Arguments
+
+| Argument | Description                   |
+|----------|-------------------------------|
+| `<ID>`   | Iteration ID or unique prefix |
+
+### Options
+
+| Flag          | Description       |
+|---------------|-------------------|
+| `-j, --json`  | Output as JSON    |
+| `-q, --quiet` | Print only the ID |
+
+### Examples
+
+```sh
+gest iteration complete abc123
+gest iteration complete abc123 --json
+```
+
+---
+
 ## iteration create
 
 Create a new iteration.
@@ -146,14 +179,15 @@ gest iteration create [OPTIONS] <TITLE>
 
 ### Options
 
-| Flag                              | Description                                                                                                     |
-|-----------------------------------|-----------------------------------------------------------------------------------------------------------------|
-| `-d, --description <DESCRIPTION>` | Description text                                                                                                |
-| `-j, --json`                      | Output the created iteration as JSON                                                                            |
-| `-m, --metadata <METADATA>`       | Key=value metadata pair (repeatable, e.g. `-m key=value`)                                                       |
-| `-q, --quiet`                     | Print only the iteration ID                                                                                     |
-| `-s, --status <STATUS>`           | Initial status: `active`, `cancelled`, or `completed` (default: `active`). `failed` is accepted but deprecated. |
-| `--tag <TAG>`                     | Tag (repeatable, or comma-separated)                                                                            |
+| Flag                              | Description                                                                         |
+|-----------------------------------|-------------------------------------------------------------------------------------|
+| `-d, --description <DESCRIPTION>` | Description text                                                                    |
+| `-j, --json`                      | Output the created iteration as JSON                                                |
+| `-m, --metadata <KEY=VALUE>`      | Set a metadata key=value pair (repeatable; supports dot-paths and scalar inference) |
+| `--metadata-json <JSON>`          | Merge a JSON object into metadata (repeatable; applied after `--metadata` pairs)    |
+| `-q, --quiet`                     | Print only the iteration ID                                                         |
+| `-s, --status <STATUS>`           | Initial status: `active`, `cancelled`, or `completed` (default: `active`)           |
+| `-t, --tag <TAG>`                 | Tag (repeatable)                                                                    |
 
 ### Examples
 
@@ -167,6 +201,42 @@ gest iteration create "Auth Refactor" -d "Rewrite authentication layer" --tag "b
 # Machine-readable output
 gest iteration create "Sprint 2" --json
 gest iteration create "Sprint 2" -q
+```
+
+---
+
+## iteration delete
+
+Permanently delete an iteration and drop its task memberships. Tasks themselves are not
+deleted; they just lose their iteration association. This is irreversible.
+
+```text
+gest iteration delete [OPTIONS] <ID>
+```
+
+### Arguments
+
+| Argument | Description                   |
+|----------|-------------------------------|
+| `<ID>`   | Iteration ID or unique prefix |
+
+### Options
+
+| Flag          | Description                                                                     |
+|---------------|---------------------------------------------------------------------------------|
+| `--yes`       | Skip the interactive confirmation prompt                                        |
+| `--force`     | Reserved for future guards; currently a no-op (iterations have no guards today) |
+| `-j, --json`  | Output as JSON                                                                  |
+| `-q, --quiet` | Suppress normal output                                                          |
+
+### Examples
+
+```sh
+# Interactive (prompts for confirmation)
+gest iteration delete abc123
+
+# Non-interactive
+gest iteration delete abc123 --yes
 ```
 
 ---
@@ -237,13 +307,14 @@ gest iteration list [OPTIONS]
 
 ### Options
 
-| Flag                    | Description                                                                                   |
-|-------------------------|-----------------------------------------------------------------------------------------------|
-| `-a, --all`             | Include resolved (completed/cancelled) iterations                                             |
-| `--has-available`       | Only show iterations with at least one claimable task                                         |
-| `-j, --json`            | Output iteration list as JSON                                                                 |
-| `-s, --status <STATUS>` | Filter by status: `active`, `cancelled`, or `completed`. `failed` is accepted but deprecated. |
-| `--tag <TAG>`           | Filter by tag                                                                                 |
+| Flag                    | Description                                                          |
+|-------------------------|----------------------------------------------------------------------|
+| `-a, --all`             | Include resolved (completed/cancelled) iterations                    |
+| `--has-available`       | Only show iterations with at least one claimable task                |
+| `--limit <N>`           | Cap the number of items returned                                     |
+| `-s, --status <STATUS>` | Filter by status: `active`, `cancelled`, or `completed`              |
+| `-t, --tag <TAG>`       | Filter by tag                                                        |
+| `-j, --json`            | Output iteration list as JSON                                        |
 
 ### Examples
 
@@ -320,9 +391,9 @@ gest iteration meta get abc123 goal --raw
 
 ## iteration next
 
-Find (or claim) the next available task in an iteration. The task is selected from the
-active phase -- the lowest phase with incomplete tasks -- sorted by priority then creation
-date.
+Find (or claim) the next available task in an iteration. Candidates are drawn from the
+active phase (the lowest phase with incomplete tasks) and sorted by phase ascending, then
+by priority ascending (lower number = higher priority). No further tie-break is applied.
 
 ```text
 gest iteration next [OPTIONS] <ID>
@@ -336,11 +407,12 @@ gest iteration next [OPTIONS] <ID>
 
 ### Options
 
-| Flag              | Description                                         |
-|-------------------|-----------------------------------------------------|
-| `--claim`         | Set the task to in-progress and assign it           |
-| `--agent <AGENT>` | Agent name for assignment (required with `--claim`) |
-| `-j, --json`      | Output as JSON                                      |
+| Flag              | Description                                                   |
+|-------------------|---------------------------------------------------------------|
+| `--claim`         | Set the task to in-progress and assign it (may be used alone) |
+| `--agent <AGENT>` | Agent name for assignment (requires `--claim`)                |
+| `-j, --json`      | Output as JSON                                                |
+| `-q, --quiet`     | Print only the task ID                                        |
 
 ### Exit Codes
 
@@ -397,9 +469,9 @@ gest iteration remove iter123 task456
 
 ## iteration reopen
 
-Reopen a cancelled (or failed) iteration and restore all its cancelled tasks to `open`.
+Reopen a completed or cancelled iteration and restore all its cancelled tasks to `open`.
 Tasks with `done` status are left unchanged. This reverses the effect of
-`iteration cancel`.
+`iteration cancel` or `iteration complete`.
 
 ```text
 gest iteration reopen [OPTIONS] <ID>
@@ -552,7 +624,10 @@ gest iteration untag abc123 draft
 
 ## iteration update
 
-Update an iteration's title, description, status, tags, or metadata.
+Update an iteration's title, description, or metadata. For status changes, use the
+[`complete`](#iteration-complete), [`cancel`](#iteration-cancel), or
+[`reopen`](#iteration-reopen) shortcuts instead. Tag changes go through
+[`tag`](#iteration-tag) / [`untag`](#iteration-untag).
 
 ```text
 gest iteration update [OPTIONS] <ID>
@@ -566,22 +641,21 @@ gest iteration update [OPTIONS] <ID>
 
 ### Options
 
-| Flag                              | Description                                                                             |
-|-----------------------------------|-----------------------------------------------------------------------------------------|
-| `-d, --description <DESCRIPTION>` | New description                                                                         |
-| `-j, --json`                      | Output as JSON                                                                          |
-| `-m, --metadata <METADATA>`       | Key=value metadata pair, merged with existing (repeatable)                              |
-| `-q, --quiet`                     | Print only the iteration ID                                                             |
-| `-s, --status <STATUS>`           | New status: `active`, `cancelled`, or `completed`. `failed` is accepted but deprecated. |
-| `--tag <TAG>`                     | Replace all tags (repeatable, or comma-separated)                                       |
-| `-t, --title <TITLE>`             | New title                                                                               |
+| Flag                              | Description                                                                         |
+|-----------------------------------|-------------------------------------------------------------------------------------|
+| `-d, --description <DESCRIPTION>` | New description                                                                     |
+| `-j, --json`                      | Output as JSON                                                                      |
+| `-m, --metadata <KEY=VALUE>`      | Set a metadata key=value pair (repeatable; supports dot-paths and scalar inference) |
+| `--metadata-json <JSON>`          | Merge a JSON object into metadata (repeatable; applied after `--metadata` pairs)    |
+| `-q, --quiet`                     | Print only the iteration ID                                                         |
+| `-t, --title <TITLE>`             | New title                                                                           |
 
 ### Examples
 
 ```sh
-gest iteration update abc123 -s completed
-gest iteration update abc123 -t "Sprint 1 - Revised" -m goal="deliver auth"
+gest iteration update abc123 -t "Sprint 1 - Revised"
+gest iteration update abc123 -m goal="deliver auth"
 
 # Machine-readable output
-gest iteration update abc123 -s completed --json
+gest iteration update abc123 -t "Sprint 1 - Revised" --json
 ```

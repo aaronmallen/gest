@@ -8,6 +8,7 @@ use crate::store::model::{artifact, iteration, note, primitives::Id, task};
 
 /// Export all project data to the `.gest/` directory as JSON and markdown files.
 pub async fn export_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
+  log::debug!("sync export: project={} dir={}", project_id.short(), gest_dir.display());
   std::fs::create_dir_all(gest_dir)?;
   std::fs::create_dir_all(gest_dir.join("artifacts"))?;
 
@@ -16,6 +17,11 @@ pub async fn export_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> 
   export_iterations(conn, project_id, gest_dir).await?;
   export_notes(conn, project_id, gest_dir).await?;
 
+  log::debug!(
+    "sync export: complete project={} dir={}",
+    project_id.short(),
+    gest_dir.display()
+  );
   Ok(())
 }
 
@@ -50,6 +56,11 @@ async fn export_artifacts(conn: &Connection, project_id: &Id, gest_dir: &Path) -
   for artifact in &artifacts {
     let filename = artifact_filename(artifact.id());
     let md_path = artifacts_dir.join(&filename);
+    log::debug!(
+      "sync export: artifact {} -> {}",
+      artifact.id().short(),
+      md_path.display()
+    );
     write_if_changed(conn, project_id, &md_path, artifact.body().as_bytes()).await?;
     index.insert(filename, artifact.title().to_string());
   }
@@ -59,6 +70,7 @@ async fn export_artifacts(conn: &Connection, project_id: &Id, gest_dir: &Path) -
   let index_path = artifacts_dir.join("index.json");
   write_if_changed(conn, project_id, &index_path, index_json.as_bytes()).await?;
 
+  log::debug!("sync export: wrote {} artifacts", artifacts.len());
   Ok(())
 }
 
@@ -81,6 +93,7 @@ async fn export_iterations(conn: &Connection, project_id: &Id, gest_dir: &Path) 
   let path = gest_dir.join("iterations.json");
   write_if_changed(conn, project_id, &path, json.as_bytes()).await?;
 
+  log::debug!("sync export: wrote {} iterations", iterations.len());
   Ok(())
 }
 
@@ -106,6 +119,7 @@ async fn export_notes(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
   let json = serde_json::to_string_pretty(&task_notes)?;
   let path = gest_dir.join("task_notes.json");
   write_if_changed(conn, project_id, &path, json.as_bytes()).await?;
+  log::debug!("sync export: wrote {} task notes", task_notes.len());
 
   // Export artifact notes
   let mut rows = conn
@@ -128,6 +142,7 @@ async fn export_notes(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
   let json = serde_json::to_string_pretty(&artifact_notes)?;
   let path = gest_dir.join("artifact_notes.json");
   write_if_changed(conn, project_id, &path, json.as_bytes()).await?;
+  log::debug!("sync export: wrote {} artifact notes", artifact_notes.len());
 
   Ok(())
 }
@@ -151,6 +166,7 @@ async fn export_tasks(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
   let path = gest_dir.join("tasks.json");
   write_if_changed(conn, project_id, &path, json.as_bytes()).await?;
 
+  log::debug!("sync export: wrote {} tasks", tasks.len());
   Ok(())
 }
 
@@ -170,11 +186,13 @@ async fn write_if_changed(conn: &Connection, project_id: &Id, path: &Path, conte
   if let Some(row) = rows.next().await? {
     let old_digest: String = row.get(0)?;
     if old_digest == new_digest {
+      log::trace!("sync export: skipped {} (digest unchanged)", path.display());
       return Ok(());
     }
   }
 
   // Write the file and update the digest
+  log::debug!("sync export: writing {}", path.display());
   std::fs::write(path, content)?;
 
   conn

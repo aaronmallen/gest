@@ -20,8 +20,8 @@ features:
     details: Store specs, ADRs, RFCs, and design documents as versioned Markdown with YAML frontmatter. Keep architectural decisions next to the code they describe.
   - title: 🤖 Agent-Native
     details: Every command supports --json output. Agents read the work queue, claim tasks, update status, and store artifacts — all through the CLI without any special integration.
-  - title: 📁 Plain Files, No Infrastructure
-    details: TOML for tasks, Markdown for artifacts — no database, no server, no accounts. Data is inspectable, diffable, and travels with your VCS.
+  - title: 🗂️ SQLite-First, Git-Friendly
+    details: Entity data lives in a single SQLite database — atomic writes, relational queries, fast dependency graphs. Opt into a .gest/ sync mirror (YAML + Markdown) to commit your data alongside your code.
   - title: 🌐 Global or Local
-    details: Store data globally in ~/.local/share/gest/ for cross-project tracking, or locally in .gest/ to version-control everything inside a single repo.
+    details: By default, projects share one SQLite database at ~/.local/share/gest/gest.db. Add --local on init to also materialize a .gest/ mirror inside the repo for version control and collaboration.
 ---

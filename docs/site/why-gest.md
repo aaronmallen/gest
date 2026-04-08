@@ -4,9 +4,11 @@ AI agents are good at generating tasks. They decompose a feature request into do
 write specs, and propose execution plans. The hard part is turning that output into parallel
 workstreams without losing track of what depends on what.
 
-Gest solves this by giving you a lightweight task and artifact store that lives in your repo as
-plain files. No database, no server, no accounts -- just TOML and Markdown that version-control
-alongside your code.
+Gest solves this by giving you a lightweight task and artifact store backed by a local SQLite
+database (via libsql). The database is the source of truth — atomic writes, relational queries,
+fast dependency graphs — and an optional `.gest/` sync mirror writes YAML and Markdown files
+alongside your code so the data is inspectable, diffable, and travels with your VCS. No server,
+no accounts, no team-facing infrastructure.
 
 ## The problem
 
@@ -94,12 +96,13 @@ tracks:
 - **Task and artifact views** — filter, search, and inspect with rendered Markdown.
 - **Iteration detail** — tasks grouped by phase with dependency visualization.
 - **Kanban board** — columns mapped to task status for tracking iteration progress.
-- **Full-text search** — find anything across tasks and artifacts without memorizing IDs.
+- **Full-text search** — find anything across tasks, artifacts, and iterations without
+  memorizing IDs.
 
 The dashboard is read/write — you can update tasks, change statuses, and manage iterations
 directly from the browser. It runs entirely local, requires no setup beyond `gest serve`, and
-works against the same plain-file store the CLI uses. There is no separate database or sync
-layer.
+reads and writes the same SQLite database the CLI uses, so changes in one surface show up
+immediately in the other.
 
 This matters because parallel agent execution generates a lot of state. When three agents are
 working concurrently on phase 1 of an iteration, you want a place to see at a glance what's

@@ -1,15 +1,20 @@
 use std::sync::Arc;
 
+use getset::Getters;
 use tokio::sync::broadcast::Sender;
 
 use crate::store::{Db, model::primitives::Id};
 
 /// Shared state for the web server.
-#[derive(Clone)]
+#[derive(Clone, Getters)]
 pub struct AppState {
+  #[get = "pub"]
   author_id: Option<Id>,
+  #[get = "pub"]
   project_id: Id,
+  #[get = "pub"]
   reload_tx: Sender<()>,
+  #[get = "pub"]
   store: Arc<Db>,
 }
 
@@ -25,29 +30,9 @@ impl AppState {
     }
   }
 
-  /// The resolved author ID for the current user, if available.
-  pub fn author_id(&self) -> Option<&Id> {
-    self.author_id.as_ref()
-  }
-
   /// Set the resolved author ID.
   pub fn with_author_id(mut self, id: Id) -> Self {
     self.author_id = Some(id);
     self
-  }
-
-  /// The current project ID.
-  pub fn project_id(&self) -> &Id {
-    &self.project_id
-  }
-
-  /// Broadcast channel for SSE reload notifications.
-  pub fn reload_tx(&self) -> &Sender<()> {
-    &self.reload_tx
-  }
-
-  /// The database connection handle.
-  pub fn store(&self) -> &Arc<Db> {
-    &self.store
   }
 }

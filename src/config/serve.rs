@@ -2,24 +2,30 @@
 
 use std::net::{IpAddr, Ipv4Addr};
 
+use getset::CopyGetters;
 use serde::{Deserialize, Serialize};
 
 use crate::logging::LevelFilter;
 
 /// Settings from the `[serve]` configuration table.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, CopyGetters, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
 pub struct Settings {
   /// IP address the server should bind to.
+  #[getset(get_copy = "pub")]
   bind_address: IpAddr,
   /// File watcher debounce window in milliseconds.
+  #[getset(get_copy = "pub")]
   debounce_ms: u64,
   /// Optional log level override applied while `gest serve` is running.
+  #[getset(get_copy = "pub")]
   #[serde(default, skip_serializing_if = "Option::is_none")]
   log_level: Option<LevelFilter>,
   /// Whether to automatically open the browser when the server starts.
+  #[getset(get_copy = "pub")]
   open: bool,
   /// Port the server should listen on.
+  #[getset(get_copy = "pub")]
   port: u16,
 }
 
@@ -32,33 +38,6 @@ impl Default for Settings {
       open: true,
       port: 2300,
     }
-  }
-}
-
-impl Settings {
-  /// The IP address the server should bind to.
-  pub fn bind_address(&self) -> IpAddr {
-    self.bind_address
-  }
-
-  /// File watcher debounce window in milliseconds.
-  pub fn debounce_ms(&self) -> u64 {
-    self.debounce_ms
-  }
-
-  /// Optional log level override applied while the server is running.
-  pub fn log_level(&self) -> Option<LevelFilter> {
-    self.log_level
-  }
-
-  /// Whether to automatically open the browser when the server starts.
-  pub fn open(&self) -> bool {
-    self.open
-  }
-
-  /// The port the server should listen on.
-  pub fn port(&self) -> u16 {
-    self.port
   }
 }
 

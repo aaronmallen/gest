@@ -1,5 +1,6 @@
 //! Pager-related configuration (`[pager]` table).
 
+use getset::CopyGetters;
 use serde::{Deserialize, Serialize};
 
 /// Settings from the `[pager]` configuration table.
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// Wiring into the pager helper is intentionally deferred -- this struct only
 /// defines the schema, defaults, and serde plumbing so the values can be read
 /// and written via `gest config get` / `gest config set`.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, CopyGetters, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
 pub struct Settings {
   /// Optional pager command override (e.g. `"less -FR"`).
@@ -23,6 +24,7 @@ pub struct Settings {
   ///
   /// Defaults to `true`. When `false`, gest should print long output directly
   /// to stdout without spawning a pager process.
+  #[getset(get_copy = "pub")]
   enabled: bool,
 }
 
@@ -43,11 +45,6 @@ impl Settings {
   /// `gest config set pager.command ""`.
   pub fn command(&self) -> Option<&str> {
     self.command.as_deref().filter(|value| !value.is_empty())
-  }
-
-  /// Whether the pager is enabled.
-  pub fn enabled(&self) -> bool {
-    self.enabled
   }
 }
 

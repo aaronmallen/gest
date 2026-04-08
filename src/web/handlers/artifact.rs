@@ -260,7 +260,7 @@ pub async fn artifact_note_add(
 
   let new = note::New {
     body: form.body,
-    author_id: state.author_id().cloned(),
+    author_id: state.author_id().clone(),
   };
   repo::note::create(&conn, EntityType::Artifact, &artifact_id, &new)
     .await

@@ -1,6 +1,5 @@
 use std::{collections::BTreeMap, path::Path};
 
-use chrono::Utc;
 use libsql::Connection;
 
 use super::{Error, digest, paths};
@@ -173,8 +172,7 @@ async fn export_tasks(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
 /// Write content to a file only if the digest has changed since last sync.
 ///
 /// `gest_dir` is the project's `.gest/` root; `path` must live inside it. The
-/// `sync_digests` cache is keyed by `(project_id, relative_path)` where
-/// `relative_path` is `path` minus the `gest_dir` prefix, so the cache stays
+/// `sync_digests` cache is keyed by `(project_id, relative_path)` so it stays
 /// portable across checkouts.
 async fn write_if_changed(
   conn: &Connection,
@@ -192,39 +190,15 @@ async fn write_if_changed(
     )))
   })?;
 
-  // Check if the digest matches what we last wrote
-  let mut rows = conn
-    .query(
-      "SELECT digest FROM sync_digests WHERE relative_path = ?1 AND project_id = ?2",
-      [relative_path.clone(), project_id.to_string()],
-    )
-    .await?;
-
-  if let Some(row) = rows.next().await? {
-    let old_digest: String = row.get(0)?;
-    if old_digest == new_digest {
-      log::trace!("sync export: skipped {} (digest unchanged)", path.display());
-      return Ok(());
-    }
+  if digest::is_unchanged(conn, project_id, &relative_path, &new_digest).await? {
+    log::trace!("sync export: skipped {} (digest unchanged)", path.display());
+    return Ok(());
   }
 
-  // Write the file and update the digest
   log::debug!("sync export: writing {}", path.display());
   std::fs::write(path, content)?;
 
-  conn
-    .execute(
-      "INSERT INTO sync_digests (project_id, relative_path, digest, synced_at) \
-        VALUES (?1, ?2, ?3, ?4) \
-        ON CONFLICT(project_id, relative_path) DO UPDATE SET digest = ?3, synced_at = ?4",
-      [
-        project_id.to_string(),
-        relative_path,
-        new_digest,
-        Utc::now().to_rfc3339(),
-      ],
-    )
-    .await?;
+  digest::record(conn, project_id, &relative_path, &new_digest).await?;
 
   Ok(())
 }

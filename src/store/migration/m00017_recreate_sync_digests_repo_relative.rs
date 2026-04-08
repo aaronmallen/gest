@@ -9,7 +9,7 @@ pub const MIGRATION: Migration = Migration {
   sql: "\
     DROP TABLE IF EXISTS sync_digests;\
     CREATE TABLE sync_digests (\
-      project_id    TEXT NOT NULL REFERENCES projects(id),\
+      project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\
       relative_path TEXT NOT NULL,\
       digest        TEXT NOT NULL,\
       synced_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),\

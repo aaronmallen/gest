@@ -35,7 +35,9 @@ pub fn build_metadata(base: Option<Value>, pairs: &[String], json_blobs: &[Strin
       serde_json::from_str(blob).map_err(|e| Error::Editor(format!("invalid --metadata-json: {e}")))?;
     let object = match parsed {
       Value::Object(map) => map,
-      _ => return Err(Error::Editor("--metadata-json must be a JSON object".to_string())),
+      _ => {
+        return Err(Error::Editor("--metadata-json must be a JSON object".to_string()));
+      }
     };
     if let Some(existing) = metadata.as_object_mut() {
       for (k, v) in object {

@@ -20,25 +20,135 @@ use std::{
   time::{Duration, Instant},
 };
 
-use axum::{Router, middleware};
+use askama::{Error as AskamaError, Template};
+use axum::{
+  Router,
+  http::StatusCode,
+  middleware,
+  response::{Html, IntoResponse, Response},
+};
 use notify::{Error as NotifyError, Event as NotifyEvent, RecursiveMode, Watcher};
+use serde_json::Error as SerdeJsonError;
 pub use state::AppState;
+use thiserror::Error as ThisError;
 
-use crate::{io::git, store::Db};
+use crate::{
+  io::git,
+  store::{Db, Error as StoreError},
+};
 
-/// File name of the unix domain socket used for the web reload IPC channel.
-pub const RELOAD_SOCKET_FILE: &str = "web.sock";
-
-/// Errors that can occur in the web server.
-#[derive(Debug, thiserror::Error)]
+/// Errors produced by the web layer.
+///
+/// A single `Error` covers both the startup path (file watcher, socket bind, TCP
+/// listener) and the request path (handler responses). The [`IntoResponse`] impl
+/// maps variants to real HTTP status codes so handlers can return typed errors
+/// instead of stringified 500s. Handler call sites still use
+/// [`crate::web::handlers::AppError`] until phase 6 of the web refactor.
+///
+/// `BadRequest` and `Internal` carry user-facing messages that the `IntoResponse`
+/// impl renders through the shared error template. `NotFound` renders the
+/// dedicated not-found template. `Io` and `Notify` appear during server startup
+/// (socket binding, file watcher) and render as opaque 500s if they ever surface
+/// through a handler.
+#[derive(Debug, ThisError)]
+#[allow(dead_code)] // handler variants are wired up in phase 6 of the web refactor
 pub enum Error {
-  /// An I/O error.
+  /// 400 Bad Request with a user-facing message.
+  #[error("{0}")]
+  BadRequest(String),
+  /// 500 Internal Server Error; the wrapped detail is logged, never rendered.
+  #[error("{0}")]
+  Internal(String),
+  /// Filesystem or network I/O error (server bootstrap or request handling).
   #[error(transparent)]
   Io(#[from] IoError),
-  /// File watcher error.
+  /// 404 Not Found; renders the `not_found.html` template.
+  #[error("not found")]
+  NotFound,
+  /// File watcher error from the `notify` crate (server bootstrap).
   #[error(transparent)]
   Notify(#[from] NotifyError),
 }
+
+#[derive(Template)]
+#[template(path = "error.html")]
+struct ErrorTemplate {
+  message: String,
+  status: u16,
+}
+
+#[derive(Template)]
+#[template(path = "not_found.html")]
+struct NotFoundTemplate;
+
+impl From<AskamaError> for Error {
+  fn from(value: AskamaError) -> Self {
+    Self::Internal(value.to_string())
+  }
+}
+
+impl From<SerdeJsonError> for Error {
+  fn from(value: SerdeJsonError) -> Self {
+    Self::Internal(value.to_string())
+  }
+}
+
+impl From<StoreError> for Error {
+  fn from(value: StoreError) -> Self {
+    match value {
+      StoreError::NotFound(_) => Self::NotFound,
+      other => Self::Internal(other.to_string()),
+    }
+  }
+}
+
+impl IntoResponse for Error {
+  fn into_response(self) -> Response {
+    match self {
+      Self::BadRequest(message) => render_error(StatusCode::BAD_REQUEST, message),
+      Self::Internal(detail) => {
+        log::error!("internal error: {detail}");
+        render_error(
+          StatusCode::INTERNAL_SERVER_ERROR,
+          "Something went wrong. Please try again.".to_owned(),
+        )
+      }
+      Self::Io(err) => {
+        log::error!("io error: {err}");
+        render_error(
+          StatusCode::INTERNAL_SERVER_ERROR,
+          "Something went wrong. Please try again.".to_owned(),
+        )
+      }
+      Self::NotFound => {
+        let body = NotFoundTemplate
+          .render()
+          .unwrap_or_else(|_| "404 — not found".to_owned());
+        (StatusCode::NOT_FOUND, Html(body)).into_response()
+      }
+      Self::Notify(err) => {
+        log::error!("notify error: {err}");
+        render_error(
+          StatusCode::INTERNAL_SERVER_ERROR,
+          "Something went wrong. Please try again.".to_owned(),
+        )
+      }
+    }
+  }
+}
+
+/// Render the shared error template for a given status and user-facing message.
+fn render_error(status: StatusCode, message: String) -> Response {
+  let tmpl = ErrorTemplate {
+    message,
+    status: status.as_u16(),
+  };
+  let body = tmpl.render().unwrap_or_else(|_| format!("{} — error", status.as_u16()));
+  (status, Html(body)).into_response()
+}
+
+/// File name of the unix domain socket used for the web reload IPC channel.
+pub const RELOAD_SOCKET_FILE: &str = "web.sock";
 
 /// Resolve the unix domain socket path used by the web server's reload listener.
 ///
@@ -218,4 +328,137 @@ fn router(state: AppState) -> Router {
     .layer(middleware::from_fn(request_log::log_request))
     .layer(middleware::from_fn(security_headers::add_security_headers))
     .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+  use axum::body::to_bytes;
+
+  use super::*;
+
+  async fn body_string(response: Response) -> (StatusCode, String) {
+    let status = response.status();
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    (status, String::from_utf8(bytes.to_vec()).unwrap())
+  }
+
+  mod from_askama_error {
+    use super::*;
+
+    #[test]
+    fn it_converts_a_render_error_into_an_internal_error() {
+      let askama_err = AskamaError::Fmt;
+      let err: Error = askama_err.into();
+
+      assert!(matches!(err, Error::Internal(_)));
+    }
+  }
+
+  mod from_serde_json_error {
+    use super::*;
+
+    #[test]
+    fn it_converts_a_json_error_into_an_internal_error() {
+      let json_err = serde_json::from_str::<serde_json::Value>("{not json}").unwrap_err();
+      let err: Error = json_err.into();
+
+      assert!(matches!(err, Error::Internal(_)));
+    }
+  }
+
+  mod from_store_error {
+    use super::*;
+
+    #[test]
+    fn it_maps_any_other_store_error_to_internal() {
+      let store_err = StoreError::InvalidPrefix("bad".to_owned());
+      let err: Error = store_err.into();
+
+      assert!(matches!(err, Error::Internal(_)));
+    }
+
+    #[test]
+    fn it_maps_store_not_found_to_not_found() {
+      let store_err = StoreError::NotFound("task xyz".to_owned());
+      let err: Error = store_err.into();
+
+      assert!(matches!(err, Error::NotFound));
+    }
+  }
+
+  mod into_response {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_hides_internal_details_in_the_rendered_body() {
+      let secret = "db connection string leaked";
+      let err = Error::Internal(secret.to_owned());
+
+      let (status, body) = body_string(err.into_response()).await;
+
+      assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+      assert!(!body.contains(secret));
+      assert!(body.contains("Something went wrong"));
+    }
+
+    #[tokio::test]
+    async fn it_renders_bad_request_with_a_400_status() {
+      let err = Error::BadRequest("invalid priority".to_owned());
+
+      let (status, body) = body_string(err.into_response()).await;
+
+      assert_eq!(status, StatusCode::BAD_REQUEST);
+      assert!(body.contains("invalid priority"));
+      assert!(body.contains("<html"));
+    }
+
+    #[tokio::test]
+    async fn it_renders_internal_as_a_500_html_error_page() {
+      let err = Error::Internal("boom".to_owned());
+
+      let (status, body) = body_string(err.into_response()).await;
+
+      assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+      assert!(body.contains("<html"));
+      assert!(body.contains("500"));
+    }
+
+    #[tokio::test]
+    async fn it_renders_io_as_a_500_html_error_page() {
+      let err = Error::Io(IoError::other("disk full"));
+
+      let (status, body) = body_string(err.into_response()).await;
+
+      assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+      assert!(!body.contains("disk full"));
+      assert!(body.contains("<html"));
+      assert!(body.contains("500"));
+    }
+
+    #[tokio::test]
+    async fn it_renders_not_found_with_a_404_status() {
+      let err = Error::NotFound;
+
+      let (status, body) = body_string(err.into_response()).await;
+
+      assert_eq!(status, StatusCode::NOT_FOUND);
+      assert!(body.contains("404"));
+      assert!(body.contains("<html"));
+    }
+
+    #[tokio::test]
+    async fn it_renders_notify_as_a_500_html_error_page() {
+      let notify_err = NotifyError::generic("watcher exploded");
+      let err = Error::Notify(notify_err);
+
+      let (status, body) = body_string(err.into_response()).await;
+
+      assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+      assert!(!body.contains("watcher exploded"));
+      assert!(body.contains("<html"));
+      assert!(body.contains("500"));
+    }
+  }
 }

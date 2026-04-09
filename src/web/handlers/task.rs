@@ -13,7 +13,7 @@ use crate::{
   store::{
     model::{
       note,
-      primitives::{EntityType, Id, RelationshipType, TaskStatus},
+      primitives::{EntityType, Id, Priority, RelationshipType, TaskStatus},
       relationship, task,
     },
     repo,
@@ -26,14 +26,6 @@ use crate::{
     timeline::{self, TimelineItem},
   },
 };
-
-/// Form body for task create submissions.
-#[derive(Deserialize)]
-pub struct TaskForm {
-  description: Option<String>,
-  priority: Option<u8>,
-  title: String,
-}
 
 /// Query parameters for the task list view (status tab selection).
 #[derive(Deserialize)]
@@ -50,7 +42,9 @@ struct DisplayLink {
 
 #[derive(Template)]
 #[template(path = "tasks/create.html")]
-struct TaskCreateTemplate;
+struct TaskCreateTemplate {
+  priority_options: Vec<PriorityOption>,
+}
 
 #[derive(Template)]
 #[template(path = "tasks/detail_content.html")]
@@ -82,7 +76,7 @@ struct TaskEditTemplate {
   description: String,
   error: Option<String>,
   existing_links: Vec<ExistingLink>,
-  priority: String,
+  priority_options: Vec<PriorityOption>,
   tags: String,
   task: task::Model,
   title: String,
@@ -108,6 +102,13 @@ struct TaskListTemplate {
   in_progress_count: usize,
   open_count: usize,
   rows: Vec<TaskRow>,
+}
+
+/// Dropdown option for the task priority `<select>`.
+struct PriorityOption {
+  label: String,
+  selected: bool,
+  value: String,
 }
 
 /// Enriched row for the task list view.
@@ -145,21 +146,46 @@ pub async fn note_add(
 
 /// Task create form.
 pub async fn task_create_form() -> handlers::Result<Html<String>> {
-  let tmpl = TaskCreateTemplate;
+  let tmpl = TaskCreateTemplate {
+    priority_options: build_priority_options(None),
+  };
   Ok(Html(tmpl.render().map_err(log_err("task_create_form"))?))
 }
 
 /// Handle task creation from form.
-pub async fn task_create_submit(
-  State(state): State<AppState>,
-  Form(form): Form<TaskForm>,
-) -> handlers::Result<Redirect> {
-  log::debug!("task_create_submit: title={}", form.title);
+pub async fn task_create_submit(State(state): State<AppState>, body: Bytes) -> handlers::Result<Redirect> {
+  let mut title = String::new();
+  let mut description = String::new();
+  let mut priority_str = String::new();
+  for (key, value) in form_urlencoded::parse(&body) {
+    match key.as_ref() {
+      "title" => title = value.into_owned(),
+      "description" => description = value.into_owned(),
+      "priority" => priority_str = value.into_owned(),
+      _ => {}
+    }
+  }
+  log::debug!("task_create_submit: title={title}");
+
+  let priority: Option<u8> = if priority_str.is_empty() {
+    None
+  } else {
+    let byte: u8 = priority_str.parse().map_err(|_| {
+      log::error!("task_create_submit: invalid priority: {priority_str}");
+      AppError::BadRequest("invalid priority".to_owned())
+    })?;
+    Priority::try_from(byte).map_err(|_| {
+      log::error!("task_create_submit: priority out of range: {byte}");
+      AppError::BadRequest("invalid priority".to_owned())
+    })?;
+    Some(byte)
+  };
+
   let conn = state.store().connect().await.map_err(log_err("task_create_submit"))?;
   let new = task::New {
-    description: form.description.unwrap_or_default(),
-    priority: form.priority,
-    title: form.title,
+    description,
+    priority,
+    title,
     ..Default::default()
   };
   let task = repo::task::create(&conn, state.project_id(), &new)
@@ -255,10 +281,11 @@ pub async fn task_edit_form(State(state): State<AppState>, Path(id): Path<String
     .map_err(log_err("task_edit_form"))?;
   let existing_links = forms::build_existing_links_for_entity(&task_id, EntityType::Task, &rels);
 
+  let priority_options = build_priority_options(task.priority());
   let tmpl = TaskEditTemplate {
     title: task.title().to_owned(),
     description: task.description().to_owned(),
-    priority: task.priority().map(|p| p.to_string()).unwrap_or_default(),
+    priority_options,
     tags: tags.join(", "),
     task,
     error: None,
@@ -351,6 +378,10 @@ pub async fn task_update(
       log::error!("task_update: invalid priority: {priority_str}");
       AppError::BadRequest("invalid priority".to_owned())
     })?;
+    Priority::try_from(val).map_err(|_| {
+      log::error!("task_update: priority out of range: {val}");
+      AppError::BadRequest("invalid priority".to_owned())
+    })?;
     Some(Some(val))
   };
 
@@ -411,6 +442,29 @@ fn build_display_links(task_id: &Id, rels: &[relationship::Model]) -> Vec<Displa
     });
   }
   links
+}
+
+/// Build the list of priority options rendered in the task create/edit forms.
+///
+/// `current` is the task's current priority (or `None` for the create form).
+/// The resulting list always contains a leading "no priority" option followed
+/// by one option per [`Priority::ALL`] variant.
+fn build_priority_options(current: Option<u8>) -> Vec<PriorityOption> {
+  let mut options = Vec::with_capacity(Priority::ALL.len() + 1);
+  options.push(PriorityOption {
+    label: "— none —".to_owned(),
+    selected: current.is_none(),
+    value: String::new(),
+  });
+  for priority in Priority::ALL {
+    let byte: u8 = (*priority).into();
+    options.push(PriorityOption {
+      label: priority.to_string(),
+      selected: current == Some(byte),
+      value: byte.to_string(),
+    });
+  }
+  options
 }
 
 /// Build task list data: rows filtered by status plus unfiltered per-status counts.
@@ -593,6 +647,83 @@ mod tests {
     // Leak the tempdir for the duration of the test process
     std::mem::forget(tmp);
     AppState::new(store, project_id)
+  }
+
+  mod build_priority_options {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn it_emits_a_leading_none_option_followed_by_every_priority_variant() {
+      let options = build_priority_options(None);
+
+      assert_eq!(options.len(), Priority::ALL.len() + 1);
+      assert_eq!(options[0].value, "");
+      assert_eq!(options[0].label, "— none —");
+      assert!(options[0].selected);
+      for (i, priority) in Priority::ALL.iter().enumerate() {
+        let option = &options[i + 1];
+        let byte: u8 = (*priority).into();
+        assert_eq!(option.value, byte.to_string());
+        assert_eq!(option.label, priority.to_string());
+        assert!(!option.selected);
+      }
+    }
+
+    #[test]
+    fn it_selects_the_matching_option_when_a_current_priority_is_given() {
+      let options = build_priority_options(Some(2));
+
+      let selected: Vec<_> = options.iter().filter(|o| o.selected).collect();
+      assert_eq!(selected.len(), 1);
+      assert_eq!(selected[0].value, "2");
+      assert_eq!(selected[0].label, "medium");
+    }
+  }
+
+  mod task_create_submit {
+    use axum::{
+      body::{Bytes, to_bytes},
+      extract::State,
+      http::StatusCode,
+      response::IntoResponse,
+    };
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_rejects_an_out_of_range_priority_with_a_bad_request_html_response() {
+      let state = setup().await;
+
+      let body = Bytes::from("title=bad&description=&priority=9");
+      let err = super::super::task_create_submit(State(state), body)
+        .await
+        .expect_err("priority=9 is out of Priority range and must fail");
+
+      let response = err.into_response();
+      let status = response.status();
+      let body_bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+      let html = String::from_utf8(body_bytes.to_vec()).unwrap();
+
+      assert_eq!(status, StatusCode::BAD_REQUEST);
+      assert!(html.contains("<html"));
+      assert!(html.contains("invalid priority"));
+    }
+
+    #[tokio::test]
+    async fn it_treats_an_empty_priority_as_no_priority_and_redirects() {
+      let state = setup().await;
+
+      let body = Bytes::from("title=no-priority&description=&priority=");
+      let redirect = super::super::task_create_submit(State(state), body)
+        .await
+        .expect("empty priority should succeed");
+      let response = redirect.into_response();
+
+      assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    }
   }
 
   mod task_detail_error_response {

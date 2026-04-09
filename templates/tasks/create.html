@@ -18,8 +18,12 @@
         <textarea class="form-textarea" id="description" name="description" placeholder="Markdown supported..."></textarea>
       </div>
       <div class="form-group">
-        <label for="priority">Priority (0=critical, 1=high, 2=medium, 3=low)</label>
-        <input class="form-input" type="number" id="priority" name="priority" min="0" max="4">
+        <label for="priority">Priority</label>
+        <select class="form-select" id="priority" name="priority">
+          {% for option in priority_options %}
+          <option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" type="submit">Create Task</button>

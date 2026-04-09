@@ -6,6 +6,8 @@
 //! been resolved, [`Db::configure_sync`] wires in transparent import/export
 //! against the project's `.gest/` directory.
 
+/// Filesystem-backed Gravatar avatar cache.
+pub mod avatar_cache;
 /// JSON metadata helpers shared by all `meta` subcommands.
 pub mod meta;
 /// Sequential schema migrations applied at startup.

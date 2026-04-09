@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
   Error,
-  env::{GEST_STORAGE__DATA_DIR, GEST_STORAGE__SYNC},
+  env::{GEST_STORAGE__CACHE_DIR, GEST_STORAGE__DATA_DIR, GEST_STORAGE__SYNC},
 };
 
 /// Storage-related configuration settings.
@@ -13,6 +13,8 @@ use super::{
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
 pub struct Settings {
+  /// Explicit cache directory override from the config file.
+  cache_dir: Option<PathBuf>,
   /// Explicit data directory override from the config file.
   data_dir: Option<PathBuf>,
   /// Whether automatic file sync with `.gest/` directories is enabled.
@@ -21,6 +23,48 @@ pub struct Settings {
 }
 
 impl Settings {
+  /// Resolves the cache directory using the following precedence:
+  ///
+  /// 1. `GEST_STORAGE__CACHE_DIR` environment variable (must be absolute)
+  /// 2. `storage.cache_dir` from the config file (must be absolute)
+  /// 3. XDG cache home (`$XDG_CACHE_HOME/gest`), falling back to `~/.cache/gest` when `XDG_CACHE_HOME`
+  ///    is unset (handled by `dir_spec::cache_home`).
+  ///
+  /// The cache directory holds regeneratable artifacts (such as the avatar cache) that gest owns
+  /// internally. Users control only the root; layout beneath it is an implementation detail.
+  pub fn cache_dir(&self) -> Result<PathBuf, Error> {
+    if let Ok(path) = GEST_STORAGE__CACHE_DIR.value() {
+      if path.is_absolute() {
+        log::debug!("$GEST_STORAGE__CACHE_DIR is set to {:?}", path.display());
+        log::trace!("using $GEST_STORAGE__CACHE_DIR");
+        return Ok(path);
+      }
+      log::debug!("$GEST_STORAGE__CACHE_DIR: {:?} is not absolute", path.display());
+      log::trace!("ignoring $GEST_STORAGE__CACHE_DIR");
+      log::warn!("ignoring $GEST_STORAGE__CACHE_DIR: path is not absolute");
+    } else {
+      log::debug!("$GEST_STORAGE__CACHE_DIR is not set");
+    }
+
+    if let Some(path) = &self.cache_dir {
+      if path.is_absolute() {
+        log::debug!("storage.cache_dir is set to {:?}", path.display());
+        log::trace!("using storage.cache_dir");
+        return Ok(path.clone());
+      }
+      log::debug!("storage.cache_dir: {:?} is not absolute", path.display());
+      log::trace!("ignoring storage.cache_dir");
+      log::warn!("ignoring storage.cache_dir: path is not absolute");
+    } else {
+      log::debug!("storage.cache_dir is not set");
+    }
+
+    log::trace!("falling back to XDG cache home");
+    dir_spec::cache_home()
+      .map(|path| path.join("gest"))
+      .ok_or(Error::XDGDirNotFound("cache"))
+  }
+
   /// Resolves the data directory using the following precedence:
   ///
   /// 1. `GEST_STORAGE__DATA_DIR` environment variable (must be absolute)
@@ -85,6 +129,7 @@ mod tests {
     #[test]
     fn it_falls_back_to_xdg_data_home() {
       let settings = Settings {
+        cache_dir: None,
         data_dir: None,
         sync: None,
       };
@@ -100,6 +145,7 @@ mod tests {
     #[test]
     fn it_ignores_relative_config_value() {
       let settings = Settings {
+        cache_dir: None,
         data_dir: Some(PathBuf::from("relative/path")),
         sync: None,
       };
@@ -115,6 +161,7 @@ mod tests {
     #[test]
     fn it_ignores_relative_env_var() {
       let settings = Settings {
+        cache_dir: None,
         data_dir: Some(PathBuf::from("/from/config")),
         sync: None,
       };
@@ -129,6 +176,7 @@ mod tests {
     #[test]
     fn it_prefers_env_var_over_config_and_xdg() {
       let settings = Settings {
+        cache_dir: None,
         data_dir: Some(PathBuf::from("/from/config")),
         sync: None,
       };
@@ -143,6 +191,7 @@ mod tests {
     #[test]
     fn it_uses_config_value_when_env_var_is_unset() {
       let settings = Settings {
+        cache_dir: None,
         data_dir: Some(PathBuf::from("/from/config")),
         sync: None,
       };
@@ -170,6 +219,7 @@ mod tests {
     #[test]
     fn it_env_var_can_enable_over_config() {
       let settings = Settings {
+        cache_dir: None,
         data_dir: None,
         sync: Some(false),
       };
@@ -182,6 +232,7 @@ mod tests {
     #[test]
     fn it_env_var_overrides_config() {
       let settings = Settings {
+        cache_dir: None,
         data_dir: None,
         sync: Some(true),
       };
@@ -194,6 +245,7 @@ mod tests {
     #[test]
     fn it_returns_false_when_config_sync_is_false() {
       let settings = Settings {
+        cache_dir: None,
         data_dir: None,
         sync: Some(false),
       };
@@ -206,6 +258,7 @@ mod tests {
     #[test]
     fn it_returns_true_when_config_sync_is_true() {
       let settings = Settings {
+        cache_dir: None,
         data_dir: None,
         sync: Some(true),
       };

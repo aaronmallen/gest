@@ -98,10 +98,11 @@ For a dedicated guide to terminal UI color customization, see
 
 ### `[storage]`
 
-| Key        | Type                   | Default           | Description                                                                                                         |
-|------------|------------------------|-------------------|---------------------------------------------------------------------------------------------------------------------|
-| `data_dir` | string (absolute path) | _(auto-resolved)_ | Override the global data root directory. Must be an absolute path.                                                  |
-| `sync`     | boolean                | `true`            | Enable bidirectional sync between the SQLite database and a `.gest/` directory when one exists in the project root. |
+| Key         | Type                   | Default           | Description                                                                                                                                                                               |
+|-------------|------------------------|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `cache_dir` | string (absolute path) | _(auto-resolved)_ | Override the global cache directory used for regeneratable artifacts such as the avatar cache. Must be an absolute path. Defaults to `$XDG_CACHE_HOME/gest` (`~/.cache/gest` when unset). |
+| `data_dir`  | string (absolute path) | _(auto-resolved)_ | Override the global data root directory. Must be an absolute path.                                                                                                                        |
+| `sync`      | boolean                | `true`            | Enable bidirectional sync between the SQLite database and a `.gest/` directory when one exists in the project root.                                                                       |
 
 ### `[database]`
 
@@ -184,15 +185,16 @@ primary = "#5AB0FF"
 gest recognizes the following environment variables. They take precedence over
 values from config files.
 
-| Variable                 | Description                                                                                   |
-|--------------------------|-----------------------------------------------------------------------------------------------|
-| `GEST_CONFIG`            | Override the path to the global config file.                                                  |
-| `GEST_LOG__LEVEL`        | Override the log level filter (e.g. `debug`, `trace`). Takes precedence over the config file. |
-| `GEST_STORAGE__DATA_DIR` | Override the global data root directory (must be an absolute path).                           |
-| `GEST_STORAGE__SYNC`     | Enable or disable bidirectional sync to `.gest/` (`true`/`false`).                            |
-| `VISUAL`                 | Preferred editor for interactive editing (checked before `EDITOR`).                           |
-| `EDITOR`                 | Fallback editor for interactive editing.                                                      |
-| `PAGER`                  | Preferred pager program (falls back to `less`).                                               |
+| Variable                  | Description                                                                                   |
+|---------------------------|-----------------------------------------------------------------------------------------------|
+| `GEST_CONFIG`             | Override the path to the global config file.                                                  |
+| `GEST_LOG__LEVEL`         | Override the log level filter (e.g. `debug`, `trace`). Takes precedence over the config file. |
+| `GEST_STORAGE__CACHE_DIR` | Override the global cache directory for regeneratable artifacts (must be an absolute path).   |
+| `GEST_STORAGE__DATA_DIR`  | Override the global data root directory (must be an absolute path).                           |
+| `GEST_STORAGE__SYNC`      | Enable or disable bidirectional sync to `.gest/` (`true`/`false`).                            |
+| `VISUAL`                  | Preferred editor for interactive editing (checked before `EDITOR`).                           |
+| `EDITOR`                  | Fallback editor for interactive editing.                                                      |
+| `PAGER`                   | Preferred pager program (falls back to `less`).                                               |
 
 ## Managing config from the CLI
 

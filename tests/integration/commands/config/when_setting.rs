@@ -62,6 +62,41 @@ fn it_infers_bool_int_and_string_value_types() {
 }
 
 #[test]
+fn it_round_trips_storage_cache_dir_through_set_and_get() {
+  let g = GestCmd::new();
+  let cache_dir = g.temp_dir_path().join("custom-cache");
+  let cache_dir_str = cache_dir.to_str().unwrap().to_string();
+
+  g.cmd()
+    .args(["config", "set", "storage.cache_dir", &cache_dir_str])
+    .assert()
+    .success();
+
+  let config_path = g.temp_dir_path().join(".gest.toml");
+  let content = fs::read_to_string(&config_path).expect("config file should exist");
+  let parsed: Table = toml::from_str(&content).expect("config should be valid TOML");
+  let storage = parsed.get("storage").and_then(Value::as_table).unwrap();
+  assert_eq!(storage.get("cache_dir"), Some(&Value::String(cache_dir_str.clone())));
+
+  let output = g
+    .cmd()
+    .args(["config", "get", "storage.cache_dir"])
+    .output()
+    .expect("config get failed to run");
+
+  assert!(
+    output.status.success(),
+    "config get exited non-zero: {}",
+    String::from_utf8_lossy(&output.stderr)
+  );
+  let stdout = String::from_utf8_lossy(&output.stdout);
+  assert!(
+    stdout.contains(&cache_dir_str),
+    "expected output to contain {cache_dir_str:?}, got: {stdout}"
+  );
+}
+
+#[test]
 fn it_sets_a_nested_dot_path_key() {
   let g = GestCmd::new();
   let config_path = g.temp_dir_path().join(".gest.toml");

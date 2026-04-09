@@ -36,7 +36,49 @@ rewrite the following:
 - **Duplicate title** — do not repeat the title as an `# H1` heading in the body. GitHub already displays the title
   prominently; an H1 in the body is redundant.
 
-### 3. Confirm and Create
+### 3. Reshape to the Issue Template
+
+Rewrite the sanitized content into the project's standard issue template. Use this exact section order and
+headings — no extra sections, no "Proposed Solution" or "Problem Statement" headings, no duplicate title.
+
+```markdown
+## User Story
+As a <role>, I want <capability> so that <benefit>.
+
+## Context
+<Background and motivation: why this is needed, relevant constraints, prior-art references.
+Keep to 1–3 paragraphs. Technical framing is fine; implementation plans are not.>
+
+## Acceptance Criteria
+- [ ] <Measurable outcome 1>
+- [ ] <Measurable outcome 2>
+- [ ] `cargo build` and `cargo test` pass.
+
+## Out of Scope
+- <Explicit non-goal 1>
+- <Explicit non-goal 2>
+```
+
+Template rules:
+
+- **User Story is required.** Derive the role, capability, and benefit from the task description. If the source
+  content doesn't state a user-facing benefit, infer one from context rather than omitting the section.
+- **Context is required** and should explain *why*, not *how*. Pull motivation, constraints, and relevant prior-art
+  pointers from the source. Do not include file:line references, variant names, or implementation plans unless a
+  reader genuinely cannot understand the issue without them.
+- **Acceptance Criteria is required** and uses GitHub task-list syntax (`- [ ]`). Each criterion should be
+  independently verifiable. Always include a final `cargo build` / `cargo test` criterion unless the work is
+  docs-only.
+- **Out of Scope is required** when the source identifies non-goals; omit the section only if there are none.
+- **No other top-level headings.** Do not add Summary, Problem, Proposed Solution, Breaking Change, References,
+  Open Questions, or similar — fold any essential content from those sections into Context or Acceptance Criteria.
+- **No code blocks showing implementation** (e.g., `impl X { ... }`). Prose descriptions only in Context.
+- **Tables are allowed** in Context when they convey reference data (e.g., a code → name mapping).
+
+For overarching/epic issues promoted from a spec or iteration, the same template applies. Use the `epic` type label
+in addition to area labels.
+
+### 4. Confirm and Create
 
 Draft the `gh issue create` command and present it to the user for confirmation:
 
@@ -53,7 +95,7 @@ After the user confirms, execute the command. Extract the issue number from the 
 cargo run -- task meta set <id> github-issue <number>
 ```
 
-### 4. Report
+### 5. Report
 
 Print a summary: the GitHub Issue number and URL.
 

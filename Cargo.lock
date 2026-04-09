@@ -1045,6 +1045,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "toml",
+ "tower 0.5.3",
  "typed-env",
  "unicode-width",
  "yaml_serde",

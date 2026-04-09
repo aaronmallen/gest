@@ -5,6 +5,7 @@ mod forms;
 mod gravatar;
 mod handlers;
 mod markdown;
+mod nonce;
 mod reload_ipc;
 mod request_log;
 mod security_headers;
@@ -327,6 +328,7 @@ fn router(state: AppState) -> Router {
     .fallback(handlers::not_found)
     .layer(middleware::from_fn(request_log::log_request))
     .layer(middleware::from_fn(security_headers::add_security_headers))
+    .layer(middleware::from_fn(nonce::attach_nonce))
     .with_state(state)
 }
 
@@ -459,6 +461,91 @@ mod tests {
       assert!(!body.contains("watcher exploded"));
       assert!(body.contains("<html"));
       assert!(body.contains("500"));
+    }
+  }
+
+  mod middleware_chain {
+    use axum::{Router, body::Body, http::Request as HttpRequest, routing::get};
+    use pretty_assertions::assert_eq;
+    use tower::ServiceExt;
+
+    use super::*;
+
+    fn test_router() -> Router {
+      async fn page() -> Html<&'static str> {
+        Html(concat!(
+          "<html><head><style nonce=\"__CSP_NONCE__\">x{}</style></head>",
+          "<body><script nonce=\"__CSP_NONCE__\">1;</script></body></html>",
+        ))
+      }
+      Router::new()
+        .route("/", get(page))
+        .layer(middleware::from_fn(security_headers::add_security_headers))
+        .layer(middleware::from_fn(nonce::attach_nonce))
+    }
+
+    #[tokio::test]
+    async fn it_emits_a_csp_header_that_never_contains_unsafe_inline() {
+      let response = test_router()
+        .oneshot(HttpRequest::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+      let csp = response
+        .headers()
+        .get("content-security-policy")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+
+      assert!(!csp.contains("'unsafe-inline'"));
+      assert!(csp.contains("default-src 'self'"));
+      assert!(csp.contains("script-src 'self' 'nonce-"));
+      assert!(csp.contains("style-src 'self' 'nonce-"));
+    }
+
+    #[tokio::test]
+    async fn it_sets_the_permissions_and_referrer_policy_headers() {
+      let response = test_router()
+        .oneshot(HttpRequest::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+      let referrer = response.headers().get("referrer-policy").unwrap().to_str().unwrap();
+      let permissions = response.headers().get("permissions-policy").unwrap().to_str().unwrap();
+
+      assert_eq!(referrer, "no-referrer");
+      assert!(permissions.contains("camera=()"));
+      assert!(permissions.contains("microphone=()"));
+      assert!(permissions.contains("geolocation=()"));
+    }
+
+    #[tokio::test]
+    async fn it_stamps_the_same_nonce_in_the_csp_header_and_the_response_body() {
+      let response = test_router()
+        .oneshot(HttpRequest::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+      let csp = response
+        .headers()
+        .get("content-security-policy")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+      let (_, body) = body_string(response).await;
+
+      // Extract the nonce value from the CSP header.
+      let marker = "'nonce-";
+      let start = csp.find(marker).unwrap() + marker.len();
+      let end = start + csp[start..].find('\'').unwrap();
+      let nonce = &csp[start..end];
+
+      assert!(!nonce.is_empty());
+      assert!(!body.contains("__CSP_NONCE__"));
+      assert_eq!(body.matches(&format!("nonce=\"{nonce}\"")).count(), 2);
     }
   }
 }

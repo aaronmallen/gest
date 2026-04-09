@@ -68,3 +68,4 @@ insta = "1"
 pretty_assertions = "1"
 temp-env = "0.3"
 tempfile = "3"
+tower = { features = ["util"], version = "0.5" }

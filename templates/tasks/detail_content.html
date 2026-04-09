@@ -146,6 +146,7 @@
 
 <div class="note-card">
   <form method="post" action="/tasks/{{ task.id() }}/notes">
+    <input type="hidden" name="_csrf" value="__CSRF_TOKEN__">
     <div class="form-group md-preview-container">
       <label for="note-body">Add a note</label>
       <button type="button" class="btn md-preview-btn md-preview-toggle" data-target="note-body">Preview</button>

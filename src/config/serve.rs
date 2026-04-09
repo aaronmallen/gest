@@ -14,6 +14,13 @@ pub struct Settings {
   /// IP address the server should bind to.
   #[getset(get_copy = "pub")]
   bind_address: IpAddr,
+  /// Hex-encoded 32-byte HMAC key used to sign CSRF cookies.
+  ///
+  /// Auto-generated and persisted to the global config file on first startup
+  /// when absent. Rotating the key invalidates every outstanding CSRF cookie
+  /// on the next request, which will be reissued transparently.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  csrf_signing_key: Option<String>,
   /// File watcher debounce window in milliseconds.
   #[getset(get_copy = "pub")]
   debounce_ms: u64,
@@ -29,10 +36,18 @@ pub struct Settings {
   port: u16,
 }
 
+impl Settings {
+  /// Hex-encoded HMAC signing key used by the CSRF middleware.
+  pub fn csrf_signing_key(&self) -> Option<&str> {
+    self.csrf_signing_key.as_deref()
+  }
+}
+
 impl Default for Settings {
   fn default() -> Self {
     Self {
       bind_address: IpAddr::V4(Ipv4Addr::LOCALHOST),
+      csrf_signing_key: None,
       debounce_ms: 2000,
       log_level: None,
       open: true,
@@ -134,6 +149,7 @@ mod tests {
   fn it_round_trips_through_toml() {
     let settings = Settings {
       bind_address: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+      csrf_signing_key: Some("deadbeef".to_owned()),
       debounce_ms: 500,
       log_level: Some(LevelFilter::Debug),
       open: false,

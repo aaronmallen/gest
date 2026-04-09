@@ -1,6 +1,7 @@
 //! Web server for the gest dashboard.
 
 mod assets;
+mod csrf;
 mod forms;
 mod gravatar;
 mod handlers;
@@ -28,6 +29,7 @@ use axum::{
   middleware,
   response::{Html, IntoResponse, Response},
 };
+pub use csrf::CsrfKey;
 use notify::{Error as NotifyError, Event as NotifyEvent, RecursiveMode, Watcher};
 use serde_json::Error as SerdeJsonError;
 pub use state::AppState;
@@ -179,6 +181,7 @@ pub async fn serve(
   gest_dir: Option<PathBuf>,
   socket_path: Option<PathBuf>,
   debounce_ms: u64,
+  csrf_key: CsrfKey,
 ) -> Result<(), Error> {
   let mut state = AppState::new(store, project_id);
 
@@ -243,7 +246,7 @@ pub async fn serve(
   #[cfg(not(unix))]
   let _ = socket_path;
 
-  let app = router(state);
+  let app = router(state, csrf_key);
 
   log::info!("starting web server at http://{addr}");
   let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -253,7 +256,7 @@ pub async fn serve(
 }
 
 /// Build the application router with all routes.
-fn router(state: AppState) -> Router {
+fn router(state: AppState, csrf_key: CsrfKey) -> Router {
   Router::new()
     .route("/", axum::routing::get(handlers::dashboard))
     .route("/_dashboard", axum::routing::get(handlers::dashboard_fragment))
@@ -329,6 +332,10 @@ fn router(state: AppState) -> Router {
     .layer(middleware::from_fn(request_log::log_request))
     .layer(middleware::from_fn(security_headers::add_security_headers))
     .layer(middleware::from_fn(nonce::attach_nonce))
+    .layer(middleware::from_fn(move |req, next| {
+      let key = csrf_key.clone();
+      async move { csrf::csrf_layer(key, req, next).await }
+    }))
     .with_state(state)
 }
 

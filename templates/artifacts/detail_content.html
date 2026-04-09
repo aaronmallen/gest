@@ -62,6 +62,7 @@
 {% if !artifact.is_archived() %}
 <div style="margin-bottom: 16px;">
   <form method="post" action="/artifacts/{{ artifact.id() }}/archive" style="display:inline;">
+    <input type="hidden" name="_csrf" value="__CSRF_TOKEN__">
     <button type="submit" class="btn btn-danger" onclick="return confirm('Archive this artifact?');">Archive</button>
   </form>
 </div>
@@ -107,6 +108,7 @@
 
 <div class="note-card">
   <form method="post" action="/artifacts/{{ artifact.id() }}/notes">
+    <input type="hidden" name="_csrf" value="__CSRF_TOKEN__">
     <div class="form-group md-preview-container">
       <label for="note-body">Add a note</label>
       <button type="button" class="btn md-preview-btn md-preview-toggle" data-target="note-body">Preview</button>

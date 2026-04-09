@@ -21,6 +21,7 @@
   <div class="term-bar"><span class="term-title">edit task {{ task.id().short() }}</span></div>
   <div class="term-body">
     <form method="post" action="/tasks/{{ task.id() }}">
+      <input type="hidden" name="_csrf" value="__CSRF_TOKEN__">
       <div class="form-group">
         <label for="title">Title</label>
         <input class="form-input" type="text" id="title" name="title" required autofocus value="{{ title }}">

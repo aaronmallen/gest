@@ -15,6 +15,7 @@
     <div class="form-error" style="margin-bottom: 12px;">{{ err }}</div>
     {% endif %}
     <form method="post" action="/artifacts/{{ artifact.id() }}">
+      <input type="hidden" name="_csrf" value="__CSRF_TOKEN__">
       <div class="form-group">
         <label for="title">Title</label>
         <input class="form-input" type="text" id="title" name="title" required autofocus value="{{ title }}">

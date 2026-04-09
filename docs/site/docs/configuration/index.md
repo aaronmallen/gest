@@ -130,13 +130,14 @@ to `sqlite`.
 Controls the built-in web dashboard (`gest serve`). CLI flags on `gest serve` override
 these values at runtime.
 
-| Key            | Type    | Default       | Description                                                                      |
-|----------------|---------|---------------|----------------------------------------------------------------------------------|
-| `bind_address` | string  | `127.0.0.1`   | IP address the server should bind to.                                            |
-| `debounce_ms`  | integer | `2000`        | File watcher debounce window in milliseconds.                                    |
-| `log_level`    | string  | _none_        | Optional log level override applied only while `gest serve` is running.          |
-| `open`         | boolean | `true`        | Whether to automatically open the browser when the server starts.                |
-| `port`         | integer | `2300`        | Port the server should listen on.                                                |
+| Key                 | Type    | Default       | Description                                                                                                                                    |
+|---------------------|---------|---------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| `bind_address`      | string  | `127.0.0.1`   | IP address the server should bind to.                                                                                                          |
+| `csrf_signing_key`  | string  | _(generated)_ | Hex-encoded 32-byte HMAC key used to sign CSRF cookies. Generated and persisted to the global config on first run if absent.                   |
+| `debounce_ms`       | integer | `2000`        | File watcher debounce window in milliseconds.                                                                                                  |
+| `log_level`         | string  | _none_        | Optional log level override applied only while `gest serve` is running.                                                                        |
+| `open`              | boolean | `true`        | Whether to automatically open the browser when the server starts.                                                                              |
+| `port`              | integer | `2300`        | Port the server should listen on.                                                                                                              |
 
 ### `[log]`
 

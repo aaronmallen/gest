@@ -58,6 +58,9 @@
             {% for tag in row.tags %}
               <a href="/search?q=tag:{{ tag }}" class="tag">#{{ tag }}</a>{{ " " }}
             {% endfor %}
+            {% if row.link_count > 0 %}
+              <span class="c-dim" title="linked entities">[{{ row.link_count }} link{% if row.link_count != 1 %}s{% endif %}]</span>
+            {% endif %}
           </td>
           <td class="c-dim">{{ row.artifact.updated_at().format("%Y-%m-%d %H:%M") }}</td>
         </tr>

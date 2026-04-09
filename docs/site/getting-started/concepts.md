@@ -43,7 +43,8 @@ tasks without a priority are treated as unprioritized rather than defaulting to 
 
 Phase is a numeric label used to group tasks for parallel execution inside an iteration. Tasks
 in the same phase have no ordering dependency on each other and can run concurrently. Lower
-phase numbers execute first.
+phase numbers execute first. Phases are the parallelism boundary: if one task blocks another,
+they must live in different phases.
 
 ## Artifacts
 
@@ -120,6 +121,38 @@ tasks. This makes it clear which tasks can run in parallel and which must wait.
 gest iteration add <iteration-id> <task-id>      # add a task
 gest iteration remove <iteration-id> <task-id>   # remove a task
 ```
+
+## Working across workspaces
+
+Gest's zero-config discovery resolves each checkout to its own project row by default, so a
+secondary jj workspace, git worktree, or fresh clone will not see tasks, artifacts, or
+iterations from the primary checkout until it is explicitly attached to the same project.
+
+From the primary checkout, print the current project id:
+
+```sh
+gest project
+```
+
+Then from each secondary checkout, attach to that same id:
+
+```sh
+gest project attach <project-id>
+```
+
+Before removing a workspace, detach it so the project row is not left pointing at a stale
+path:
+
+```sh
+gest project detach
+```
+
+Once multiple checkouts share a project, each workspace can call
+`gest iteration next --claim --agent <name>` to pull a different unblocked task from the
+active phase — this is how phases translate into real parallelism across agents. See
+[Dependency Graphs](#dependency-graphs) for how phases and blocking links interact, and
+[Orchestrate multiple agents](agents.md#orchestrate-multiple-agents) for the end-to-end
+loop. For the full `gest project` reference, see [`gest project`](/cli/project).
 
 ## Linking
 

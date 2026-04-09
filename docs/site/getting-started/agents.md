@@ -97,20 +97,21 @@ gest task link <task-id> child-of <artifact-id> --artifact
 ## Build execution plans
 
 Group related tasks into an iteration with phased execution. Tasks in the same
-phase can run in parallel; lower phases execute first:
+phase can run in parallel; lower phases execute first. Phases are the
+parallelism boundary: if one task blocks another, they must live in different
+phases.
 
 ```sh
-# Create tasks with phase assignments
-gest task create "Add parser types" --phase 1 --priority 1
-gest task create "Add CLI flag" --phase 1 --priority 2
-gest task create "Integrate parser" --phase 2 --priority 0
+# Create tasks (no phase yet)
+gest task create "Add parser types"
+gest task create "Add CLI flag"
+gest task create "Integrate parser"
 
-# Set dependencies
-gest task link <integrate-id> blocked-by <parser-id>
-
-# Create an iteration and add tasks
+# Create an iteration and assign tasks to phases
 gest iteration create "Implement feature X"
-gest iteration add <iteration-id> <task-id>
+gest iteration add <iteration-id> <parser-id>    --phase 1
+gest iteration add <iteration-id> <cli-flag-id>  --phase 1
+gest iteration add <iteration-id> <integrate-id> --phase 2
 
 # Visualize the plan
 gest iteration graph <iteration-id>

@@ -5,7 +5,7 @@ use libsql::Connection;
 
 use crate::{
   AppContext,
-  cli::{Error, meta_args},
+  cli::{Error, commands::task::priority::parse_priority, meta_args},
   store::{
     model::{
       primitives::{AuthorType, EntityType, Id, RelationshipType, TaskStatus},
@@ -49,8 +49,8 @@ pub struct Command {
   /// The phase within the iteration (defaults to max existing + 1). Requires `--iteration`.
   #[arg(long, requires = "iteration")]
   phase: Option<u32>,
-  /// The task priority (0-4, lower is higher).
-  #[arg(long, short)]
+  /// The task priority; either 0-4 (lower is higher) or one of critical|high|medium|low|lowest.
+  #[arg(long, short, value_parser = parse_priority)]
   priority: Option<u8>,
   /// The initial task status.
   #[arg(long, short)]

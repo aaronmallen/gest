@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  cli::{Error, meta_args},
+  cli::{Error, commands::task::priority::parse_priority, meta_args},
   store::{
     model::{
       primitives::{AuthorType, EntityType, TaskStatus},
@@ -33,8 +33,8 @@ pub struct Command {
   /// Move the task to a phase within its iteration.
   #[arg(long)]
   phase: Option<u32>,
-  /// Set the task priority (0-4).
-  #[arg(long, short)]
+  /// Set the task priority; either 0-4 (lower is higher) or one of critical|high|medium|low|lowest.
+  #[arg(long, short, value_parser = parse_priority)]
   priority: Option<u8>,
   /// Set the task status.
   #[arg(long, short)]

@@ -17,7 +17,6 @@ pub use id::Primitive as Id;
 /// Lifecycle status tracked on each iteration.
 pub use iteration_status::Primitive as IterationStatus;
 /// Relative importance assigned to a task.
-#[allow(unused_imports)]
 pub use priority::Primitive as Priority;
 /// Semantic kind of relationship between two entities.
 pub use relationship_type::Primitive as RelationshipType;

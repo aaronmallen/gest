@@ -13,6 +13,7 @@ mod when_listing_notes;
 mod when_managing_metadata;
 mod when_note_delete_prompt;
 mod when_prefix_highlighting;
+mod when_setting_priority;
 mod when_showing;
 mod when_showing_notes;
 mod when_untagging;

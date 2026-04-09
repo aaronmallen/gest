@@ -10,6 +10,7 @@ mod link;
 mod list;
 mod meta;
 mod note;
+mod priority;
 mod show;
 mod tag;
 mod untag;

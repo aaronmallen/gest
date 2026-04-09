@@ -22,7 +22,9 @@ const FRONTMATTER_DELIM: &str = "---\n";
 /// Tombstone the on-disk file for an artifact by setting `deleted_at` in its
 /// YAML frontmatter. No-op if `gest_dir` is `None` or the file is missing.
 pub fn tombstone_artifact(gest_dir: Option<&Path>, id: &Id, deleted_at: DateTime<Utc>) -> Result<(), Error> {
-  let Some(gest_dir) = gest_dir else { return Ok(()) };
+  let Some(gest_dir) = gest_dir else {
+    return Ok(());
+  };
   let path = paths::artifact_path(gest_dir, id);
   if !path.exists() {
     return Ok(());
@@ -200,19 +202,19 @@ mod tests {
       let mapping = value.as_mapping().unwrap();
       assert_eq!(
         mapping
-          .get(&YamlValue::String("deleted_at".into()))
+          .get(YamlValue::String("deleted_at".into()))
           .and_then(YamlValue::as_str),
         Some("2026-04-08T12:00:00+00:00")
       );
       assert_eq!(
         mapping
-          .get(&YamlValue::String("title".into()))
+          .get(YamlValue::String("title".into()))
           .and_then(YamlValue::as_str),
         Some("Sprint")
       );
       assert_eq!(
         mapping
-          .get(&YamlValue::String("status".into()))
+          .get(YamlValue::String("status".into()))
           .and_then(YamlValue::as_str),
         Some("active")
       );

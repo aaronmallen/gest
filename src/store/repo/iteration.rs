@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use chrono::Utc;
 use libsql::{Connection, Value};
@@ -270,9 +270,10 @@ pub async fn tasks_with_phase(conn: &Connection, iteration_id: &Id) -> Result<Ve
     let status: String = row.get(2)?;
     let priority: Option<i64> = row.get(3)?;
     let phase: i64 = row.get(4)?;
+    let id_short = Id::from_str(&full_id).map_err(Error::InvalidValue)?.short();
     result.push(IterationTaskRow {
       blocked_by: Vec::new(),
-      id_short: short_task_id(&full_id),
+      id_short,
       is_blocking: false,
       phase: phase as u32,
       priority: priority.map(|p| p as u8),
@@ -289,7 +290,15 @@ pub async fn tasks_with_phase(conn: &Connection, iteration_id: &Id) -> Result<Ve
   let blocking = resolve_blocking_batch(conn, iteration_id).await?;
   for (full_id, row) in full_ids.iter().zip(result.iter_mut()) {
     if let Some(info) = blocking.get(full_id) {
-      row.blocked_by = info.blockers.iter().map(|id| short_task_id(id)).collect();
+      row.blocked_by = info
+        .blockers
+        .iter()
+        .map(|id| {
+          Id::from_str(id)
+            .map(|parsed| parsed.short())
+            .map_err(Error::InvalidValue)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
       row.is_blocking = info.is_blocking;
     }
   }
@@ -352,14 +361,6 @@ async fn resolve_blocking_batch(conn: &Connection, iteration_id: &Id) -> Result<
   }
 
   Ok(map)
-}
-
-fn short_task_id(full_id: &str) -> String {
-  if full_id.len() >= 8 {
-    full_id[..8].to_string()
-  } else {
-    full_id.to_string()
-  }
 }
 
 async fn collect_ids(conn: &Connection, sql: &str, project_id: &Id) -> Result<Vec<String>, Error> {
@@ -972,7 +973,7 @@ mod tests {
       let blocked_row = rows.iter().find(|r| r.title == "Blocked").unwrap();
       let blocker_row = rows.iter().find(|r| r.title == "Blocker").unwrap();
 
-      assert_eq!(blocked_row.blocked_by, vec![short_task_id(&blocker.to_string())]);
+      assert_eq!(blocked_row.blocked_by, vec![blocker.short()]);
       assert!(!blocked_row.is_blocking);
 
       assert!(blocker_row.blocked_by.is_empty());
@@ -1012,7 +1013,7 @@ mod tests {
       let blocked_row = rows.iter().find(|r| r.title == "Blocked").unwrap();
       let blocker_row = rows.iter().find(|r| r.title == "Blocker").unwrap();
 
-      assert_eq!(blocked_row.blocked_by, vec![short_task_id(&blocker.to_string())]);
+      assert_eq!(blocked_row.blocked_by, vec![blocker.short()]);
       assert!(blocker_row.is_blocking);
     }
 

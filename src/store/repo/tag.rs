@@ -1,5 +1,7 @@
+use std::{collections::HashMap, str::FromStr};
+
 use chrono::Utc;
-use libsql::Connection;
+use libsql::{Connection, Value};
 
 use crate::store::{
   Error,
@@ -153,6 +155,51 @@ pub async fn find_or_create(conn: &Connection, label: &str) -> Result<Tag, Error
   create(conn, &tag).await
 }
 
+/// Return all tags attached to each of the given entities in a single query.
+///
+/// Entities with no tags are absent from the returned map. Within each entry
+/// the tags are ordered by label. Passing an empty `entity_ids` slice returns
+/// an empty map without issuing a query.
+pub async fn for_entities(
+  conn: &Connection,
+  entity_type: EntityType,
+  entity_ids: &[Id],
+) -> Result<HashMap<Id, Vec<Tag>>, Error> {
+  log::debug!("repo::tag::for_entities");
+  let mut map: HashMap<Id, Vec<Tag>> = HashMap::new();
+  if entity_ids.is_empty() {
+    return Ok(map);
+  }
+
+  let placeholders = (2..entity_ids.len() + 2)
+    .map(|i| format!("?{i}"))
+    .collect::<Vec<_>>()
+    .join(", ");
+  let sql = format!(
+    "SELECT t.id, t.label, t.created_at, t.updated_at, et.entity_id \
+      FROM entity_tags et \
+      INNER JOIN tags t ON t.id = et.tag_id \
+      WHERE et.entity_type = ?1 AND et.entity_id IN ({placeholders}) \
+      ORDER BY et.entity_id, t.label"
+  );
+
+  let mut params: Vec<Value> = Vec::with_capacity(entity_ids.len() + 1);
+  params.push(Value::from(entity_type.to_string()));
+  for id in entity_ids {
+    params.push(Value::from(id.to_string()));
+  }
+
+  let mut rows = conn.query(&sql, libsql::params_from_iter(params)).await?;
+  while let Some(row) = rows.next().await? {
+    let entity_id_str: String = row.get(4)?;
+    let tag = Tag::try_from(row)?;
+    let entity_id = Id::from_str(&entity_id_str).map_err(Error::InvalidValue)?;
+    map.entry(entity_id).or_default().push(tag);
+  }
+
+  Ok(map)
+}
+
 /// Return all tag labels for a specific entity.
 pub async fn for_entity(conn: &Connection, entity_type: EntityType, entity_id: &Id) -> Result<Vec<String>, Error> {
   log::debug!("repo::tag::for_entity");
@@ -299,6 +346,72 @@ mod tests {
 
       let removed = detach(&conn, EntityType::Task, &task_id, "nonexistent").await.unwrap();
       assert!(!removed);
+    }
+  }
+
+  mod for_entities_fn {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_groups_tags_by_entity_in_one_query() {
+      let (_store, conn, _tmp) = setup().await;
+      let project_id = create_project(&conn).await;
+      let t1 = create_task(&conn, &project_id).await;
+      let t2 = create_task(&conn, &project_id).await;
+      let t3 = create_task(&conn, &project_id).await;
+
+      attach(&conn, EntityType::Task, &t1, "alpha").await.unwrap();
+      attach(&conn, EntityType::Task, &t1, "zebra").await.unwrap();
+      attach(&conn, EntityType::Task, &t2, "alpha").await.unwrap();
+      // t3 has no tags
+
+      let map = for_entities(&conn, EntityType::Task, &[t1.clone(), t2.clone(), t3.clone()])
+        .await
+        .unwrap();
+
+      assert_eq!(map.len(), 2);
+      let t1_tags = map.get(&t1).unwrap();
+      assert_eq!(t1_tags.len(), 2);
+      assert_eq!(t1_tags[0].label(), "alpha");
+      assert_eq!(t1_tags[1].label(), "zebra");
+      let t2_tags = map.get(&t2).unwrap();
+      assert_eq!(t2_tags.len(), 1);
+      assert_eq!(t2_tags[0].label(), "alpha");
+      assert!(!map.contains_key(&t3));
+    }
+
+    #[tokio::test]
+    async fn it_returns_empty_map_for_empty_input() {
+      let (_store, conn, _tmp) = setup().await;
+
+      let map = for_entities(&conn, EntityType::Task, &[]).await.unwrap();
+
+      assert!(map.is_empty());
+    }
+
+    #[tokio::test]
+    async fn it_scopes_by_entity_type() {
+      let (_store, conn, _tmp) = setup().await;
+      let project_id = create_project(&conn).await;
+      let task_id = create_task(&conn, &project_id).await;
+
+      attach(&conn, EntityType::Task, &task_id, "task-tag").await.unwrap();
+      // Attach the same id as an artifact tag would go to a different type, so
+      // the task lookup should ignore it. Simulate by attaching a different
+      // type with the same id.
+      attach(&conn, EntityType::Artifact, &task_id, "artifact-tag")
+        .await
+        .unwrap();
+
+      let map = for_entities(&conn, EntityType::Task, std::slice::from_ref(&task_id))
+        .await
+        .unwrap();
+
+      let tags = map.get(&task_id).unwrap();
+      assert_eq!(tags.len(), 1);
+      assert_eq!(tags[0].label(), "task-tag");
     }
   }
 }

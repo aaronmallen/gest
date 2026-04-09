@@ -8,6 +8,7 @@ use crate::{
       primitives::Id,
       task::{Filter, Model, New, Patch},
     },
+    repo::iteration::StatusCounts,
   },
   ui::components::min_unique_prefix,
 };
@@ -168,6 +169,42 @@ pub async fn shortest_all_prefix(conn: &Connection, project_id: &Id) -> Result<u
   let ids = collect_ids(conn, "SELECT id FROM tasks WHERE project_id = ?1", project_id).await?;
   let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
   Ok(min_unique_prefix(&refs))
+}
+
+/// Return task counts grouped by status for a project in a single query.
+///
+/// The returned [`StatusCounts`] includes every task in the project — active
+/// and terminal — so callers can render a summary row without issuing a
+/// second full-table scan.
+pub async fn status_counts(conn: &Connection, project_id: &Id) -> Result<StatusCounts, Error> {
+  log::debug!("repo::task::status_counts");
+  let mut rows = conn
+    .query(
+      "SELECT status, COUNT(*) FROM tasks WHERE project_id = ?1 GROUP BY status",
+      [project_id.to_string()],
+    )
+    .await?;
+
+  let mut counts = StatusCounts {
+    cancelled: 0,
+    done: 0,
+    in_progress: 0,
+    open: 0,
+    total: 0,
+  };
+  while let Some(row) = rows.next().await? {
+    let status: String = row.get(0)?;
+    let count: i64 = row.get(1)?;
+    counts.total += count;
+    match status.as_str() {
+      "cancelled" => counts.cancelled = count,
+      "done" => counts.done = count,
+      "in-progress" => counts.in_progress = count,
+      "open" => counts.open = count,
+      _ => {}
+    }
+  }
+  Ok(counts)
 }
 
 async fn collect_ids(conn: &Connection, sql: &str, project_id: &Id) -> Result<Vec<String>, Error> {
@@ -686,6 +723,92 @@ mod tests {
 
       assert_eq!(shortest_active_prefix(&conn, &pid).await.unwrap(), 1);
       assert_eq!(shortest_all_prefix(&conn, &pid).await.unwrap(), 1);
+    }
+  }
+
+  mod status_counts_fn {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_groups_counts_by_status_in_one_query() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      create(
+        &conn,
+        &pid,
+        &New {
+          title: "Open 1".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      create(
+        &conn,
+        &pid,
+        &New {
+          title: "Open 2".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      create(
+        &conn,
+        &pid,
+        &New {
+          title: "Done".into(),
+          status: Some(TaskStatus::Done),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      create(
+        &conn,
+        &pid,
+        &New {
+          title: "Cancelled".into(),
+          status: Some(TaskStatus::Cancelled),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      create(
+        &conn,
+        &pid,
+        &New {
+          title: "In progress".into(),
+          status: Some(TaskStatus::InProgress),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+
+      let counts = status_counts(&conn, &pid).await.unwrap();
+
+      assert_eq!(counts.open, 2);
+      assert_eq!(counts.done, 1);
+      assert_eq!(counts.cancelled, 1);
+      assert_eq!(counts.in_progress, 1);
+      assert_eq!(counts.total, 5);
+    }
+
+    #[tokio::test]
+    async fn it_returns_zeros_for_empty_project() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let counts = status_counts(&conn, &pid).await.unwrap();
+
+      assert_eq!(counts.open, 0);
+      assert_eq!(counts.done, 0);
+      assert_eq!(counts.cancelled, 0);
+      assert_eq!(counts.in_progress, 0);
+      assert_eq!(counts.total, 0);
     }
   }
 

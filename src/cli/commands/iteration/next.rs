@@ -44,9 +44,7 @@ impl Command {
     let conn = context.store().connect().await?;
 
     let id = repo::resolve::resolve_id(&conn, "iterations", &self.id).await?;
-    let iteration = repo::iteration::find_by_id(&conn, id.clone())
-      .await?
-      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let iteration = repo::iteration::find_required_by_id(&conn, id.clone()).await?;
 
     if iteration.status() != IterationStatus::Active {
       eprintln!("iteration is not active");
@@ -69,9 +67,7 @@ impl Command {
     for row in &open_rows {
       // Resolve full task ID from short prefix
       let full_id = repo::resolve::resolve_id(&conn, "tasks", &row.id_short).await?;
-      let task = repo::task::find_by_id(&conn, full_id.clone())
-        .await?
-        .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(row.id_short.clone())))?;
+      let task = repo::task::find_required_by_id(&conn, full_id.clone()).await?;
 
       // Check if task is blocked
       let rels = repo::relationship::for_entity(&conn, EntityType::Task, &full_id).await?;
@@ -123,15 +119,13 @@ impl Command {
     let task_id: crate::store::model::primitives::Id = next
       .full_id
       .parse()
-      .map_err(|e: String| Error::Resolve(repo::resolve::Error::NotFound(e)))?;
+      .map_err(|e: String| Error::Argument(format!("invalid task id: {e}")))?;
 
     // If --claim, update the task
     let task = if self.claim {
       let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
 
-      let before_task = repo::task::find_by_id(&conn, task_id.clone())
-        .await?
-        .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(next.full_id.clone())))?;
+      let before_task = repo::task::find_required_by_id(&conn, task_id.clone()).await?;
       let before = serde_json::to_value(&before_task)?;
 
       let mut patch = crate::store::model::task::Patch {
@@ -160,9 +154,7 @@ impl Command {
       .await?;
       updated
     } else {
-      repo::task::find_by_id(&conn, task_id.clone())
-        .await?
-        .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(next.full_id.clone())))?
+      repo::task::find_required_by_id(&conn, task_id.clone()).await?
     };
 
     let phase = next.phase;

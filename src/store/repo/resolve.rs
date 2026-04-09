@@ -1,23 +1,9 @@
-use libsql::{Connection, Error as DbError};
+use libsql::Connection;
 
-use crate::store::model::primitives::{EntityType, Id};
-
-/// Errors that can occur during ID prefix resolution.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// Multiple entities matched the given prefix.
-  #[error("ambiguous id prefix '{0}': matches {1} entities")]
-  Ambiguous(String, usize),
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// The given prefix is invalid.
-  #[error("{0}")]
-  InvalidPrefix(String),
-  /// No entity matched the given prefix.
-  #[error("no match for id prefix '{0}'")]
-  NotFound(String),
-}
+use crate::store::{
+  Error,
+  model::primitives::{EntityType, Id},
+};
 
 /// Returns the SQL fragment that filters a table to its "active" set.
 ///
@@ -87,7 +73,7 @@ pub async fn resolve_id(conn: &Connection, table: &str, prefix: &str) -> Result<
   // Phase 2: fallback to all rows
   let all_matches = query_matches(conn, table, prefix, false).await?;
   match all_matches.len() {
-    0 => Err(Error::NotFound(prefix.to_string())),
+    0 => Err(Error::NotFound(format!("id prefix '{prefix}'"))),
     1 => all_matches
       .into_iter()
       .next()
@@ -149,7 +135,7 @@ pub async fn resolve_entity(conn: &Connection, prefix: &str) -> Result<(EntityTy
   // Phase 2: fallback to all rows
   let all_matches = collect_entity_matches(conn, prefix, false).await?;
   match all_matches.len() {
-    0 => Err(Error::NotFound(prefix.to_string())),
+    0 => Err(Error::NotFound(format!("id prefix '{prefix}'"))),
     1 => Ok(all_matches.into_iter().next().unwrap()),
     n => Err(Error::Ambiguous(prefix.to_string(), n)),
   }

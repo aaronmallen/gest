@@ -37,9 +37,7 @@ impl Command {
     let conn = context.store().connect().await?;
 
     let id = repo::resolve::resolve_id(&conn, "tasks", &self.id).await?;
-    let task = repo::task::find_by_id(&conn, id.clone())
-      .await?
-      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let task = repo::task::find_required_by_id(&conn, id).await?;
 
     let iteration_ids = iteration_memberships(&conn, task.id()).await?;
     if !iteration_ids.is_empty() && !self.force {
@@ -115,14 +113,10 @@ async fn iteration_memberships(conn: &libsql::Connection, task_id: &Id) -> Resul
       [task_id.to_string()],
     )
     .await
-    .map_err(|e| Error::Store(crate::store::Error::from(e)))?;
+    .map_err(crate::store::Error::from)?;
   let mut out = Vec::new();
-  while let Some(row) = rows
-    .next()
-    .await
-    .map_err(|e| Error::Store(crate::store::Error::from(e)))?
-  {
-    let id_str: String = row.get(0).map_err(|e| Error::Store(crate::store::Error::from(e)))?;
+  while let Some(row) = rows.next().await.map_err(crate::store::Error::from)? {
+    let id_str: String = row.get(0).map_err(crate::store::Error::from)?;
     let id: Id = id_str
       .parse()
       .map_err(|e: String| Error::Argument(format!("invalid iteration id in iteration_tasks: {e}")))?;

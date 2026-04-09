@@ -1,28 +1,11 @@
-use std::{
-  io::Error as IoError,
-  path::{Path, PathBuf},
+use std::path::{Path, PathBuf};
+
+use libsql::Connection;
+
+use crate::store::{
+  Error,
+  model::{Project, ProjectWorkspace, primitives::Id},
 };
-
-use libsql::{Connection, Error as DbError};
-
-use crate::store::model::{Error as ModelError, Project, ProjectWorkspace, primitives::Id};
-
-/// Errors that can occur in project repository operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// A filesystem I/O error occurred.
-  #[error(transparent)]
-  Io(#[from] IoError),
-  /// A row could not be converted into a domain model.
-  #[error(transparent)]
-  Model(#[from] ModelError),
-  /// A YAML serialization error occurred.
-  #[error(transparent)]
-  Yaml(#[from] yaml_serde::Error),
-}
 
 /// Return all projects ordered by creation time (newest first).
 pub async fn all(conn: &Connection) -> Result<Vec<Project>, Error> {
@@ -100,7 +83,7 @@ pub async fn create(conn: &Connection, root: impl Into<PathBuf>) -> Result<Proje
 
   let created = find_by_id(conn, project.id().clone())
     .await?
-    .ok_or_else(|| Error::Model(ModelError::InvalidValue("project not found after insert".into())))?;
+    .ok_or_else(|| Error::InvalidValue("project not found after insert".into()))?;
 
   if let Some(gest_dir) = gest_dir {
     let stored = ProjectFile {

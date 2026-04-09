@@ -4,7 +4,8 @@ use libsql::Row;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{Error, primitives::Id};
+use super::primitives::Id;
+use crate::store::Error;
 
 /// A recorded command execution for undo support.
 #[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]

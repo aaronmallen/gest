@@ -22,9 +22,7 @@ impl Command {
     log::debug!("iteration status: entry");
     let conn = context.store().connect().await?;
     let id = repo::resolve::resolve_id(&conn, "iterations", &self.id).await?;
-    let iteration = repo::iteration::find_by_id(&conn, id.clone())
-      .await?
-      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let iteration = repo::iteration::find_required_by_id(&conn, id.clone()).await?;
 
     let counts = repo::iteration::task_status_counts(&conn, &id).await?;
     let max_phase = repo::iteration::max_phase(&conn, &id).await?;

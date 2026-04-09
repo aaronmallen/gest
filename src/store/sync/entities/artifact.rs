@@ -12,8 +12,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use crate::store::{
+  Error,
   model::primitives::Id,
-  sync::{Error, digest, paths, yaml},
+  sync::{digest, paths, yaml},
 };
 
 const FRONTMATTER_DELIM: &str = "---\n";

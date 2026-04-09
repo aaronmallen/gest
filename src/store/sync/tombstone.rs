@@ -15,10 +15,7 @@ use std::{fs, path::Path};
 use chrono::{DateTime, Utc};
 use yaml_serde::{Mapping, Value as YamlValue};
 
-use crate::store::{
-  model::primitives::Id,
-  sync::{Error, paths},
-};
+use crate::store::{Error, model::primitives::Id, sync::paths};
 
 const FRONTMATTER_DELIM: &str = "---\n";
 

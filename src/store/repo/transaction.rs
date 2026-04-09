@@ -1,26 +1,14 @@
 use chrono::Utc;
-use libsql::{Connection, Error as DbError, Value};
+use libsql::{Connection, Value};
 use serde_json::Value as JsonValue;
 
-use crate::store::model::{
-  Error as ModelError,
-  primitives::Id,
-  transaction::{Event, Model},
+use crate::store::{
+  Error,
+  model::{
+    primitives::Id,
+    transaction::{Event, Model},
+  },
 };
-
-/// Errors that can occur in transaction repository operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// A row could not be converted into a domain model.
-  #[error(transparent)]
-  Model(#[from] ModelError),
-  /// No undoable transaction found.
-  #[error("nothing to undo")]
-  NothingToUndo,
-}
 
 const SELECT_COLUMNS: &str = "id, project_id, author_id, command, undone_at, created_at";
 
@@ -60,7 +48,7 @@ pub async fn begin_with_author(
 
   find_by_id(conn, id)
     .await?
-    .ok_or_else(|| Error::Model(ModelError::InvalidValue("transaction not found after insert".into())))
+    .ok_or_else(|| Error::InvalidValue("transaction not found after insert".into()))
 }
 
 /// Find a transaction by its ID.
@@ -265,14 +253,14 @@ pub async fn semantic_events_for_row(
     let created_at: String = row.get(6)?;
     let author_id: Option<String> = row.get(7)?;
 
-    let id: Id = id.parse().map_err(ModelError::InvalidValue)?;
+    let id: Id = id.parse().map_err(Error::InvalidValue)?;
     let author_id = author_id
       .map(|s| s.parse::<Id>())
       .transpose()
-      .map_err(ModelError::InvalidValue)?;
+      .map_err(Error::InvalidValue)?;
     let created_at = chrono::DateTime::parse_from_rfc3339(&created_at)
       .map(|dt| dt.with_timezone(&Utc))
-      .map_err(|e| ModelError::InvalidValue(e.to_string()))?;
+      .map_err(|e| Error::InvalidValue(e.to_string()))?;
 
     results.push(SemanticEvent {
       author_id,

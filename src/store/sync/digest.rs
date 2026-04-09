@@ -9,8 +9,7 @@ use chrono::Utc;
 use libsql::Connection;
 use sha2::{Digest, Sha256};
 
-use super::Error;
-use crate::store::model::primitives::Id;
+use crate::store::{Error, model::primitives::Id};
 
 /// Compute the SHA-256 digest of `content`, returned as a lowercase hex string.
 pub fn compute(content: &[u8]) -> String {

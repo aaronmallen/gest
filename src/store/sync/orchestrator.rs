@@ -10,8 +10,8 @@ use std::path::Path;
 
 use libsql::Connection;
 
-use super::{Error, entities};
-use crate::store::model::primitives::Id;
+use super::entities;
+use crate::store::{Error, model::primitives::Id};
 
 /// Import every per-entity file under `gest_dir` into SQLite.
 pub async fn import_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {

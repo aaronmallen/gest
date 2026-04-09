@@ -24,9 +24,7 @@ impl Command {
     let conn = context.store().connect().await?;
 
     let id = repo::resolve::resolve_id(&conn, "artifacts", &self.id).await?;
-    let artifact = repo::artifact::find_by_id(&conn, id.clone())
-      .await?
-      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let artifact = repo::artifact::find_required_by_id(&conn, id.clone()).await?;
 
     let short_id = artifact.id().short();
     if self.output.json || self.output.quiet {

@@ -31,9 +31,7 @@ impl Command {
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
     let id = repo::resolve::resolve_id(&conn, "tasks", &self.id).await?;
-    let task = repo::task::find_by_id(&conn, id.clone())
-      .await?
-      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let task = repo::task::find_required_by_id(&conn, id.clone()).await?;
 
     let parsed = if self.as_json {
       serde_json::from_str(&self.value)?
@@ -59,9 +57,7 @@ impl Command {
     repo::task::update(&conn, &id, &patch).await?;
     repo::transaction::record_event(&conn, tx.id(), "tasks", &id.to_string(), "modified", Some(&before)).await?;
 
-    let updated = repo::task::find_by_id(&conn, id.clone())
-      .await?
-      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let updated = repo::task::find_required_by_id(&conn, id.clone()).await?;
     let short_id = id.short();
     self.output.print_entity(&updated, &short_id, || {
       SuccessMessage::new("set metadata")

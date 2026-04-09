@@ -1,30 +1,18 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
-use libsql::{Connection, Error as DbError, Value};
+use libsql::{Connection, Value};
 
 use crate::{
-  store::model::{
-    Error as ModelError,
-    iteration::{Filter, Model, New, Patch},
-    primitives::{Id, IterationStatus},
+  store::{
+    Error,
+    model::{
+      iteration::{Filter, Model, New, Patch},
+      primitives::{Id, IterationStatus},
+    },
   },
   ui::components::min_unique_prefix,
 };
-
-/// Errors that can occur in iteration repository operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// A row could not be converted into a domain model.
-  #[error(transparent)]
-  Model(#[from] ModelError),
-  /// The requested entity was not found.
-  #[error("iteration not found: {0}")]
-  NotFound(String),
-}
 
 const SELECT_COLUMNS: &str = "\
   id, project_id, title, status, description, \
@@ -165,7 +153,7 @@ pub async fn create(conn: &Connection, project_id: &Id, new: &New) -> Result<Mod
 
   find_by_id(conn, id)
     .await?
-    .ok_or_else(|| Error::Model(ModelError::InvalidValue("iteration not found after insert".into())))
+    .ok_or_else(|| Error::InvalidValue("iteration not found after insert".into()))
 }
 
 /// Find an iteration by its [`Id`].
@@ -183,6 +171,14 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<M
     Some(row) => Ok(Some(Model::try_from(row)?)),
     None => Ok(None),
   }
+}
+
+/// Find an iteration by its [`Id`], returning [`Error::NotFound`] when no row matches.
+pub async fn find_required_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Model, Error> {
+  let id = id.into();
+  find_by_id(conn, id.clone())
+    .await?
+    .ok_or_else(|| Error::NotFound(format!("iteration {}", id.short())))
 }
 
 /// Get the maximum phase number for an iteration, or None if empty.
@@ -422,12 +418,12 @@ pub async fn update(conn: &Connection, id: &Id, patch: &Patch) -> Result<Model, 
   let affected = conn.execute(&sql, libsql::params_from_iter(params)).await?;
 
   if affected == 0 {
-    return Err(Error::NotFound(id.short()));
+    return Err(Error::NotFound(format!("iteration {}", id.short())));
   }
 
   find_by_id(conn, id.clone())
     .await?
-    .ok_or_else(|| Error::NotFound(id.short()))
+    .ok_or_else(|| Error::NotFound(format!("iteration {}", id.short())))
 }
 
 /// Return the current phase of a task within its iteration, if any.

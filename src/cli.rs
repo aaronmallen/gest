@@ -95,66 +95,27 @@ pub enum Error {
   /// An invalid command-line argument.
   #[error("{0}")]
   Argument(String),
-  /// An artifact repository error.
-  #[error(transparent)]
-  ArtifactRepo(#[from] crate::store::repo::artifact::Error),
-  /// An author repository error.
-  #[error(transparent)]
-  AuthorRepo(#[from] crate::store::repo::author::Error),
   /// A configuration loading or validation error.
   #[error(transparent)]
   Config(#[from] crate::config::Error),
-  /// A cascade delete repository error.
-  #[error(transparent)]
-  EntityDelete(#[from] crate::store::repo::entity::delete::Error),
   /// An editor launch error.
   #[error("{0}")]
   Editor(String),
   /// An I/O error (e.g. writing to the filesystem).
   #[error(transparent)]
   Io(#[from] std::io::Error),
-  /// An iteration repository error.
-  #[error(transparent)]
-  IterationRepo(#[from] crate::store::repo::iteration::Error),
   /// A metadata key was not found on the entity.
   #[error("metadata key not found: {0}")]
   MetaKeyNotFound(String),
-  /// A note repository error.
-  #[error(transparent)]
-  NoteRepo(#[from] crate::store::repo::note::Error),
-  /// A project repository error.
-  #[error(transparent)]
-  ProjectRepo(#[from] crate::store::repo::project::Error),
-  /// A relationship repository error.
-  #[error(transparent)]
-  RelationshipRepo(#[from] crate::store::repo::relationship::Error),
-  /// An ID prefix resolution error.
-  #[error(transparent)]
-  Resolve(#[from] crate::store::repo::resolve::Error),
-  /// A search error.
-  #[error(transparent)]
-  SearchRepo(#[from] crate::store::repo::search::Error),
   /// A serialization error (e.g. snapshotting entity state for transactions).
   #[error(transparent)]
   Serialize(#[from] serde_json::Error),
-  /// An error opening or connecting to the store.
+  /// An error originating in the store layer.
   #[error(transparent)]
   Store(#[from] crate::store::Error),
-  /// A sync layer error.
-  #[error(transparent)]
-  Sync(#[from] crate::store::sync::Error),
-  /// A tag repository error.
-  #[error(transparent)]
-  TagRepo(#[from] crate::store::repo::tag::Error),
-  /// A task repository error.
-  #[error(transparent)]
-  TaskRepo(#[from] crate::store::repo::task::Error),
   /// A TOML serialization error.
   #[error(transparent)]
   TomlSerialize(#[from] toml::ser::Error),
-  /// A transaction repository error.
-  #[error(transparent)]
-  TransactionRepo(#[from] crate::store::repo::transaction::Error),
   /// The current directory has not been initialized as a gest project.
   #[error("not a gest project (run `gest init` to initialize)")]
   UninitializedProject,

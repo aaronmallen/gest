@@ -11,8 +11,9 @@ use libsql::Connection;
 use serde::{Deserialize, Serialize};
 
 use crate::store::{
+  Error,
   model::primitives::Id,
-  sync::{Error, paths, yaml},
+  sync::{paths, yaml},
 };
 
 /// On-disk wrapper for `.gest/relationship/<id>.yaml`.

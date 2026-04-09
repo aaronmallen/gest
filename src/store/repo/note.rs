@@ -1,25 +1,13 @@
 use chrono::Utc;
-use libsql::{Connection, Error as DbError, Value};
+use libsql::{Connection, Value};
 
-use crate::store::model::{
-  Error as ModelError,
-  note::{Model, New, Patch},
-  primitives::{EntityType, Id},
+use crate::store::{
+  Error,
+  model::{
+    note::{Model, New, Patch},
+    primitives::{EntityType, Id},
+  },
 };
-
-/// Errors that can occur in note repository operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// A row could not be converted into a domain model.
-  #[error(transparent)]
-  Model(#[from] ModelError),
-  /// The requested entity was not found.
-  #[error("note not found: {0}")]
-  NotFound(String),
-}
 
 const SELECT_COLUMNS: &str = "id, entity_id, entity_type, author_id, body, created_at, updated_at";
 
@@ -50,7 +38,7 @@ pub async fn create(conn: &Connection, entity_type: EntityType, entity_id: &Id, 
 
   find_by_id(conn, id)
     .await?
-    .ok_or_else(|| Error::Model(ModelError::InvalidValue("note not found after insert".into())))
+    .ok_or_else(|| Error::InvalidValue("note not found after insert".into()))
 }
 
 /// Delete a note by its ID. Returns true if the note was deleted.
@@ -77,6 +65,14 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<M
     Some(row) => Ok(Some(Model::try_from(row)?)),
     None => Ok(None),
   }
+}
+
+/// Find a note by its [`Id`], returning [`Error::NotFound`] when no row matches.
+pub async fn find_required_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Model, Error> {
+  let id = id.into();
+  find_by_id(conn, id.clone())
+    .await?
+    .ok_or_else(|| Error::NotFound(format!("note {}", id.short())))
 }
 
 /// Return all notes for a specific entity, newest first.
@@ -139,12 +135,12 @@ pub async fn update(conn: &Connection, id: &Id, patch: &Patch) -> Result<Model, 
   let affected = conn.execute(&sql, libsql::params_from_iter(params)).await?;
 
   if affected == 0 {
-    return Err(Error::NotFound(id.short()));
+    return Err(Error::NotFound(format!("note {}", id.short())));
   }
 
   find_by_id(conn, id.clone())
     .await?
-    .ok_or_else(|| Error::NotFound(id.short()))
+    .ok_or_else(|| Error::NotFound(format!("note {}", id.short())))
 }
 
 #[cfg(test)]

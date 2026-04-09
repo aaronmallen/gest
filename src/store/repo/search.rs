@@ -1,20 +1,10 @@
-use libsql::{Connection, Error as DbError, Value};
+use libsql::{Connection, Value};
 
 use crate::store::{
-  model::{Error as ModelError, artifact, iteration, primitives::Id, task},
+  Error,
+  model::{artifact, iteration, primitives::Id, task},
   search_query::{Filter, ParsedQuery},
 };
-
-/// Errors that can occur in search operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// A row could not be converted into a domain model.
-  #[error(transparent)]
-  Model(#[from] ModelError),
-}
 
 /// Results from a cross-entity search.
 pub struct Results {

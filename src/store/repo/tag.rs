@@ -1,23 +1,15 @@
 use chrono::Utc;
-use libsql::{Connection, Error as DbError};
+use libsql::Connection;
 
-use crate::store::model::{
-  Error as ModelError, Tag,
-  primitives::{EntityType, Id},
+use crate::store::{
+  Error,
+  model::{
+    Tag,
+    primitives::{EntityType, Id},
+  },
 };
 
 const SELECT_COLUMNS: &str = "id, label, created_at, updated_at";
-
-/// Errors that can occur in tag repository operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// A row could not be converted into a domain model.
-  #[error(transparent)]
-  Model(#[from] ModelError),
-}
 
 /// Return all tags ordered by label.
 pub async fn all(conn: &Connection) -> Result<Vec<Tag>, Error> {
@@ -88,7 +80,7 @@ pub async fn create(conn: &Connection, tag: &Tag) -> Result<Tag, Error> {
 
   find_by_id(conn, tag.id().clone())
     .await?
-    .ok_or_else(|| Error::Model(ModelError::InvalidValue("tag not found after insert".into())))
+    .ok_or_else(|| Error::InvalidValue("tag not found after insert".into()))
 }
 
 /// Detach a tag from an entity. Does not delete the tag itself.

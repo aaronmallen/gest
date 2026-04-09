@@ -18,8 +18,8 @@ use std::{
 use libsql::Connection;
 use serde::{Serialize, de::DeserializeOwned};
 
-use super::{Error, digest, paths};
-use crate::store::model::primitives::Id;
+use super::{digest, paths};
+use crate::store::{Error, model::primitives::Id};
 
 /// Read and YAML-deserialize a file into `T`, returning `Ok(None)` if absent.
 ///

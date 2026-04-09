@@ -1,22 +1,13 @@
 use chrono::Utc;
-use libsql::{Connection, Error as DbError};
+use libsql::Connection;
 
-use crate::store::model::{
-  Error as ModelError,
-  primitives::{EntityType, Id, RelationshipType},
-  relationship::Model,
+use crate::store::{
+  Error,
+  model::{
+    primitives::{EntityType, Id, RelationshipType},
+    relationship::Model,
+  },
 };
-
-/// Errors that can occur in relationship repository operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// A row could not be converted into a domain model.
-  #[error(transparent)]
-  Model(#[from] ModelError),
-}
 
 const SELECT_COLUMNS: &str = "id, rel_type, source_id, source_type, target_id, target_type, created_at, updated_at";
 
@@ -50,7 +41,7 @@ pub async fn create(
 
   find_by_id(conn, id)
     .await?
-    .ok_or_else(|| Error::Model(ModelError::InvalidValue("relationship not found after insert".into())))
+    .ok_or_else(|| Error::InvalidValue("relationship not found after insert".into()))
 }
 
 /// Delete a relationship by its ID. Returns true if deleted.

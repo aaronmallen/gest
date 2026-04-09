@@ -25,9 +25,7 @@ impl Command {
     log::debug!("task meta get: entry");
     let conn = context.store().connect().await?;
     let id = repo::resolve::resolve_id(&conn, "tasks", &self.id).await?;
-    let task = repo::task::find_by_id(&conn, id)
-      .await?
-      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let task = repo::task::find_required_by_id(&conn, id).await?;
 
     let value =
       meta::resolve_path(task.metadata(), &self.path).ok_or_else(|| Error::MetaKeyNotFound(self.path.clone()))?;

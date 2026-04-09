@@ -1,28 +1,16 @@
 use chrono::Utc;
-use libsql::{Connection, Error as DbError, Value};
+use libsql::{Connection, Value};
 
 use crate::{
-  store::model::{
-    Error as ModelError,
-    artifact::{Filter, Model, New, Patch},
-    primitives::Id,
+  store::{
+    Error,
+    model::{
+      artifact::{Filter, Model, New, Patch},
+      primitives::Id,
+    },
   },
   ui::components::min_unique_prefix,
 };
-
-/// Errors that can occur in artifact repository operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// A row could not be converted into a domain model.
-  #[error(transparent)]
-  Model(#[from] ModelError),
-  /// The requested entity was not found.
-  #[error("artifact not found: {0}")]
-  NotFound(String),
-}
 
 const SELECT_COLUMNS: &str = "\
   id, project_id, title, body, metadata, \
@@ -73,12 +61,12 @@ pub async fn archive(conn: &Connection, id: &Id) -> Result<Model, Error> {
     .await?;
 
   if affected == 0 {
-    return Err(Error::NotFound(id.short()));
+    return Err(Error::NotFound(format!("artifact {}", id.short())));
   }
 
   find_by_id(conn, id.clone())
     .await?
-    .ok_or_else(|| Error::NotFound(id.short()))
+    .ok_or_else(|| Error::NotFound(format!("artifact {}", id.short())))
 }
 
 /// Create a new artifact in the given project.
@@ -112,7 +100,7 @@ pub async fn create(conn: &Connection, project_id: &Id, new: &New) -> Result<Mod
 
   find_by_id(conn, id)
     .await?
-    .ok_or_else(|| Error::Model(ModelError::InvalidValue("artifact not found after insert".into())))
+    .ok_or_else(|| Error::InvalidValue("artifact not found after insert".into()))
 }
 
 /// Find an artifact by its [`Id`].
@@ -130,6 +118,14 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<M
     Some(row) => Ok(Some(Model::try_from(row)?)),
     None => Ok(None),
   }
+}
+
+/// Find an artifact by its [`Id`], returning [`Error::NotFound`] when no row matches.
+pub async fn find_required_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Model, Error> {
+  let id = id.into();
+  find_by_id(conn, id.clone())
+    .await?
+    .ok_or_else(|| Error::NotFound(format!("artifact {}", id.short())))
 }
 
 /// Return the minimum unique prefix length over all active (non-archived)
@@ -197,42 +193,18 @@ pub async fn update(conn: &Connection, id: &Id, patch: &Patch) -> Result<Model, 
   let affected = conn.execute(&sql, libsql::params_from_iter(params)).await?;
 
   if affected == 0 {
-    return Err(Error::NotFound(id.short()));
+    return Err(Error::NotFound(format!("artifact {}", id.short())));
   }
 
   find_by_id(conn, id.clone())
     .await?
-    .ok_or_else(|| Error::NotFound(id.short()))
+    .ok_or_else(|| Error::NotFound(format!("artifact {}", id.short())))
 }
 
 #[cfg(test)]
 mod tests {
-  use std::sync::Arc;
-
-  use tempfile::TempDir;
-
   use super::*;
-  use crate::store::{self, Db, model::Project};
-
-  async fn setup() -> (Arc<Db>, Connection, TempDir, Id) {
-    let (store, tmp) = store::open_temp().await.unwrap();
-    let conn = store.connect().await.unwrap();
-    let project = Project::new("/tmp/artifact-test".into());
-    conn
-      .execute(
-        "INSERT INTO projects (id, root, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-        [
-          project.id().to_string(),
-          project.root().to_string_lossy().into_owned(),
-          project.created_at().to_rfc3339(),
-          project.updated_at().to_rfc3339(),
-        ],
-      )
-      .await
-      .unwrap();
-    let project_id = project.id().clone();
-    (store, conn, tmp, project_id)
-  }
+  use crate::store::testing::setup_project_db as setup;
 
   mod all_fn {
     use pretty_assertions::assert_eq;

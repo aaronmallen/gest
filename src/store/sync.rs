@@ -12,34 +12,11 @@ pub mod paths;
 pub mod tombstone;
 pub mod yaml;
 
-use std::{
-  io::Error as IoError,
-  path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
-use libsql::{Connection, Error as DbError};
+use libsql::Connection;
 
-use crate::store::model::primitives::Id;
-
-/// Errors that can occur during sync operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// A filesystem I/O error.
-  #[error(transparent)]
-  Io(#[from] IoError),
-  /// A model conversion error.
-  #[error(transparent)]
-  Model(#[from] crate::store::model::Error),
-  /// A JSON serialization error (used by metadata blobs that remain JSON).
-  #[error(transparent)]
-  Serialization(#[from] serde_json::Error),
-  /// A YAML serialization or deserialization error.
-  #[error(transparent)]
-  Yaml(#[from] yaml_serde::Error),
-}
+use crate::store::{Error, model::primitives::Id};
 
 /// Sync state from `.gest/` into the database.
 pub async fn import(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {

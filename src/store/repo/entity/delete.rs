@@ -14,27 +14,10 @@
 //! This module does **not** write tombstone files, prompt the user, or
 //! begin a transaction — those concerns belong to the caller.
 
-use libsql::{Connection, Error as DbError};
+use libsql::Connection;
 use serde_json::{Map, Value as JsonValue};
 
-use crate::store::{
-  model::{Error as ModelError, primitives::EntityType},
-  repo::transaction,
-};
-
-/// Errors returned by cascade delete operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// A row could not be converted into a domain model.
-  #[error(transparent)]
-  Model(#[from] ModelError),
-  /// An error from the transaction audit layer.
-  #[error(transparent)]
-  Transaction(#[from] transaction::Error),
-}
+use crate::store::{Error, model::primitives::EntityType, repo::transaction};
 
 /// Per-table counts of rows removed by a [`delete_with_cascade`] call.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -271,7 +254,7 @@ async fn capture_parent(conn: &Connection, entity_type: EntityType, id: &str) ->
   let row = rows
     .next()
     .await?
-    .ok_or_else(|| Error::Model(ModelError::InvalidValue(format!("{entity_type} not found: {id}"))))?;
+    .ok_or_else(|| Error::NotFound(format!("{entity_type} {id}")))?;
 
   let mut map = Map::new();
   for (idx, column) in columns.iter().enumerate() {
@@ -420,9 +403,9 @@ async fn record_and_delete_child(
         .await?;
     }
     other => {
-      return Err(Error::Model(ModelError::InvalidValue(format!(
+      return Err(Error::InvalidValue(format!(
         "unexpected child table in cascade delete: {other}"
-      ))));
+      )));
     }
   }
   Ok(())

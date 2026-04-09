@@ -1,20 +1,12 @@
-use libsql::{Connection, Error as DbError, Value};
+use libsql::{Connection, Value};
 
-use crate::store::model::{
-  Author, Error as ModelError,
-  primitives::{AuthorType, Id},
+use crate::store::{
+  Error,
+  model::{
+    Author,
+    primitives::{AuthorType, Id},
+  },
 };
-
-/// Errors that can occur in author repository operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-  /// The underlying database driver returned an error.
-  #[error(transparent)]
-  Database(#[from] DbError),
-  /// A row could not be converted into a domain model.
-  #[error(transparent)]
-  Model(#[from] ModelError),
-}
 
 const SELECT_COLUMNS: &str = "id, author_type, name, email, created_at, updated_at";
 
@@ -56,7 +48,7 @@ pub async fn create(conn: &Connection, author: &Author) -> Result<Author, Error>
 
   find_by_id(conn, author.id().clone())
     .await?
-    .ok_or_else(|| Error::Model(ModelError::InvalidValue("author not found after insert".into())))
+    .ok_or_else(|| Error::InvalidValue("author not found after insert".into()))
 }
 
 /// Find an author by their [`Id`].

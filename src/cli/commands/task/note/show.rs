@@ -23,9 +23,7 @@ impl Command {
     let conn = context.store().connect().await?;
     let note_id = repo::resolve::resolve_id(&conn, "notes", &self.id).await?;
 
-    let note = repo::note::find_by_id(&conn, note_id)
-      .await?
-      .ok_or_else(|| repo::note::Error::NotFound(self.id.clone()))?;
+    let note = repo::note::find_required_by_id(&conn, note_id).await?;
 
     let short_id = note.id().short();
     self.output.print_entity(&note, &short_id, || {

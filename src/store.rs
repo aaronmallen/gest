@@ -98,18 +98,44 @@ impl Db {
   }
 }
 
-/// Errors that can occur when opening the database store.
+/// Errors that can occur anywhere in the store subsystem.
+///
+/// This is the single error type used by every module under `src/store/`:
+/// connection management, schema migrations, model row decoding, repositories,
+/// and sync. CLI and web callers consume `store::Error` directly — no layer
+/// inside the store should construct per-module error types on their behalf.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+  /// An id prefix matched multiple entities.
+  #[error("ambiguous id prefix '{0}': matches {1} entities")]
+  Ambiguous(String, usize),
   /// A configuration value (such as the resolved data directory) could not be read.
   #[error(transparent)]
   Config(#[from] crate::config::Error),
   /// The underlying libsql driver returned an error.
   #[error(transparent)]
   Database(#[from] DbError),
-  /// Creating or accessing the on-disk database file failed.
+  /// The given id prefix is invalid.
+  #[error("{0}")]
+  InvalidPrefix(String),
+  /// A column value or row field could not be parsed into the expected domain type.
+  #[error("invalid value: {0}")]
+  InvalidValue(String),
+  /// A filesystem I/O error occurred while accessing the database or sync files.
   #[error(transparent)]
   Io(#[from] IoError),
+  /// The requested entity could not be found.
+  #[error("not found: {0}")]
+  NotFound(String),
+  /// No undoable transaction was available.
+  #[error("nothing to undo")]
+  NothingToUndo,
+  /// A JSON serialization error while encoding or decoding payloads.
+  #[error(transparent)]
+  Serialization(#[from] serde_json::Error),
+  /// A YAML serialization error while reading or writing the `.gest/` directory.
+  #[error(transparent)]
+  Yaml(#[from] yaml_serde::Error),
 }
 
 /// Open (or create) the database described by `settings`.
@@ -139,6 +165,46 @@ pub async fn open(settings: &crate::config::Settings) -> Result<Arc<Db>, Error> 
   migration::run(&conn).await?;
 
   Ok(store)
+}
+
+/// Shared `#[cfg(test)]` fixtures used by every repo test module.
+#[cfg(test)]
+pub mod testing {
+  use std::sync::Arc;
+
+  use libsql::Connection;
+  use tempfile::TempDir;
+
+  use super::{Db, Error, open_temp};
+  use crate::store::model::{Project, primitives::Id};
+
+  /// Spin up a temporary database, insert a project row, and hand back a
+  /// ready-to-use connection plus the project id. Every repo test previously
+  /// rolled its own version of this; consolidating here keeps the fixtures in
+  /// lockstep with the schema.
+  pub async fn setup_project_db() -> (Arc<Db>, Connection, TempDir, Id) {
+    let (store, tmp) = open_temp().await.expect("open_temp");
+    let conn = store.connect().await.expect("connect");
+    let project = Project::new("/tmp/repo-test".into());
+    insert_project(&conn, &project).await.expect("insert project");
+    let project_id = project.id().clone();
+    (store, conn, tmp, project_id)
+  }
+
+  async fn insert_project(conn: &Connection, project: &Project) -> Result<(), Error> {
+    conn
+      .execute(
+        "INSERT INTO projects (id, root, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
+        [
+          project.id().to_string(),
+          project.root().to_string_lossy().into_owned(),
+          project.created_at().to_rfc3339(),
+          project.updated_at().to_rfc3339(),
+        ],
+      )
+      .await?;
+    Ok(())
+  }
 }
 
 /// Open a temporary local database. Useful for tests that need an `AppContext`

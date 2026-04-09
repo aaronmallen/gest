@@ -26,9 +26,7 @@ impl Command {
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
     let id = repo::resolve::resolve_id(&conn, "iterations", &self.id).await?;
-    let iteration = repo::iteration::find_by_id(&conn, id.clone())
-      .await?
-      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let iteration = repo::iteration::find_required_by_id(&conn, id.clone()).await?;
 
     if iteration.status().is_terminal() {
       return Err(Error::Editor(format!(

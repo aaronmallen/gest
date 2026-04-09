@@ -3,10 +3,8 @@ use getset::{CopyGetters, Getters};
 use libsql::Row;
 use serde::{Deserialize, Serialize};
 
-use super::{
-  Error,
-  primitives::{AuthorType, Id},
-};
+use super::primitives::{AuthorType, Id};
+use crate::store::Error;
 
 /// An author who can create notes, events, and other actions.
 #[derive(Clone, CopyGetters, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]

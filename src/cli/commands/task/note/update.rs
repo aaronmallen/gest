@@ -27,9 +27,7 @@ impl Command {
     let conn = context.store().connect().await?;
     let note_id = repo::resolve::resolve_id(&conn, "notes", &self.id).await?;
 
-    let existing = repo::note::find_by_id(&conn, note_id.clone())
-      .await?
-      .ok_or_else(|| repo::note::Error::NotFound(self.id.clone()))?;
+    let existing = repo::note::find_required_by_id(&conn, note_id.clone()).await?;
 
     let body = match &self.body {
       Some(b) if b == "-" => {

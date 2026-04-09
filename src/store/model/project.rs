@@ -5,7 +5,8 @@ use getset::Getters;
 use libsql::Row;
 use serde::{Deserialize, Serialize};
 
-use super::{Error, primitives::Id};
+use super::primitives::Id;
+use crate::store::Error;
 
 /// A project represents a tracked repository or directory root.
 ///

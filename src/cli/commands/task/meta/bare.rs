@@ -9,9 +9,7 @@ use crate::{
 pub async fn call(context: &AppContext, raw_id: &str, output: &json::Flags) -> Result<(), Error> {
   let conn = context.store().connect().await?;
   let id = repo::resolve::resolve_id(&conn, "tasks", raw_id).await?;
-  let task = repo::task::find_by_id(&conn, id)
-    .await?
-    .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(raw_id.to_string())))?;
+  let task = repo::task::find_required_by_id(&conn, id).await?;
 
   let metadata = task.metadata();
 

@@ -3,7 +3,8 @@ use getset::Getters;
 use libsql::Row;
 use serde::{Deserialize, Serialize};
 
-use super::{Error, primitives::Id};
+use super::primitives::Id;
+use crate::store::Error;
 
 /// A deduplicated label that can be attached to any entity.
 #[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]

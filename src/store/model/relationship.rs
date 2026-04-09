@@ -3,10 +3,8 @@ use getset::{CopyGetters, Getters};
 use libsql::Row;
 use serde::{Deserialize, Serialize};
 
-use super::{
-  Error,
-  primitives::{EntityType, Id, RelationshipType},
-};
+use super::primitives::{EntityType, Id, RelationshipType};
+use crate::store::Error;
 
 /// A directed relationship between two entities.
 #[derive(Clone, CopyGetters, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]

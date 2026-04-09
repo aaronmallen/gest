@@ -31,9 +31,7 @@ impl Command {
     repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
 
     // Pool follows the tagged task's status.
-    let task = repo::task::find_by_id(&conn, id.clone())
-      .await?
-      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let task = repo::task::find_required_by_id(&conn, id.clone()).await?;
     let prefix_len = if task.status().is_terminal() {
       repo::task::shortest_all_prefix(&conn, project_id).await?
     } else {

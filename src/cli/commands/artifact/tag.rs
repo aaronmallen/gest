@@ -29,9 +29,7 @@ impl Command {
     let tag = repo::tag::attach(&conn, EntityType::Artifact, &id, &self.label).await?;
     repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
 
-    let artifact = repo::artifact::find_by_id(&conn, id.clone())
-      .await?
-      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let artifact = repo::artifact::find_required_by_id(&conn, id.clone()).await?;
     let prefix_len = if artifact.is_archived() {
       repo::artifact::shortest_all_prefix(&conn, project_id).await?
     } else {

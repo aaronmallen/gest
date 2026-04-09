@@ -56,9 +56,7 @@ impl Command {
     repo::transaction::record_event(&conn, tx.id(), "relationships", &rel.id().to_string(), "created", None).await?;
 
     // Pool follows the source task's status.
-    let source_task = repo::task::find_by_id(&conn, source_id.clone())
-      .await?
-      .ok_or_else(|| Error::Resolve(repo::resolve::Error::NotFound(self.id.clone())))?;
+    let source_task = repo::task::find_required_by_id(&conn, source_id.clone()).await?;
     let prefix_len = if source_task.status().is_terminal() {
       repo::task::shortest_all_prefix(&conn, project_id).await?
     } else {

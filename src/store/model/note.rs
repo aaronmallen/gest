@@ -3,10 +3,8 @@ use getset::{CopyGetters, Getters};
 use libsql::Row;
 use serde::{Deserialize, Serialize};
 
-use super::{
-  Error,
-  primitives::{EntityType, Id},
-};
+use super::primitives::{EntityType, Id};
+use crate::store::Error;
 
 /// A note attached to an entity.
 #[derive(Clone, CopyGetters, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]

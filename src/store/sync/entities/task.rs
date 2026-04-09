@@ -14,8 +14,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use crate::store::{
+  Error,
   model::primitives::{EntityType, Id},
-  sync::{Error, paths, yaml},
+  sync::{paths, yaml},
 };
 
 /// On-disk wrapper for `.gest/task/<id>.yaml`.

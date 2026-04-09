@@ -4,10 +4,8 @@ use libsql::Row;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{
-  Error,
-  primitives::{Id, TaskStatus},
-};
+use super::primitives::{Id, TaskStatus};
+use crate::store::Error;
 
 /// A unit of work within a project.
 #[derive(Clone, CopyGetters, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]

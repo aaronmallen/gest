@@ -5,14 +5,9 @@
 //! passed through MD5 or SHA-256). Entries are reused for
 //! [`DEFAULT_TTL`](self::DEFAULT_TTL) before they are refetched.
 //!
-//! This module provides the storage layer only: the HTTP route that surfaces
-//! cached bytes to browsers is wired up separately as part of the Gravatar
-//! proxy feature. Callers fetch on demand via [`AvatarCache::get_or_fetch`].
-
-// The HTTP wiring that consumes this cache lands in a later phase of the
-// Gravatar proxy work. Until then the items below are exercised only by unit
-// tests, so suppress the dead-code warnings at the module boundary.
-#![allow(dead_code)]
+//! The HTTP route that surfaces cached bytes to browsers lives in
+//! [`crate::web::handlers::avatar`] and consumes this cache via
+//! [`AvatarCache::get_or_fetch`].
 
 use std::{
   fs,
@@ -116,11 +111,6 @@ impl AvatarCache {
 
     self.write(&path, &bytes)?;
     Ok((bytes, content_type))
-  }
-
-  /// Return the TTL applied to cache entries.
-  pub fn ttl(&self) -> Duration {
-    self.ttl
   }
 
   /// Resolve the on-disk path for a cache entry.

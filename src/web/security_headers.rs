@@ -81,7 +81,7 @@ fn build_csp_header(nonce: Option<&str>) -> String {
   };
   format!(
     "default-src 'self'; script-src {script_src}; style-src {style_src}; \
-      img-src 'self' https://www.gravatar.com; connect-src 'self'; \
+      img-src 'self'; connect-src 'self'; \
       frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
   )
 }
@@ -104,10 +104,11 @@ mod tests {
     }
 
     #[test]
-    fn it_includes_gravatar_in_the_img_src_allowlist() {
+    fn it_restricts_img_src_to_self_and_never_allows_external_gravatar() {
       let csp = build_csp_header(Some("x"));
 
-      assert!(csp.contains("img-src 'self' https://www.gravatar.com"));
+      assert!(csp.contains("img-src 'self';"));
+      assert!(!csp.contains("gravatar.com"));
     }
 
     #[test]
@@ -133,7 +134,7 @@ mod tests {
       assert_eq!(
         csp,
         "default-src 'self'; script-src 'self'; style-src 'self'; \
-          img-src 'self' https://www.gravatar.com; connect-src 'self'; \
+          img-src 'self'; connect-src 'self'; \
           frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
       );
     }

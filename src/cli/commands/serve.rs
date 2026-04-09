@@ -56,6 +56,7 @@ impl Command {
     }
 
     let data_dir = context.settings().storage().data_dir()?;
+    let cache_dir = context.settings().storage().cache_dir()?;
     let socket_path = crate::web::reload_socket_path(context.gest_dir().as_deref(), &data_dir);
 
     let csrf_key = resolve_csrf_key(serve_config.csrf_signing_key())?;
@@ -68,6 +69,7 @@ impl Command {
       Some(socket_path),
       debounce_ms,
       csrf_key,
+      cache_dir,
     )
     .await
     .map_err(std::io::Error::other)?;

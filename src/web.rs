@@ -37,7 +37,7 @@ use thiserror::Error as ThisError;
 
 use crate::{
   io::git,
-  store::{Db, Error as StoreError},
+  store::{Db, Error as StoreError, avatar_cache::AvatarCache},
 };
 
 /// Errors produced by the web layer.
@@ -174,6 +174,7 @@ pub fn reload_socket_path(gest_dir: Option<&Path>, data_dir: &Path) -> PathBuf {
 /// When `socket_path` is provided (and the platform is unix), a unix domain socket
 /// listener is bound there and forwards bare connection signals to the SSE reload
 /// channel — letting CLI mutations wake browser tabs without polling the filesystem.
+#[allow(clippy::too_many_arguments)]
 pub async fn serve(
   store: Arc<Db>,
   project_id: crate::store::model::primitives::Id,
@@ -182,8 +183,10 @@ pub async fn serve(
   socket_path: Option<PathBuf>,
   debounce_ms: u64,
   csrf_key: CsrfKey,
+  cache_dir: PathBuf,
 ) -> Result<(), Error> {
-  let mut state = AppState::new(store, project_id);
+  let avatar_cache = Arc::new(AvatarCache::new(cache_dir));
+  let mut state = AppState::new(store, project_id).with_avatar_cache(avatar_cache);
 
   // Resolve the git author once at startup so note creation can tag the user.
   if let Some(ga) = git::resolve_author_or_env() {
@@ -284,6 +287,8 @@ fn router(state: AppState, csrf_key: CsrfKey) -> Router {
       "/artifacts/{id}/notes",
       axum::routing::post(handlers::artifact_note_add),
     )
+    // Local avatar proxy (first-party replacement for gravatar.com)
+    .route("/avatars/{hash}", axum::routing::get(handlers::avatar_get))
     // SSE + API
     .route("/events", axum::routing::get(sse::events))
     .route("/api/search", axum::routing::get(handlers::api_search))

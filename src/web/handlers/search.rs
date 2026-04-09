@@ -13,7 +13,10 @@ use crate::{
     model::{artifact, iteration, task},
     repo, search_query,
   },
-  web::{AppState, handlers::log_err},
+  web::{
+    AppState,
+    handlers::{self, log_err},
+  },
 };
 
 /// Query parameters for the JSON search API.
@@ -109,7 +112,10 @@ pub async fn api_search(State(state): State<AppState>, Query(params): Query<ApiS
 }
 
 /// Search page.
-pub async fn search(State(state): State<AppState>, Query(params): Query<SearchQuery>) -> Result<Html<String>, String> {
+pub async fn search(
+  State(state): State<AppState>,
+  Query(params): Query<SearchQuery>,
+) -> handlers::Result<Html<String>> {
   let conn = state.store().connect().await.map_err(log_err("search"))?;
   let query = params.q.unwrap_or_default();
 

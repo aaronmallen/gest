@@ -22,7 +22,7 @@ use crate::{
   },
   web::{
     AppState,
-    handlers::log_err,
+    handlers::{self, AppError, log_err},
     timeline::{self, TimelineItem},
   },
 };
@@ -108,7 +108,7 @@ struct PhaseGroup {
 }
 
 /// Iteration board page.
-pub async fn iteration_board(State(state): State<AppState>, Path(id): Path<String>) -> Result<Html<String>, String> {
+pub async fn iteration_board(State(state): State<AppState>, Path(id): Path<String>) -> handlers::Result<Html<String>> {
   let (iteration, open_tasks, in_progress_tasks, done_tasks, cancelled_tasks) =
     build_iteration_board(&state, &id).await?;
 
@@ -126,7 +126,7 @@ pub async fn iteration_board(State(state): State<AppState>, Path(id): Path<Strin
 pub async fn iteration_board_fragment(
   State(state): State<AppState>,
   Path(id): Path<String>,
-) -> Result<Html<String>, String> {
+) -> handlers::Result<Html<String>> {
   let (iteration, open_tasks, in_progress_tasks, done_tasks, cancelled_tasks) =
     build_iteration_board(&state, &id).await?;
 
@@ -141,7 +141,7 @@ pub async fn iteration_board_fragment(
 }
 
 /// Iteration detail page.
-pub async fn iteration_detail(State(state): State<AppState>, Path(id): Path<String>) -> Result<Html<String>, String> {
+pub async fn iteration_detail(State(state): State<AppState>, Path(id): Path<String>) -> handlers::Result<Html<String>> {
   let (iteration, tags, phases, task_count, status_counts, timeline_items) =
     build_iteration_detail(&state, &id).await?;
 
@@ -160,7 +160,7 @@ pub async fn iteration_detail(State(state): State<AppState>, Path(id): Path<Stri
 pub async fn iteration_detail_fragment(
   State(state): State<AppState>,
   Path(id): Path<String>,
-) -> Result<Html<String>, String> {
+) -> handlers::Result<Html<String>> {
   let (iteration, tags, phases, task_count, status_counts, timeline_items) =
     build_iteration_detail(&state, &id).await?;
 
@@ -179,7 +179,7 @@ pub async fn iteration_detail_fragment(
 pub async fn iteration_list(
   State(state): State<AppState>,
   Query(params): Query<IterationListParams>,
-) -> Result<Html<String>, String> {
+) -> handlers::Result<Html<String>> {
   let (rows, active_count, completed_count, cancelled_count, current_status) =
     build_iteration_list(&state, &params.status).await?;
 
@@ -197,7 +197,7 @@ pub async fn iteration_list(
 pub async fn iteration_list_fragment(
   State(state): State<AppState>,
   Query(params): Query<IterationListParams>,
-) -> Result<Html<String>, String> {
+) -> handlers::Result<Html<String>> {
   let (rows, active_count, completed_count, cancelled_count, current_status) =
     build_iteration_list(&state, &params.status).await?;
 
@@ -215,16 +215,13 @@ pub async fn iteration_list_fragment(
 async fn build_iteration_board(
   state: &AppState,
   id: &str,
-) -> Result<
-  (
-    iteration::Model,
-    Vec<IterationTaskRow>,
-    Vec<IterationTaskRow>,
-    Vec<IterationTaskRow>,
-    Vec<IterationTaskRow>,
-  ),
-  String,
-> {
+) -> handlers::Result<(
+  iteration::Model,
+  Vec<IterationTaskRow>,
+  Vec<IterationTaskRow>,
+  Vec<IterationTaskRow>,
+  Vec<IterationTaskRow>,
+)> {
   let conn = state
     .store()
     .connect()
@@ -238,7 +235,7 @@ async fn build_iteration_board(
     .map_err(log_err("build_iteration_board"))?
     .ok_or_else(|| {
       log::error!("build_iteration_board: iteration not found: {id}");
-      format!("iteration not found: {id}")
+      AppError::NotFound
     })?;
 
   let tasks = repo::iteration::tasks_with_phase(&conn, &iter_id)
@@ -265,17 +262,14 @@ async fn build_iteration_board(
 async fn build_iteration_detail(
   state: &AppState,
   id: &str,
-) -> Result<
-  (
-    iteration::Model,
-    Vec<String>,
-    Vec<PhaseGroup>,
-    i64,
-    StatusCounts,
-    Vec<TimelineItem>,
-  ),
-  String,
-> {
+) -> handlers::Result<(
+  iteration::Model,
+  Vec<String>,
+  Vec<PhaseGroup>,
+  i64,
+  StatusCounts,
+  Vec<TimelineItem>,
+)> {
   let conn = state
     .store()
     .connect()
@@ -289,7 +283,7 @@ async fn build_iteration_detail(
     .map_err(log_err("build_iteration_detail"))?
     .ok_or_else(|| {
       log::error!("build_iteration_detail: iteration not found: {id}");
-      format!("iteration not found: {id}")
+      AppError::NotFound
     })?;
 
   let tags = repo::tag::for_entity(&conn, EntityType::Iteration, &iter_id)
@@ -324,7 +318,7 @@ async fn build_iteration_detail(
 async fn build_iteration_list(
   state: &AppState,
   status_param: &Option<String>,
-) -> Result<(Vec<IterationRow>, usize, usize, usize, String), String> {
+) -> handlers::Result<(Vec<IterationRow>, usize, usize, usize, String)> {
   let conn = state.store().connect().await.map_err(log_err("build_iteration_list"))?;
 
   // Fetch all iterations to compute counts

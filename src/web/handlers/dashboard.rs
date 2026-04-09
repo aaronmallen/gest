@@ -1,11 +1,7 @@
-//! Dashboard and fallback handlers.
+//! Dashboard page handlers.
 
 use askama::Template;
-use axum::{
-  extract::State,
-  http::StatusCode,
-  response::{Html, IntoResponse, Response},
-};
+use axum::{extract::State, response::Html};
 
 use crate::{
   store::{
@@ -16,7 +12,10 @@ use crate::{
     },
     repo,
   },
-  web::{AppState, handlers::log_err},
+  web::{
+    AppState,
+    handlers::{self, log_err},
+  },
 };
 
 #[derive(Template)]
@@ -49,12 +48,8 @@ struct DashboardTemplate {
   task_count: usize,
 }
 
-#[derive(Template)]
-#[template(path = "not_found.html")]
-struct NotFoundTemplate;
-
 /// Dashboard page showing project summary.
-pub async fn dashboard(State(state): State<AppState>) -> Result<Html<String>, String> {
+pub async fn dashboard(State(state): State<AppState>) -> handlers::Result<Html<String>> {
   let conn = state.store().connect().await.map_err(log_err("dashboard"))?;
   let pid = state.project_id();
 
@@ -97,7 +92,7 @@ pub async fn dashboard(State(state): State<AppState>) -> Result<Html<String>, St
 }
 
 /// Dashboard content fragment for live reload.
-pub async fn dashboard_fragment(State(state): State<AppState>) -> Result<Html<String>, String> {
+pub async fn dashboard_fragment(State(state): State<AppState>) -> handlers::Result<Html<String>> {
   let conn = state.store().connect().await.map_err(log_err("dashboard_fragment"))?;
   let pid = state.project_id();
 
@@ -137,14 +132,6 @@ pub async fn dashboard_fragment(State(state): State<AppState>) -> Result<Html<St
     task_count,
   };
   Ok(Html(tmpl.render().map_err(log_err("dashboard_fragment"))?))
-}
-
-/// Fallback handler for unmatched routes.
-pub async fn not_found() -> Response {
-  let body = NotFoundTemplate
-    .render()
-    .unwrap_or_else(|_| "404 — not found".to_owned());
-  (StatusCode::NOT_FOUND, Html(body)).into_response()
 }
 
 /// Compute dashboard status counts from task, artifact, and iteration lists.

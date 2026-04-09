@@ -21,7 +21,7 @@ use crate::{
   web::{
     AppState,
     forms::{self, ExistingLink, NoteFormData},
-    handlers::log_err,
+    handlers::{self, AppError, log_err},
     markdown,
     timeline::{self, TimelineItem},
   },
@@ -124,7 +124,7 @@ pub async fn note_add(
   State(state): State<AppState>,
   Path(id): Path<String>,
   Form(form): Form<NoteFormData>,
-) -> Result<Redirect, String> {
+) -> handlers::Result<Redirect> {
   log::debug!("note_add: task={id}");
   let conn = state.store().connect().await.map_err(log_err("note_add"))?;
   let task_id = repo::resolve::resolve_id(&conn, "tasks", &id)
@@ -144,13 +144,16 @@ pub async fn note_add(
 }
 
 /// Task create form.
-pub async fn task_create_form() -> Result<Html<String>, String> {
+pub async fn task_create_form() -> handlers::Result<Html<String>> {
   let tmpl = TaskCreateTemplate;
   Ok(Html(tmpl.render().map_err(log_err("task_create_form"))?))
 }
 
 /// Handle task creation from form.
-pub async fn task_create_submit(State(state): State<AppState>, Form(form): Form<TaskForm>) -> Result<Redirect, String> {
+pub async fn task_create_submit(
+  State(state): State<AppState>,
+  Form(form): Form<TaskForm>,
+) -> handlers::Result<Redirect> {
   log::debug!("task_create_submit: title={}", form.title);
   let conn = state.store().connect().await.map_err(log_err("task_create_submit"))?;
   let new = task::New {
@@ -167,7 +170,7 @@ pub async fn task_create_submit(State(state): State<AppState>, Form(form): Form<
 }
 
 /// Task detail page.
-pub async fn task_detail(State(state): State<AppState>, Path(id): Path<String>) -> Result<Html<String>, String> {
+pub async fn task_detail(State(state): State<AppState>, Path(id): Path<String>) -> handlers::Result<Html<String>> {
   let conn = state.store().connect().await.map_err(log_err("task_detail"))?;
   let task_id = repo::resolve::resolve_id(&conn, "tasks", &id)
     .await
@@ -177,7 +180,7 @@ pub async fn task_detail(State(state): State<AppState>, Path(id): Path<String>) 
     .map_err(log_err("task_detail"))?
     .ok_or_else(|| {
       log::error!("task_detail: task not found: {id}");
-      format!("task not found: {id}")
+      AppError::NotFound
     })?;
 
   let (tags, description_html, is_blocked, blocking, display_links) =
@@ -200,7 +203,7 @@ pub async fn task_detail(State(state): State<AppState>, Path(id): Path<String>) 
 pub async fn task_detail_fragment(
   State(state): State<AppState>,
   Path(id): Path<String>,
-) -> Result<Html<String>, String> {
+) -> handlers::Result<Html<String>> {
   let conn = state.store().connect().await.map_err(log_err("task_detail_fragment"))?;
   let task_id = repo::resolve::resolve_id(&conn, "tasks", &id)
     .await
@@ -210,7 +213,7 @@ pub async fn task_detail_fragment(
     .map_err(log_err("task_detail_fragment"))?
     .ok_or_else(|| {
       log::error!("task_detail_fragment: task not found: {id}");
-      format!("task not found: {id}")
+      AppError::NotFound
     })?;
 
   let (tags, description_html, is_blocked, blocking, display_links) =
@@ -230,7 +233,7 @@ pub async fn task_detail_fragment(
 }
 
 /// Task edit form.
-pub async fn task_edit_form(State(state): State<AppState>, Path(id): Path<String>) -> Result<Html<String>, String> {
+pub async fn task_edit_form(State(state): State<AppState>, Path(id): Path<String>) -> handlers::Result<Html<String>> {
   let conn = state.store().connect().await.map_err(log_err("task_edit_form"))?;
   let task_id = repo::resolve::resolve_id(&conn, "tasks", &id)
     .await
@@ -240,7 +243,7 @@ pub async fn task_edit_form(State(state): State<AppState>, Path(id): Path<String
     .map_err(log_err("task_edit_form"))?
     .ok_or_else(|| {
       log::error!("task_edit_form: task not found: {id}");
-      format!("task not found: {id}")
+      AppError::NotFound
     })?;
 
   let tags = repo::tag::for_entity(&conn, EntityType::Task, &task_id)
@@ -268,7 +271,7 @@ pub async fn task_edit_form(State(state): State<AppState>, Path(id): Path<String
 pub async fn task_list(
   State(state): State<AppState>,
   Query(params): Query<TaskListParams>,
-) -> Result<Html<String>, String> {
+) -> handlers::Result<Html<String>> {
   let (rows, open_count, in_progress_count, done_count, cancelled_count, current_status) =
     build_task_list_data(&state, params.status).await?;
 
@@ -287,7 +290,7 @@ pub async fn task_list(
 pub async fn task_list_fragment(
   State(state): State<AppState>,
   Query(params): Query<TaskListParams>,
-) -> Result<Html<String>, String> {
+) -> handlers::Result<Html<String>> {
   let (rows, open_count, in_progress_count, done_count, cancelled_count, current_status) =
     build_task_list_data(&state, params.status).await?;
 
@@ -307,7 +310,7 @@ pub async fn task_update(
   State(state): State<AppState>,
   Path(id): Path<String>,
   body: Bytes,
-) -> Result<Redirect, String> {
+) -> handlers::Result<Redirect> {
   log::debug!("task_update: task={id}");
   let conn = state.store().connect().await.map_err(log_err("task_update"))?;
   let task_id = repo::resolve::resolve_id(&conn, "tasks", &id)
@@ -337,7 +340,7 @@ pub async fn task_update(
   } else {
     Some(status_str.parse().map_err(|e: String| {
       log::error!("task_update: invalid status: {e}");
-      e
+      AppError::BadRequest(format!("invalid status: {e}"))
     })?)
   };
 
@@ -346,7 +349,7 @@ pub async fn task_update(
   } else {
     let val: u8 = priority_str.parse().map_err(|_| {
       log::error!("task_update: invalid priority: {priority_str}");
-      "invalid priority".to_owned()
+      AppError::BadRequest("invalid priority".to_owned())
     })?;
     Some(Some(val))
   };
@@ -418,7 +421,7 @@ fn build_display_links(task_id: &Id, rels: &[relationship::Model]) -> Vec<Displa
 async fn build_task_list_data(
   state: &AppState,
   status_param: Option<String>,
-) -> Result<(Vec<TaskRow>, usize, usize, usize, usize, String), String> {
+) -> handlers::Result<(Vec<TaskRow>, usize, usize, usize, usize, String)> {
   let conn = state.store().connect().await.map_err(log_err("build_task_list_data"))?;
 
   let all_tasks = repo::task::all(&conn, state.project_id(), &task::Filter::all())
@@ -453,7 +456,7 @@ async fn build_task_list_data(
 }
 
 /// Build enriched task rows from a list of tasks.
-async fn build_task_rows(conn: &Connection, tasks: Vec<task::Model>) -> Result<Vec<TaskRow>, String> {
+async fn build_task_rows(conn: &Connection, tasks: Vec<task::Model>) -> handlers::Result<Vec<TaskRow>> {
   let mut rows = Vec::with_capacity(tasks.len());
   for task in tasks {
     let task_id = task.id().clone();
@@ -529,7 +532,7 @@ async fn load_task_detail_data(
   conn: &Connection,
   task_id: &Id,
   task: &task::Model,
-) -> Result<(Vec<String>, String, bool, bool, Vec<DisplayLink>), String> {
+) -> handlers::Result<(Vec<String>, String, bool, bool, Vec<DisplayLink>)> {
   let tags = repo::tag::for_entity(conn, EntityType::Task, task_id)
     .await
     .map_err(log_err("load_task_detail_data"))?;
@@ -590,6 +593,35 @@ mod tests {
     // Leak the tempdir for the duration of the test process
     std::mem::forget(tmp);
     AppState::new(store, project_id)
+  }
+
+  mod task_detail_error_response {
+    use axum::{
+      body::to_bytes,
+      extract::{Path, State},
+      http::StatusCode,
+      response::IntoResponse,
+    };
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_renders_html_500_when_the_handler_propagates_an_internal_error() {
+      let state = setup().await;
+
+      let err = task_detail(State(state), Path("!!!-not-a-valid-prefix".into()))
+        .await
+        .expect_err("invalid id prefix should propagate as an internal error");
+      let response = err.into_response();
+      let status = response.status();
+      let body_bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+      let body = String::from_utf8(body_bytes.to_vec()).unwrap();
+
+      assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+      assert!(body.contains("<html"));
+      assert!(body.contains("500"));
+    }
   }
 
   mod build_task_list_data {

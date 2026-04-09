@@ -16,7 +16,7 @@ use crate::{
   web::{
     AppState,
     forms::{self, ExistingLink, NoteFormData},
-    handlers::log_err,
+    handlers::{self, AppError, log_err},
     markdown,
     timeline::{self, TimelineItem},
   },
@@ -98,7 +98,7 @@ struct ArtifactRow {
 }
 
 /// Archive an artifact.
-pub async fn artifact_archive(State(state): State<AppState>, Path(id): Path<String>) -> Result<Redirect, String> {
+pub async fn artifact_archive(State(state): State<AppState>, Path(id): Path<String>) -> handlers::Result<Redirect> {
   log::debug!("artifact_archive: artifact={id}");
   let conn = state.store().connect().await.map_err(log_err("artifact_archive"))?;
   let artifact_id = repo::resolve::resolve_id(&conn, "artifacts", &id)
@@ -113,7 +113,7 @@ pub async fn artifact_archive(State(state): State<AppState>, Path(id): Path<Stri
 }
 
 /// Artifact create form.
-pub async fn artifact_create_form() -> Result<Html<String>, String> {
+pub async fn artifact_create_form() -> handlers::Result<Html<String>> {
   let tmpl = ArtifactCreateTemplate {
     title: String::new(),
     body: String::new(),
@@ -127,7 +127,7 @@ pub async fn artifact_create_form() -> Result<Html<String>, String> {
 pub async fn artifact_create_submit(
   State(state): State<AppState>,
   Form(form): Form<ArtifactForm>,
-) -> Result<Redirect, String> {
+) -> handlers::Result<Redirect> {
   log::debug!("artifact_create_submit: title={}", form.title);
   let conn = state
     .store()
@@ -158,7 +158,7 @@ pub async fn artifact_create_submit(
 }
 
 /// Artifact detail page.
-pub async fn artifact_detail(State(state): State<AppState>, Path(id): Path<String>) -> Result<Html<String>, String> {
+pub async fn artifact_detail(State(state): State<AppState>, Path(id): Path<String>) -> handlers::Result<Html<String>> {
   let (artifact, body_html, tags, timeline_items) = build_artifact_detail_data(&state, &id).await?;
   let tmpl = ArtifactDetailTemplate {
     artifact,
@@ -173,7 +173,7 @@ pub async fn artifact_detail(State(state): State<AppState>, Path(id): Path<Strin
 pub async fn artifact_detail_fragment(
   State(state): State<AppState>,
   Path(id): Path<String>,
-) -> Result<Html<String>, String> {
+) -> handlers::Result<Html<String>> {
   let (artifact, body_html, tags, timeline_items) = build_artifact_detail_data(&state, &id).await?;
   let tmpl = ArtifactDetailContentTemplate {
     artifact,
@@ -185,7 +185,10 @@ pub async fn artifact_detail_fragment(
 }
 
 /// Artifact edit form.
-pub async fn artifact_edit_form(State(state): State<AppState>, Path(id): Path<String>) -> Result<Html<String>, String> {
+pub async fn artifact_edit_form(
+  State(state): State<AppState>,
+  Path(id): Path<String>,
+) -> handlers::Result<Html<String>> {
   let conn = state.store().connect().await.map_err(log_err("artifact_edit_form"))?;
   let artifact_id = repo::resolve::resolve_id(&conn, "artifacts", &id)
     .await
@@ -195,7 +198,7 @@ pub async fn artifact_edit_form(State(state): State<AppState>, Path(id): Path<St
     .map_err(log_err("artifact_edit_form"))?
     .ok_or_else(|| {
       log::error!("artifact_edit_form: artifact not found: {id}");
-      format!("artifact not found: {id}")
+      AppError::NotFound
     })?;
 
   let tags = repo::tag::for_entity(&conn, EntityType::Artifact, &artifact_id)
@@ -222,7 +225,7 @@ pub async fn artifact_edit_form(State(state): State<AppState>, Path(id): Path<St
 pub async fn artifact_list(
   State(state): State<AppState>,
   Query(params): Query<ArtifactListParams>,
-) -> Result<Html<String>, String> {
+) -> handlers::Result<Html<String>> {
   let (artifacts, open_count, archived_count, current_status) = build_artifact_list_data(&state, params.status).await?;
   let tmpl = ArtifactListTemplate {
     artifacts,
@@ -237,7 +240,7 @@ pub async fn artifact_list(
 pub async fn artifact_list_fragment(
   State(state): State<AppState>,
   Query(params): Query<ArtifactListParams>,
-) -> Result<Html<String>, String> {
+) -> handlers::Result<Html<String>> {
   let (artifacts, open_count, archived_count, current_status) = build_artifact_list_data(&state, params.status).await?;
   let tmpl = ArtifactListContentTemplate {
     artifacts,
@@ -253,7 +256,7 @@ pub async fn artifact_note_add(
   State(state): State<AppState>,
   Path(id): Path<String>,
   Form(form): Form<NoteFormData>,
-) -> Result<Redirect, String> {
+) -> handlers::Result<Redirect> {
   log::debug!("artifact_note_add: artifact={id}");
   let conn = state.store().connect().await.map_err(log_err("artifact_note_add"))?;
   let artifact_id = repo::resolve::resolve_id(&conn, "artifacts", &id)
@@ -277,7 +280,7 @@ pub async fn artifact_update(
   State(state): State<AppState>,
   Path(id): Path<String>,
   body: Bytes,
-) -> Result<Redirect, String> {
+) -> handlers::Result<Redirect> {
   log::debug!("artifact_update: artifact={id}");
   let conn = state.store().connect().await.map_err(log_err("artifact_update"))?;
   let artifact_id = repo::resolve::resolve_id(&conn, "artifacts", &id)
@@ -328,7 +331,7 @@ pub async fn artifact_update(
 async fn build_artifact_detail_data(
   state: &AppState,
   id: &str,
-) -> Result<(artifact::Model, String, Vec<String>, Vec<TimelineItem>), String> {
+) -> handlers::Result<(artifact::Model, String, Vec<String>, Vec<TimelineItem>)> {
   let conn = state
     .store()
     .connect()
@@ -342,7 +345,7 @@ async fn build_artifact_detail_data(
     .map_err(log_err("build_artifact_detail_data"))?
     .ok_or_else(|| {
       log::error!("build_artifact_detail_data: artifact not found: {id}");
-      format!("artifact not found: {id}")
+      AppError::NotFound
     })?;
 
   let tags = repo::tag::for_entity(&conn, EntityType::Artifact, &artifact_id)
@@ -359,7 +362,7 @@ async fn build_artifact_detail_data(
 async fn build_artifact_list_data(
   state: &AppState,
   status: Option<String>,
-) -> Result<(Vec<ArtifactRow>, usize, usize, String), String> {
+) -> handlers::Result<(Vec<ArtifactRow>, usize, usize, String)> {
   let conn = state
     .store()
     .connect()

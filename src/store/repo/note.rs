@@ -1,3 +1,5 @@
+use std::{collections::HashMap, str::FromStr};
+
 use chrono::Utc;
 use libsql::{Connection, Value};
 
@@ -73,6 +75,49 @@ pub async fn find_required_by_id(conn: &Connection, id: impl Into<Id>) -> Result
   find_by_id(conn, id.clone())
     .await?
     .ok_or_else(|| Error::NotFound(format!("note {}", id.short())))
+}
+
+/// Return all notes for each of the given entities in a single query.
+///
+/// Entities with no notes are absent from the returned map. Within each entry
+/// the notes are ordered by `created_at` descending. Passing an empty
+/// `entity_ids` slice returns an empty map without issuing a query.
+pub async fn for_entities(
+  conn: &Connection,
+  entity_type: EntityType,
+  entity_ids: &[Id],
+) -> Result<HashMap<Id, Vec<Model>>, Error> {
+  log::debug!("repo::note::for_entities");
+  let mut map: HashMap<Id, Vec<Model>> = HashMap::new();
+  if entity_ids.is_empty() {
+    return Ok(map);
+  }
+
+  let placeholders = (2..entity_ids.len() + 2)
+    .map(|i| format!("?{i}"))
+    .collect::<Vec<_>>()
+    .join(", ");
+  let sql = format!(
+    "SELECT {SELECT_COLUMNS} FROM notes \
+      WHERE entity_type = ?1 AND entity_id IN ({placeholders}) \
+      ORDER BY entity_id, created_at DESC"
+  );
+
+  let mut params: Vec<Value> = Vec::with_capacity(entity_ids.len() + 1);
+  params.push(Value::from(entity_type.to_string()));
+  for id in entity_ids {
+    params.push(Value::from(id.to_string()));
+  }
+
+  let mut rows = conn.query(&sql, libsql::params_from_iter(params)).await?;
+  while let Some(row) = rows.next().await? {
+    let entity_id_str: String = row.get(1)?;
+    let note = Model::try_from(row)?;
+    let entity_id = Id::from_str(&entity_id_str).map_err(Error::InvalidValue)?;
+    map.entry(entity_id).or_default().push(note);
+  }
+
+  Ok(map)
 }
 
 /// Return all notes for a specific entity, newest first.
@@ -224,6 +269,91 @@ mod tests {
 
       let found = find_by_id(&conn, note.id().clone()).await.unwrap();
       assert!(found.is_none());
+    }
+  }
+
+  mod for_entities_fn {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_groups_notes_by_entity() {
+      let (_store, conn, _tmp, pid, task_id) = setup().await;
+      let task_id_2 = Id::new();
+      conn
+        .execute(
+          "INSERT INTO tasks (id, project_id, title) VALUES (?1, ?2, ?3)",
+          [task_id_2.to_string(), pid.to_string(), "Task 2".to_string()],
+        )
+        .await
+        .unwrap();
+
+      create(
+        &conn,
+        EntityType::Task,
+        &task_id,
+        &New {
+          author_id: None,
+          body: "Note A".into(),
+        },
+      )
+      .await
+      .unwrap();
+      create(
+        &conn,
+        EntityType::Task,
+        &task_id_2,
+        &New {
+          author_id: None,
+          body: "Note B".into(),
+        },
+      )
+      .await
+      .unwrap();
+
+      let map = for_entities(&conn, EntityType::Task, &[task_id.clone(), task_id_2.clone()])
+        .await
+        .unwrap();
+
+      assert_eq!(map.len(), 2);
+      assert_eq!(map[&task_id].len(), 1);
+      assert_eq!(map[&task_id_2].len(), 1);
+    }
+
+    #[tokio::test]
+    async fn it_returns_empty_map_for_empty_input() {
+      let (_store, conn, _tmp, _pid, _task_id) = setup().await;
+
+      let map = for_entities(&conn, EntityType::Task, &[]).await.unwrap();
+
+      assert!(map.is_empty());
+    }
+
+    #[tokio::test]
+    async fn it_omits_entities_with_no_notes() {
+      let (_store, conn, _tmp, _pid, task_id) = setup().await;
+      let no_notes_id = Id::new();
+
+      create(
+        &conn,
+        EntityType::Task,
+        &task_id,
+        &New {
+          author_id: None,
+          body: "Has note".into(),
+        },
+      )
+      .await
+      .unwrap();
+
+      let map = for_entities(&conn, EntityType::Task, &[task_id.clone(), no_notes_id.clone()])
+        .await
+        .unwrap();
+
+      assert_eq!(map.len(), 1);
+      assert!(map.contains_key(&task_id));
+      assert!(!map.contains_key(&no_notes_id));
     }
   }
 

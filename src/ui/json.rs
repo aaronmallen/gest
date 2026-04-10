@@ -3,7 +3,7 @@
 use clap::Args;
 use serde::Serialize;
 
-use crate::cli::Error;
+use crate::{cli::Error, ui::envelope::Envelope};
 
 /// Common output-mode flags that can be flattened into any command struct.
 #[derive(Args, Clone, Debug, Default)]
@@ -20,6 +20,61 @@ pub struct Flags {
 }
 
 impl Flags {
+  /// Print nothing (for delete in quiet mode), or the normal message.
+  pub fn print_delete(&self, normal: impl FnOnce() -> String) -> Result<(), Error> {
+    if self.json {
+      // JSON mode on delete: print empty object
+      println!("{{}}");
+    } else if self.quiet {
+      // nothing
+    } else {
+      println!("{}", normal());
+    }
+    Ok(())
+  }
+
+  /// Print a single entity wrapped in an [`Envelope`]. In JSON mode the
+  /// envelope is serialized; in quiet mode only the short ID is printed;
+  /// otherwise `normal` is called.
+  pub fn print_envelope<T: Serialize>(
+    &self,
+    envelope: &Envelope<'_, T>,
+    short_id: &str,
+    normal: impl FnOnce() -> String,
+  ) -> Result<(), Error> {
+    if self.json {
+      let json = serde_json::to_string_pretty(envelope)?;
+      println!("{json}");
+    } else if self.quiet {
+      println!("{short_id}");
+    } else {
+      println!("{}", normal());
+    }
+    Ok(())
+  }
+
+  /// Print a list of envelopes. In JSON mode the list is serialized; in raw
+  /// mode the `raw` callback renders script-friendly output; otherwise
+  /// `normal` is used.
+  pub fn print_envelopes<T: Serialize>(
+    &self,
+    envelopes: &[Envelope<'_, T>],
+    raw: impl FnOnce() -> String,
+    normal: impl FnOnce() -> String,
+  ) -> Result<(), Error> {
+    if self.json {
+      let json = serde_json::to_string_pretty(envelopes)?;
+      println!("{json}");
+    } else if self.raw {
+      println!("{}", raw());
+    } else if self.quiet {
+      // nothing
+    } else {
+      println!("{}", normal());
+    }
+    Ok(())
+  }
+
   /// Print a single entity. In JSON mode the entity is serialized; in quiet mode
   /// only the short ID is printed; otherwise `normal` is called to produce the
   /// human-readable output.
@@ -76,19 +131,6 @@ impl Flags {
       return Ok(None);
     }
     Ok(Some(normal()))
-  }
-
-  /// Print nothing (for delete in quiet mode), or the normal message.
-  pub fn print_delete(&self, normal: impl FnOnce() -> String) -> Result<(), Error> {
-    if self.json {
-      // JSON mode on delete: print empty object
-      println!("{{}}");
-    } else if self.quiet {
-      // nothing
-    } else {
-      println!("{}", normal());
-    }
-    Ok(())
   }
 }
 

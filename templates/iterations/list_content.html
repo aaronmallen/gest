@@ -49,7 +49,9 @@
           <td>{{ row.task_count }}</td>
           <td>{{ row.phase_count }}</td>
           <td>
-            {% for tag in row.tags %}<span class="tag">{{ tag }}</span>{% if !loop.last %} {% endif %}{% endfor %}
+            {% for tag in row.tags %}
+              <a href="/search?q=tag:{{ tag }}" class="tag">#{{ tag }}</a>{{ " " }}
+            {% endfor %}
           </td>
         </tr>
         {% endfor %}

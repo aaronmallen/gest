@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  cli::Error,
+  cli::{Error, tag_arg},
   store::{model::entity_tag, repo},
   ui::{components::SuccessMessage, json},
 };
@@ -12,8 +12,8 @@ use crate::{
 pub struct Command {
   /// The entity ID or prefix.
   id: String,
-  /// One or more tag labels to remove.
-  #[arg(required = true)]
+  /// One or more tag labels to remove (comma-separated values split into multiple tags).
+  #[arg(required = true, value_delimiter = ',', value_parser = tag_arg::trim_tag)]
   tags: Vec<String>,
   #[command(flatten)]
   output: json::Flags,
@@ -27,8 +27,9 @@ impl Command {
     let conn = context.store().connect().await?;
     let (entity_type, id) = repo::resolve::resolve_entity(&conn, &self.id).await?;
 
+    let labels = tag_arg::normalize_tags(&self.tags);
     let tx = repo::transaction::begin(&conn, project_id, &format!("{entity_type} untag")).await?;
-    for label in &self.tags {
+    for label in &labels {
       let before_tag = repo::tag::find_by_label(&conn, label).await?;
       repo::tag::detach(&conn, entity_type, &id, label).await?;
       if let Some(tag) = &before_tag {
@@ -49,7 +50,7 @@ impl Command {
     self.output.print_delete(|| {
       SuccessMessage::new(format!("untagged {entity_type}"))
         .id(short_id.clone())
-        .field("tags", self.tags.join(", "))
+        .field("tags", labels.join(", "))
         .to_string()
     })?;
     Ok(())

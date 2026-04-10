@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  cli::{Error, commands::task::priority::parse_priority, meta_args},
+  cli::{Error, commands::task::priority::parse_priority, meta_args, tag_arg},
   store::{
     model::{
       primitives::{AuthorType, EntityType, TaskStatus},
@@ -39,8 +39,8 @@ pub struct Command {
   /// Set the task status.
   #[arg(long, short)]
   status: Option<TaskStatus>,
-  /// Replace all tags on the task. Repeatable.
-  #[arg(long)]
+  /// Replace all tags on the task. Repeatable; comma-separated values split into multiple tags.
+  #[arg(long, value_delimiter = ',', value_parser = tag_arg::trim_tag)]
   tag: Vec<String>,
   /// Set the task title.
   #[arg(long, short)]
@@ -141,8 +141,8 @@ impl Command {
     // Replace all tags if --tag was specified
     if !self.tag.is_empty() {
       repo::tag::detach_all(&conn, EntityType::Task, &id).await?;
-      for label in &self.tag {
-        let tag = repo::tag::attach(&conn, EntityType::Task, &id, label).await?;
+      for label in tag_arg::normalize_tags(&self.tag) {
+        let tag = repo::tag::attach(&conn, EntityType::Task, &id, &label).await?;
         repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
       }
     }

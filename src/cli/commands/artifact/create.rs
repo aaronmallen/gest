@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::{
   AppContext,
-  cli::{Error, meta_args},
+  cli::{Error, meta_args, tag_arg},
   store::{
     model::{
       artifact::New,
@@ -44,8 +44,8 @@ pub struct Command {
   /// Read the body from a file path instead of stdin or `$EDITOR`.
   #[arg(long, short, conflicts_with = "body")]
   source: Option<String>,
-  /// Add a tag to the artifact (can be repeated).
-  #[arg(long, short)]
+  /// Add a tag to the artifact (can be repeated; comma-separated values split into multiple tags).
+  #[arg(long, short, value_delimiter = ',', value_parser = tag_arg::trim_tag)]
   tag: Vec<String>,
   #[command(flatten)]
   output: json::Flags,
@@ -100,8 +100,8 @@ impl Command {
     )
     .await?;
 
-    for label in &self.tag {
-      let tag = repo::tag::attach(&conn, EntityType::Artifact, artifact.id(), label).await?;
+    for label in tag_arg::normalize_tags(&self.tag) {
+      let tag = repo::tag::attach(&conn, EntityType::Artifact, artifact.id(), &label).await?;
       repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
     }
 

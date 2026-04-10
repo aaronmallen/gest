@@ -2,7 +2,7 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  cli::{Error, meta_args},
+  cli::{Error, meta_args, tag_arg},
   store::{
     model::{
       iteration::New,
@@ -30,8 +30,8 @@ pub struct Command {
   /// Set the initial status.
   #[arg(long, short)]
   status: Option<String>,
-  /// Add a tag (may be repeated).
-  #[arg(long, short)]
+  /// Add a tag (may be repeated; comma-separated values split into multiple tags).
+  #[arg(long, short, value_delimiter = ',', value_parser = tag_arg::trim_tag)]
   tag: Vec<String>,
   #[command(flatten)]
   output: json::Flags,
@@ -78,8 +78,8 @@ impl Command {
     }
 
     // Apply tags
-    for label in &self.tag {
-      repo::tag::attach(&conn, EntityType::Iteration, iteration.id(), label).await?;
+    for label in tag_arg::normalize_tags(&self.tag) {
+      repo::tag::attach(&conn, EntityType::Iteration, iteration.id(), &label).await?;
     }
 
     let prefix_len = match iteration.status() {

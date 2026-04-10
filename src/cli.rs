@@ -4,6 +4,7 @@ mod commands;
 pub mod limit;
 pub mod meta_args;
 pub mod prompt;
+pub mod tag_arg;
 pub mod web_notify;
 
 use clap::{ArgAction, CommandFactory, Parser, Subcommand};

@@ -45,3 +45,35 @@ fn it_rejects_duplicate_tag_add() {
   let occurrences = stdout.matches("dup").count();
   assert!(occurrences >= 1, "expected dup tag in list, got: {stdout}");
 }
+
+#[test]
+fn it_splits_comma_separated_positional_tags() {
+  let g = GestCmd::new();
+  let task_id = g.create_task("comma tag add target");
+
+  let output = g
+    .cmd()
+    .args(["tag", "add", &task_id, "red, green,blue"])
+    .output()
+    .expect("tag add failed to run");
+  assert!(
+    output.status.success(),
+    "tag add exited non-zero: {}",
+    String::from_utf8_lossy(&output.stderr)
+  );
+
+  let list = g
+    .cmd()
+    .args(["tag", "list", "--task"])
+    .output()
+    .expect("tag list failed");
+  let stdout = String::from_utf8_lossy(&list.stdout);
+
+  assert!(stdout.contains("red"), "expected red tag, got: {stdout}");
+  assert!(stdout.contains("green"), "expected green tag, got: {stdout}");
+  assert!(stdout.contains("blue"), "expected blue tag, got: {stdout}");
+  assert!(
+    !stdout.contains("red, green"),
+    "expected no literal comma-joined tag, got: {stdout}"
+  );
+}

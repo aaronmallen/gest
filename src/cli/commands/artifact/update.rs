@@ -3,7 +3,7 @@ use serde_json::Value;
 
 use crate::{
   AppContext,
-  cli::{Error, meta_args},
+  cli::{Error, meta_args, tag_arg},
   store::{
     model::{artifact::Patch, primitives::EntityType},
     repo,
@@ -28,8 +28,8 @@ pub struct Command {
   /// Merge a JSON object into metadata (repeatable; applied after --metadata pairs).
   #[arg(long = "metadata-json", value_name = "JSON")]
   metadata_json: Vec<String>,
-  /// Replace all tags on the artifact (can be repeated).
-  #[arg(long, short)]
+  /// Replace all tags on the artifact (can be repeated; comma-separated values split into multiple tags).
+  #[arg(long, short, value_delimiter = ',', value_parser = tag_arg::trim_tag)]
   tag: Vec<String>,
   /// Set the artifact title.
   #[arg(long, short = 'T')]
@@ -83,8 +83,8 @@ impl Command {
       for label in &existing_tags {
         repo::tag::detach(&conn, EntityType::Artifact, &id, label).await?;
       }
-      for label in &self.tag {
-        let tag = repo::tag::attach(&conn, EntityType::Artifact, &id, label).await?;
+      for label in tag_arg::normalize_tags(&self.tag) {
+        let tag = repo::tag::attach(&conn, EntityType::Artifact, &id, &label).await?;
         repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
       }
     }

@@ -5,7 +5,7 @@ use libsql::Connection;
 
 use crate::{
   AppContext,
-  cli::{Error, commands::task::priority::parse_priority, meta_args},
+  cli::{Error, commands::task::priority::parse_priority, meta_args, tag_arg},
   store::{
     model::{
       primitives::{AuthorType, EntityType, Id, RelationshipType, TaskStatus},
@@ -55,8 +55,8 @@ pub struct Command {
   /// The initial task status.
   #[arg(long, short)]
   status: Option<TaskStatus>,
-  /// Add a tag to the task. Repeatable.
-  #[arg(long)]
+  /// Add a tag to the task. Repeatable; comma-separated values split into multiple tags.
+  #[arg(long, value_delimiter = ',', value_parser = tag_arg::trim_tag)]
   tag: Vec<String>,
   #[command(flatten)]
   output: json::Flags,
@@ -108,8 +108,8 @@ impl Command {
     .await?;
 
     // Apply tags
-    for label in &self.tag {
-      let tag = repo::tag::attach(&conn, EntityType::Task, task.id(), label).await?;
+    for label in tag_arg::normalize_tags(&self.tag) {
+      let tag = repo::tag::attach(&conn, EntityType::Task, task.id(), &label).await?;
       repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
     }
 

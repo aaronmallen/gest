@@ -7,6 +7,7 @@ use axum::{
   extract::{Path, Query, State},
   response::Html,
 };
+use libsql::Connection;
 use serde::Deserialize;
 
 use crate::{
@@ -21,8 +22,7 @@ use crate::{
     },
   },
   web::{
-    AppState,
-    handlers::{self, AppError, log_err},
+    self, AppState,
     timeline::{self, TimelineItem},
   },
 };
@@ -31,6 +31,15 @@ use crate::{
 #[derive(Deserialize)]
 pub struct IterationListParams {
   status: Option<String>,
+}
+
+/// Shared data backing both the full iteration board page and the SSE fragment.
+struct IterationBoardData {
+  cancelled_tasks: Vec<IterationTaskRow>,
+  done_tasks: Vec<IterationTaskRow>,
+  in_progress_tasks: Vec<IterationTaskRow>,
+  iteration: iteration::Model,
+  open_tasks: Vec<IterationTaskRow>,
 }
 
 #[derive(Template)]
@@ -53,6 +62,16 @@ struct IterationBoardTemplate {
   open_tasks: Vec<IterationTaskRow>,
 }
 
+/// Shared data backing both the full iteration detail page and the SSE fragment.
+struct IterationDetailData {
+  iteration: iteration::Model,
+  phases: Vec<PhaseGroup>,
+  status_counts: StatusCounts,
+  tags: Vec<String>,
+  task_count: i64,
+  timeline_items: Vec<TimelineItem>,
+}
+
 #[derive(Template)]
 #[template(path = "iterations/detail_content.html")]
 struct IterationDetailFragmentTemplate {
@@ -73,6 +92,15 @@ struct IterationDetailTemplate {
   tags: Vec<String>,
   task_count: i64,
   timeline_items: Vec<TimelineItem>,
+}
+
+/// Shared data backing both the full iteration list page and the SSE fragment.
+struct IterationListData {
+  active_count: usize,
+  cancelled_count: usize,
+  completed_count: usize,
+  current_status: String,
+  rows: Vec<IterationRow>,
 }
 
 #[derive(Template)]
@@ -108,195 +136,181 @@ struct PhaseGroup {
 }
 
 /// Iteration board page.
-pub async fn iteration_board(State(state): State<AppState>, Path(id): Path<String>) -> handlers::Result<Html<String>> {
-  let (iteration, open_tasks, in_progress_tasks, done_tasks, cancelled_tasks) =
-    build_iteration_board(&state, &id).await?;
-
+pub async fn iteration_board(
+  State(state): State<AppState>,
+  Path(id): Path<String>,
+) -> Result<Html<String>, web::Error> {
+  let data = load_iteration_board(&state, &id).await?;
   let tmpl = IterationBoardTemplate {
-    iteration,
-    open_tasks,
-    in_progress_tasks,
-    done_tasks,
-    cancelled_tasks,
+    cancelled_tasks: data.cancelled_tasks,
+    done_tasks: data.done_tasks,
+    in_progress_tasks: data.in_progress_tasks,
+    iteration: data.iteration,
+    open_tasks: data.open_tasks,
   };
-  Ok(Html(tmpl.render().map_err(log_err("iteration_board"))?))
+  Ok(Html(tmpl.render()?))
 }
 
 /// Iteration board fragment (for SSE live reload).
 pub async fn iteration_board_fragment(
   State(state): State<AppState>,
   Path(id): Path<String>,
-) -> handlers::Result<Html<String>> {
-  let (iteration, open_tasks, in_progress_tasks, done_tasks, cancelled_tasks) =
-    build_iteration_board(&state, &id).await?;
-
+) -> Result<Html<String>, web::Error> {
+  let data = load_iteration_board(&state, &id).await?;
   let tmpl = IterationBoardFragmentTemplate {
-    iteration,
-    open_tasks,
-    in_progress_tasks,
-    done_tasks,
-    cancelled_tasks,
+    cancelled_tasks: data.cancelled_tasks,
+    done_tasks: data.done_tasks,
+    in_progress_tasks: data.in_progress_tasks,
+    iteration: data.iteration,
+    open_tasks: data.open_tasks,
   };
-  Ok(Html(tmpl.render().map_err(log_err("iteration_board_fragment"))?))
+  Ok(Html(tmpl.render()?))
 }
 
 /// Iteration detail page.
-pub async fn iteration_detail(State(state): State<AppState>, Path(id): Path<String>) -> handlers::Result<Html<String>> {
-  let (iteration, tags, phases, task_count, status_counts, timeline_items) =
-    build_iteration_detail(&state, &id).await?;
-
+pub async fn iteration_detail(
+  State(state): State<AppState>,
+  Path(id): Path<String>,
+) -> Result<Html<String>, web::Error> {
+  let data = load_iteration_detail(&state, &id).await?;
   let tmpl = IterationDetailTemplate {
-    iteration,
-    tags,
-    phases,
-    task_count,
-    status_counts,
-    timeline_items,
+    iteration: data.iteration,
+    phases: data.phases,
+    status_counts: data.status_counts,
+    tags: data.tags,
+    task_count: data.task_count,
+    timeline_items: data.timeline_items,
   };
-  Ok(Html(tmpl.render().map_err(log_err("iteration_detail"))?))
+  Ok(Html(tmpl.render()?))
 }
 
 /// Iteration detail fragment (for SSE live reload).
 pub async fn iteration_detail_fragment(
   State(state): State<AppState>,
   Path(id): Path<String>,
-) -> handlers::Result<Html<String>> {
-  let (iteration, tags, phases, task_count, status_counts, timeline_items) =
-    build_iteration_detail(&state, &id).await?;
-
+) -> Result<Html<String>, web::Error> {
+  let data = load_iteration_detail(&state, &id).await?;
   let tmpl = IterationDetailFragmentTemplate {
-    iteration,
-    tags,
-    phases,
-    task_count,
-    status_counts,
-    timeline_items,
+    iteration: data.iteration,
+    phases: data.phases,
+    status_counts: data.status_counts,
+    tags: data.tags,
+    task_count: data.task_count,
+    timeline_items: data.timeline_items,
   };
-  Ok(Html(tmpl.render().map_err(log_err("iteration_detail_fragment"))?))
+  Ok(Html(tmpl.render()?))
 }
 
 /// Iteration list page.
 pub async fn iteration_list(
   State(state): State<AppState>,
   Query(params): Query<IterationListParams>,
-) -> handlers::Result<Html<String>> {
-  let (rows, active_count, completed_count, cancelled_count, current_status) =
-    build_iteration_list(&state, &params.status).await?;
-
+) -> Result<Html<String>, web::Error> {
+  let data = load_iteration_list(&state, params.status).await?;
   let tmpl = IterationListTemplate {
-    rows,
-    active_count,
-    completed_count,
-    cancelled_count,
-    current_status,
+    active_count: data.active_count,
+    cancelled_count: data.cancelled_count,
+    completed_count: data.completed_count,
+    current_status: data.current_status,
+    rows: data.rows,
   };
-  Ok(Html(tmpl.render().map_err(log_err("iteration_list"))?))
+  Ok(Html(tmpl.render()?))
 }
 
 /// Iteration list fragment (for SSE live reload).
 pub async fn iteration_list_fragment(
   State(state): State<AppState>,
   Query(params): Query<IterationListParams>,
-) -> handlers::Result<Html<String>> {
-  let (rows, active_count, completed_count, cancelled_count, current_status) =
-    build_iteration_list(&state, &params.status).await?;
-
+) -> Result<Html<String>, web::Error> {
+  let data = load_iteration_list(&state, params.status).await?;
   let tmpl = IterationListFragmentTemplate {
-    rows,
-    active_count,
-    completed_count,
-    cancelled_count,
-    current_status,
+    active_count: data.active_count,
+    cancelled_count: data.cancelled_count,
+    completed_count: data.completed_count,
+    current_status: data.current_status,
+    rows: data.rows,
   };
-  Ok(Html(tmpl.render().map_err(log_err("iteration_list_fragment"))?))
+  Ok(Html(tmpl.render()?))
 }
 
-/// Build iteration board data from an iteration id.
-async fn build_iteration_board(
-  state: &AppState,
-  id: &str,
-) -> handlers::Result<(
-  iteration::Model,
-  Vec<IterationTaskRow>,
-  Vec<IterationTaskRow>,
-  Vec<IterationTaskRow>,
-  Vec<IterationTaskRow>,
-)> {
-  let conn = state
-    .store()
-    .connect()
-    .await
-    .map_err(log_err("build_iteration_board"))?;
-  let iter_id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Iterations, id)
-    .await
-    .map_err(log_err("build_iteration_board"))?;
+/// Build the enriched iteration rows for a page of iterations, batching tag
+/// lookups into a single query to avoid N+1 fan-out across the row set.
+async fn build_iteration_rows(
+  conn: &Connection,
+  iterations: Vec<iteration::Model>,
+) -> Result<Vec<IterationRow>, web::Error> {
+  if iterations.is_empty() {
+    return Ok(Vec::new());
+  }
+
+  let ids: Vec<_> = iterations.iter().map(|i| i.id().clone()).collect();
+  let tags_by_id = repo::tag::for_entities(conn, EntityType::Iteration, &ids).await?;
+
+  let mut rows = Vec::with_capacity(iterations.len());
+  for it in iterations {
+    let tags = tags_by_id
+      .get(it.id())
+      .map(|ts| ts.iter().map(|t| t.label().to_owned()).collect::<Vec<_>>())
+      .unwrap_or_default();
+    let counts = repo::iteration::task_status_counts(conn, it.id()).await?;
+    let max_phase = repo::iteration::max_phase(conn, it.id()).await?;
+    rows.push(IterationRow {
+      iteration: it,
+      phase_count: max_phase.unwrap_or(0),
+      tags,
+      task_count: counts.total,
+    });
+  }
+
+  Ok(rows)
+}
+
+/// Load the shared iteration board payload used by both the full page and the
+/// fragment handler.
+async fn load_iteration_board(state: &AppState, id: &str) -> Result<IterationBoardData, web::Error> {
+  let conn = state.store().connect().await?;
+  let iter_id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Iterations, id).await?;
   let iteration = repo::iteration::find_by_id(&conn, iter_id.clone())
-    .await
-    .map_err(log_err("build_iteration_board"))?
-    .ok_or_else(|| {
-      log::error!("build_iteration_board: iteration not found: {id}");
-      AppError::NotFound
-    })?;
+    .await?
+    .ok_or(web::Error::NotFound)?;
 
-  let tasks = repo::iteration::tasks_with_phase(&conn, &iter_id)
-    .await
-    .map_err(log_err("build_iteration_board"))?;
+  let tasks = repo::iteration::tasks_with_phase(&conn, &iter_id).await?;
 
-  let mut open = Vec::new();
-  let mut in_progress = Vec::new();
-  let mut done = Vec::new();
-  let mut cancelled = Vec::new();
+  let mut open_tasks = Vec::new();
+  let mut in_progress_tasks = Vec::new();
+  let mut done_tasks = Vec::new();
+  let mut cancelled_tasks = Vec::new();
   for t in tasks {
     match t.status.as_str() {
-      "in-progress" => in_progress.push(t),
-      "done" => done.push(t),
-      "cancelled" => cancelled.push(t),
-      _ => open.push(t),
+      "in-progress" => in_progress_tasks.push(t),
+      "done" => done_tasks.push(t),
+      "cancelled" => cancelled_tasks.push(t),
+      _ => open_tasks.push(t),
     }
   }
 
-  Ok((iteration, open, in_progress, done, cancelled))
+  Ok(IterationBoardData {
+    cancelled_tasks,
+    done_tasks,
+    in_progress_tasks,
+    iteration,
+    open_tasks,
+  })
 }
 
-/// Build enriched iteration detail data.
-async fn build_iteration_detail(
-  state: &AppState,
-  id: &str,
-) -> handlers::Result<(
-  iteration::Model,
-  Vec<String>,
-  Vec<PhaseGroup>,
-  i64,
-  StatusCounts,
-  Vec<TimelineItem>,
-)> {
-  let conn = state
-    .store()
-    .connect()
-    .await
-    .map_err(log_err("build_iteration_detail"))?;
-  let iter_id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Iterations, id)
-    .await
-    .map_err(log_err("build_iteration_detail"))?;
+/// Load the shared iteration detail payload used by both the full page and the
+/// fragment handler.
+async fn load_iteration_detail(state: &AppState, id: &str) -> Result<IterationDetailData, web::Error> {
+  let conn = state.store().connect().await?;
+  let iter_id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Iterations, id).await?;
   let iteration = repo::iteration::find_by_id(&conn, iter_id.clone())
-    .await
-    .map_err(log_err("build_iteration_detail"))?
-    .ok_or_else(|| {
-      log::error!("build_iteration_detail: iteration not found: {id}");
-      AppError::NotFound
-    })?;
+    .await?
+    .ok_or(web::Error::NotFound)?;
 
-  let tags = repo::tag::for_entity(&conn, EntityType::Iteration, &iter_id)
-    .await
-    .map_err(log_err("build_iteration_detail"))?;
-  let tasks = repo::iteration::tasks_with_phase(&conn, &iter_id)
-    .await
-    .map_err(log_err("build_iteration_detail"))?;
-  let status_counts = repo::iteration::task_status_counts(&conn, &iter_id)
-    .await
-    .map_err(log_err("build_iteration_detail"))?;
+  let tags = repo::tag::for_entity(&conn, EntityType::Iteration, &iter_id).await?;
+  let tasks = repo::iteration::tasks_with_phase(&conn, &iter_id).await?;
+  let status_counts = repo::iteration::task_status_counts(&conn, &iter_id).await?;
 
-  // Group tasks by phase
   let mut phase_map: BTreeMap<u32, Vec<IterationTaskRow>> = BTreeMap::new();
   for t in tasks {
     phase_map.entry(t.phase).or_default().push(t);
@@ -310,21 +324,27 @@ async fn build_iteration_detail(
     .collect();
 
   let task_count = status_counts.total;
-  let timeline_items = timeline::build_timeline(&conn, EntityType::Iteration, &iter_id).await?;
-  Ok((iteration, tags, phases, task_count, status_counts, timeline_items))
+  let timeline_items = timeline::build_timeline(&conn, EntityType::Iteration, &iter_id)
+    .await
+    .map_err(web::Error::Internal)?;
+
+  Ok(IterationDetailData {
+    iteration,
+    phases,
+    status_counts,
+    tags,
+    task_count,
+    timeline_items,
+  })
 }
 
-/// Build enriched iteration list data.
-async fn build_iteration_list(
-  state: &AppState,
-  status_param: &Option<String>,
-) -> handlers::Result<(Vec<IterationRow>, usize, usize, usize, String)> {
-  let conn = state.store().connect().await.map_err(log_err("build_iteration_list"))?;
+/// Load the shared iteration list payload (rows, counts, current status filter)
+/// used by both the full page and the fragment handler.
+async fn load_iteration_list(state: &AppState, status: Option<String>) -> Result<IterationListData, web::Error> {
+  let conn = state.store().connect().await?;
 
-  // Fetch all iterations to compute counts
-  let all_iterations = repo::iteration::all(&conn, state.project_id(), &iteration::Filter::all())
-    .await
-    .map_err(log_err("build_iteration_list"))?;
+  // Fetch all iterations to compute counts across every status.
+  let all_iterations = repo::iteration::all(&conn, state.project_id(), &iteration::Filter::all()).await?;
 
   let active_count = all_iterations
     .iter()
@@ -339,7 +359,7 @@ async fn build_iteration_list(
     .filter(|i| i.status() == IterationStatus::Cancelled)
     .count();
 
-  let current_status = status_param.clone().unwrap_or_else(|| "all".to_owned());
+  let current_status = status.unwrap_or_else(|| "all".to_owned());
 
   // Filter iterations based on status param. Default (no param) shows every iteration;
   // a concrete status narrows to that status.
@@ -351,30 +371,16 @@ async fn build_iteration_list(
     },
   };
 
-  let iterations = repo::iteration::all(&conn, state.project_id(), &filter)
-    .await
-    .map_err(log_err("build_iteration_list"))?;
+  let iterations = repo::iteration::all(&conn, state.project_id(), &filter).await?;
+  let rows = build_iteration_rows(&conn, iterations).await?;
 
-  let mut rows = Vec::with_capacity(iterations.len());
-  for it in iterations {
-    let tags = repo::tag::for_entity(&conn, EntityType::Iteration, it.id())
-      .await
-      .map_err(log_err("build_iteration_list"))?;
-    let counts = repo::iteration::task_status_counts(&conn, it.id())
-      .await
-      .map_err(log_err("build_iteration_list"))?;
-    let max_phase = repo::iteration::max_phase(&conn, it.id())
-      .await
-      .map_err(log_err("build_iteration_list"))?;
-    rows.push(IterationRow {
-      task_count: counts.total,
-      phase_count: max_phase.unwrap_or(0),
-      tags,
-      iteration: it,
-    });
-  }
-
-  Ok((rows, active_count, completed_count, cancelled_count, current_status))
+  Ok(IterationListData {
+    active_count,
+    cancelled_count,
+    completed_count,
+    current_status,
+    rows,
+  })
 }
 
 #[cfg(test)]
@@ -430,7 +436,7 @@ mod tests {
     AppState::new(store, project_id)
   }
 
-  mod build_iteration_board {
+  mod load_iteration_board {
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -494,24 +500,32 @@ mod tests {
       }
 
       let state = AppState::new(store_arc, project_id);
-      let (_iter, open, in_progress, done, cancelled) =
-        build_iteration_board(&state, &iter.id().to_string()).await.unwrap();
+      let data = load_iteration_board(&state, &iter.id().to_string()).await.unwrap();
 
-      assert_eq!(open.len(), 1);
-      assert_eq!(open[0].title, "Open task");
+      assert_eq!(data.open_tasks.len(), 1);
+      assert_eq!(data.open_tasks[0].title, "Open task");
 
-      assert_eq!(in_progress.len(), 1);
-      assert_eq!(in_progress[0].title, "In progress task");
+      assert_eq!(data.in_progress_tasks.len(), 1);
+      assert_eq!(data.in_progress_tasks[0].title, "In progress task");
 
-      assert_eq!(done.len(), 1);
-      assert_eq!(done[0].title, "Done task");
+      assert_eq!(data.done_tasks.len(), 1);
+      assert_eq!(data.done_tasks[0].title, "Done task");
 
-      assert_eq!(cancelled.len(), 1);
-      assert_eq!(cancelled[0].title, "Cancelled task");
+      assert_eq!(data.cancelled_tasks.len(), 1);
+      assert_eq!(data.cancelled_tasks[0].title, "Cancelled task");
+    }
+
+    #[tokio::test]
+    async fn it_returns_not_found_for_an_unknown_iteration() {
+      let state = setup().await;
+
+      let result = load_iteration_board(&state, "kkkkkkkk").await;
+
+      assert!(matches!(result, Err(web::Error::NotFound)));
     }
   }
 
-  mod build_iteration_list {
+  mod load_iteration_list {
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -520,46 +534,50 @@ mod tests {
     async fn it_defaults_to_all_when_no_status_given() {
       let state = setup().await;
 
-      let (rows, active, completed, cancelled, current) = build_iteration_list(&state, &None).await.unwrap();
+      let data = load_iteration_list(&state, None).await.unwrap();
 
-      assert_eq!(current, "all");
-      assert_eq!(rows.len(), 4);
-      assert_eq!((active, completed, cancelled), (2, 1, 1));
+      assert_eq!(data.current_status, "all");
+      assert_eq!(data.rows.len(), 4);
+      assert_eq!(
+        (data.active_count, data.completed_count, data.cancelled_count),
+        (2, 1, 1)
+      );
     }
 
     #[tokio::test]
     async fn it_filters_to_a_specific_status() {
       let state = setup().await;
 
-      let (rows, _, _, _, current) = build_iteration_list(&state, &Some("completed".into())).await.unwrap();
+      let data = load_iteration_list(&state, Some("completed".into())).await.unwrap();
 
-      assert_eq!(current, "completed");
-      assert_eq!(rows.len(), 1);
-      assert_eq!(rows[0].iteration.status(), IterationStatus::Completed);
+      assert_eq!(data.current_status, "completed");
+      assert_eq!(data.rows.len(), 1);
+      assert_eq!(data.rows[0].iteration.status(), IterationStatus::Completed);
     }
 
     #[tokio::test]
     async fn it_reports_counts_across_every_status_regardless_of_filter() {
       let state = setup().await;
 
-      let (_, active_a, completed_a, cancelled_a, _) = build_iteration_list(&state, &None).await.unwrap();
-      let (_, active_b, completed_b, cancelled_b, _) =
-        build_iteration_list(&state, &Some("completed".into())).await.unwrap();
+      let a = load_iteration_list(&state, None).await.unwrap();
+      let b = load_iteration_list(&state, Some("completed".into())).await.unwrap();
 
-      assert_eq!((active_a, completed_a, cancelled_a), (2, 1, 1));
-      assert_eq!((active_b, completed_b, cancelled_b), (2, 1, 1));
+      assert_eq!((a.active_count, a.completed_count, a.cancelled_count), (2, 1, 1));
+      assert_eq!((b.active_count, b.completed_count, b.cancelled_count), (2, 1, 1));
     }
 
     #[tokio::test]
     async fn it_returns_every_iteration_when_status_is_all() {
       let state = setup().await;
 
-      let (rows, active, completed, cancelled, current) =
-        build_iteration_list(&state, &Some("all".into())).await.unwrap();
+      let data = load_iteration_list(&state, Some("all".into())).await.unwrap();
 
-      assert_eq!(current, "all");
-      assert_eq!(rows.len(), 4);
-      assert_eq!((active, completed, cancelled), (2, 1, 1));
+      assert_eq!(data.current_status, "all");
+      assert_eq!(data.rows.len(), 4);
+      assert_eq!(
+        (data.active_count, data.completed_count, data.cancelled_count),
+        (2, 1, 1)
+      );
     }
   }
 

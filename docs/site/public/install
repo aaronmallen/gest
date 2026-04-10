@@ -44,17 +44,19 @@ main() {
 
 detect_os() {
   case "$(uname -s)" in
-    Darwin) echo "macos" ;;
-    Linux)  echo "linux" ;;
-    *)      err "unsupported OS: $(uname -s)" ;;
+    Darwin)  echo "macos" ;;
+    FreeBSD) echo "freebsd" ;;
+    Linux)   echo "linux" ;;
+    *)       err "unsupported OS: $(uname -s) — supported: Darwin, FreeBSD, Linux. Try: cargo install gest" ;;
   esac
 }
 
 detect_arch() {
   case "$(uname -m)" in
-    x86_64)          echo "x86_64" ;;
-    aarch64 | arm64) echo "aarch64" ;;
-    *)               err "unsupported architecture: $(uname -m)" ;;
+    x86_64)              echo "x86_64" ;;
+    aarch64 | arm64)     echo "aarch64" ;;
+    armv7l | armv6l)     echo "armv7" ;;
+    *)                   err "unsupported architecture: $(uname -m) — supported: x86_64, aarch64/arm64, armv7l. Try: cargo install gest" ;;
   esac
 }
 
@@ -76,11 +78,20 @@ build_target() {
   arch="$2"
 
   case "$os" in
-    macos) echo "${arch}-apple-darwin" ;;
+    freebsd)
+      case "$arch" in
+        x86_64) echo "x86_64-unknown-freebsd" ;;
+        *)      err "unsupported FreeBSD architecture: ${arch} — only x86_64 is supported. Try: cargo install gest" ;;
+      esac
+      ;;
     linux)
       libc="$(detect_libc)"
-      echo "${arch}-unknown-linux-${libc}"
+      case "$arch" in
+        armv7) echo "armv7-unknown-linux-${libc}eabihf" ;;
+        *)     echo "${arch}-unknown-linux-${libc}" ;;
+      esac
       ;;
+    macos) echo "${arch}-apple-darwin" ;;
   esac
 }
 
@@ -110,12 +121,17 @@ download() {
   url="$1"
   dest="$2"
 
+  rc=0
   if has curl; then
-    curl -fsSL -o "$dest" "$url"
+    curl -fsSL -o "$dest" "$url" || rc=$?
   elif has wget; then
-    wget -qO "$dest" "$url"
+    wget -qO "$dest" "$url" || rc=$?
   else
     err "curl or wget is required"
+  fi
+
+  if [ "$rc" -ne 0 ]; then
+    err "failed to download ${url} — this version may not have a pre-built binary for your platform. Try: cargo install gest"
   fi
 }
 

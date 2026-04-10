@@ -160,6 +160,13 @@ These are the token keys currently recognized by gest.
 - `config.no_overrides`
 - `config.value`
 
+### Confirm Prompt
+
+- `confirm.description`
+- `confirm.indicator`
+- `confirm.selected`
+- `confirm.unselected`
+
 ### IDs And Status Indicators
 
 - `id.prefix`

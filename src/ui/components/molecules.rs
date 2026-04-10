@@ -1,6 +1,7 @@
 //! Molecule-level UI components — composed from atoms.
 
 mod banner;
+mod confirm_prompt;
 mod empty_list;
 mod error_message;
 mod field_list;
@@ -15,6 +16,7 @@ mod task_row;
 mod update_notice;
 
 pub use banner::Component as Banner;
+pub use confirm_prompt::Component as ConfirmPrompt;
 pub use empty_list::Component as EmptyList;
 pub use error_message::Component as ErrorMessage;
 pub use field_list::Component as FieldList;

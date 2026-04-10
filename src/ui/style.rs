@@ -38,6 +38,10 @@ pub const ALL_TOKENS: &[&str] = &[
   "config.label",
   "config.no_overrides",
   "config.value",
+  "confirm.description",
+  "confirm.indicator",
+  "confirm.selected",
+  "confirm.unselected",
   "emphasis",
   "error",
   "id.prefix",
@@ -264,6 +268,15 @@ pub struct Theme {
   config_no_overrides: Style,
   #[get = "pub"]
   config_value: Style,
+
+  #[get = "pub"]
+  confirm_description: Style,
+  #[get = "pub"]
+  confirm_indicator: Style,
+  #[get = "pub"]
+  confirm_selected: Style,
+  #[get = "pub"]
+  confirm_unselected: Style,
 
   #[get = "pub"]
   emphasis: Style,
@@ -504,6 +517,11 @@ impl Default for Theme {
       config_no_overrides: Style::new().fg(c(TextDim)),
       config_value: Style::new().fg(c(Text)),
 
+      confirm_description: Style::new().fg(c(TextMuted)),
+      confirm_indicator: Style::new().fg(c(Primary)).bold(),
+      confirm_selected: Style::new().fg(c(Primary)).bold(),
+      confirm_unselected: Style::new().fg(c(TextDim)),
+
       emphasis: Style::new().fg(c(Primary)).bold(),
       error: Style::new().fg(c(Error)).bold(),
 
@@ -695,6 +713,11 @@ impl Theme {
       "config.no_overrides" => Some(&mut self.config_no_overrides),
       "config.value" => Some(&mut self.config_value),
 
+      "confirm.description" => Some(&mut self.confirm_description),
+      "confirm.indicator" => Some(&mut self.confirm_indicator),
+      "confirm.selected" => Some(&mut self.confirm_selected),
+      "confirm.unselected" => Some(&mut self.confirm_unselected),
+
       "emphasis" => Some(&mut self.emphasis),
       "error" => Some(&mut self.error),
 
@@ -862,6 +885,11 @@ fn palette_for_token(key: &str) -> Option<Palette> {
     "config.no_overrides" => Some(TextDim),
     "config.value" => Some(Text),
 
+    "confirm.description" => Some(TextMuted),
+    "confirm.indicator" => Some(Primary),
+    "confirm.selected" => Some(Primary),
+    "confirm.unselected" => Some(TextDim),
+
     "emphasis" => Some(Primary),
     "error" => Some(Error),
 
@@ -988,8 +1016,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_has_114_token_keys() {
-      assert_eq!(ALL_TOKENS.len(), 114);
+    fn it_has_118_token_keys() {
+      assert_eq!(ALL_TOKENS.len(), 118);
     }
 
     #[test]

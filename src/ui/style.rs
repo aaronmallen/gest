@@ -23,7 +23,6 @@ pub const ALL_TOKENS: &[&str] = &[
   "artifact.list.title",
   "artifact.list.title.archived",
   "banner.author",
-  "banner.author.name",
   "banner.gradient.end",
   "banner.gradient.start",
   "banner.shadow",
@@ -233,8 +232,6 @@ pub struct Theme {
 
   #[get = "pub"]
   banner_author: Style,
-  #[get = "pub"]
-  banner_author_name: Style,
   #[get = "pub"]
   banner_gradient_end: Style,
   #[get = "pub"]
@@ -488,8 +485,7 @@ impl Default for Theme {
       artifact_list_title: Style::new().fg(c(Text)),
       artifact_list_title_archived: Style::new().fg(c(TextDim)),
 
-      banner_author: Style::new().fg(c(Text)).italic(),
-      banner_author_name: Style::new().fg(c(Accent)).bold(),
+      banner_author: Style::new().fg(c(Accent)).bold(),
       banner_gradient_end: Style::new().fg(Color::Rgb(68, 169, 211)),
       banner_gradient_start: Style::new().fg(Color::Rgb(24, 178, 155)),
       banner_shadow: Style::new().fg(Color::Rgb(14, 130, 112)),
@@ -681,7 +677,6 @@ impl Theme {
       "artifact.list.title.archived" => Some(&mut self.artifact_list_title_archived),
 
       "banner.author" => Some(&mut self.banner_author),
-      "banner.author.name" => Some(&mut self.banner_author_name),
       "banner.gradient.end" => Some(&mut self.banner_gradient_end),
       "banner.gradient.start" => Some(&mut self.banner_gradient_start),
       "banner.shadow" => Some(&mut self.banner_shadow),
@@ -848,8 +843,7 @@ fn palette_for_token(key: &str) -> Option<Palette> {
     "artifact.list.title" => Some(Text),
     "artifact.list.title.archived" => Some(TextDim),
 
-    "banner.author" => Some(Text),
-    "banner.author.name" => Some(Accent),
+    "banner.author" => Some(Accent),
     "banner.gradient.end" => None,
     "banner.gradient.start" => None,
     "banner.shadow" => None,
@@ -994,8 +988,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_has_115_token_keys() {
-      assert_eq!(ALL_TOKENS.len(), 115);
+    fn it_has_114_token_keys() {
+      assert_eq!(ALL_TOKENS.len(), 114);
     }
 
     #[test]

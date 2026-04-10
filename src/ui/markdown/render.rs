@@ -1,6 +1,6 @@
 //! Render pass: convert the [`Block`] IR into styled terminal output.
 
-use pulldown_cmark::BlockQuoteKind;
+use pulldown_cmark::{BlockQuoteKind, HeadingLevel};
 use unicode_width::UnicodeWidthStr;
 use yansi::{Paint, Style};
 
@@ -30,8 +30,9 @@ fn render_block(block: &Block, width: usize) -> String {
       content, ..
     } => render_code_block(content),
     Block::Heading {
-      inlines, ..
-    } => render_heading(inlines),
+      inlines,
+      level,
+    } => render_heading(inlines, *level),
     Block::List {
       items,
       ordered,
@@ -81,10 +82,11 @@ fn render_code_block(content: &str) -> String {
   out
 }
 
-/// Render a heading: styled text followed by a blank line.
-fn render_heading(inlines: &[Inline]) -> String {
+/// Render a heading: `#` × level prefix, styled text, and a trailing blank line.
+fn render_heading(inlines: &[Inline], level: HeadingLevel) -> String {
   let theme = style::global();
-  let text = render_inlines(inlines);
+  let prefix = "#".repeat(level as usize);
+  let text = format!("{prefix} {}", render_inlines(inlines));
   format!("{}\n\n", text.paint(*theme.markdown_heading()))
 }
 
@@ -348,13 +350,43 @@ mod tests {
     }
 
     #[test]
+    fn it_renders_h1_with_single_hash_prefix() {
+      let out = render_md("# Heading One", 80);
+
+      assert!(
+        out.contains("# Heading One"),
+        "h1 should render with single # prefix, got: {out:?}"
+      );
+    }
+
+    #[test]
+    fn it_renders_h3_with_triple_hash_prefix() {
+      let out = render_md("### Heading Three", 80);
+
+      assert!(
+        out.contains("### Heading Three"),
+        "h3 should render with ### prefix, got: {out:?}"
+      );
+    }
+
+    #[test]
+    fn it_renders_h6_with_sextuple_hash_prefix() {
+      let out = render_md("###### Heading Six", 80);
+
+      assert!(
+        out.contains("###### Heading Six"),
+        "h6 should render with ###### prefix, got: {out:?}"
+      );
+    }
+
+    #[test]
     fn it_renders_heading_with_blank_line_after() {
       let out = render_md("# Title\n\nbody", 80);
 
-      assert!(out.contains("Title"));
+      assert!(out.contains("# Title"));
       assert!(
-        out.contains("Title\n\n"),
-        "heading should be followed by blank line, got: {out:?}"
+        out.contains("# Title\n\n"),
+        "heading should include # prefix and be followed by blank line, got: {out:?}"
       );
     }
 
@@ -416,6 +448,16 @@ mod tests {
       let out = render_md("", 80);
 
       assert!(out.is_empty());
+    }
+
+    #[test]
+    fn it_styles_heading_prefix_inside_the_same_span() {
+      let out = render_md_ansi("# Title", 80);
+
+      assert!(
+        !out.contains("\x1b[0m# ") && !out.contains("\x1b[m# "),
+        "# prefix should share the heading's styled span, got: {out:?}"
+      );
     }
 
     #[test]

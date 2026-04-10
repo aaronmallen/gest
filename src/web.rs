@@ -45,8 +45,7 @@ use crate::{
 /// A single `Error` covers both the startup path (file watcher, socket bind, TCP
 /// listener) and the request path (handler responses). The [`IntoResponse`] impl
 /// maps variants to real HTTP status codes so handlers can return typed errors
-/// instead of stringified 500s. Handler call sites still use
-/// [`crate::web::handlers::AppError`] until phase 6 of the web refactor.
+/// instead of stringified 500s.
 ///
 /// `BadRequest` and `Internal` carry user-facing messages that the `IntoResponse`
 /// impl renders through the shared error template. `NotFound` renders the

@@ -1,0 +1,15 @@
+---
+source: tests/integration/commands/iteration/when_graphing.rs
+assertion_line: 84
+expression: out
+---
+
+  Sprint
+  1 phase · 3 tasks
+
+  ◆  Phase 1  ──
+  ├─╮─╮
+  ○ │ │  [ID]  first task                           ○ open
+  │ ○ │  [ID]  second task                          ○ open
+  │ │ ○  [ID]  third task                           ○ open
+  ╰─╯─╯

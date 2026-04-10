@@ -1,0 +1,14 @@
+---
+source: tests/integration/commands/iteration/when_graphing.rs
+assertion_line: 64
+expression: out
+---
+
+  Sprint
+  2 phases · 2 tasks
+
+  ◆  Phase 1  ──
+  ○  [ID]  blocker task                         ○ open  ! blocking
+  │
+  ◆  Phase 2  ──
+  ⊗  [ID]  blocked task                         ⊗ blocked  blocked-by [ID]

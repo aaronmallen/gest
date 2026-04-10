@@ -1,0 +1,11 @@
+---
+source: tests/integration/commands/iteration/when_graphing.rs
+assertion_line: 124
+expression: out
+---
+
+  Sprint
+  1 phase · 1 task
+
+  ◆  Phase 1  ──
+  ○  [ID]  [P1]  priority task                        ○ open

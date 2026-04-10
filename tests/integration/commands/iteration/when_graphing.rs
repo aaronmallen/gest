@@ -2,9 +2,8 @@
 
 use crate::support::helpers::GestCmd;
 
-/// Run `iteration graph` with color disabled so stdout contains no ANSI
-/// escape sequences (the existing `strip_ansi` helper operates on bytes and
-/// corrupts multi-byte UTF-8 box-drawing characters).
+/// Run `iteration graph` with color disabled and normalize dynamic IDs so
+/// snapshot output is deterministic across runs.
 fn graph(g: &GestCmd, iter_id: &str) -> String {
   let mut cmd = g.raw_cmd();
   cmd.env("NO_COLOR", "1");
@@ -15,79 +14,37 @@ fn graph(g: &GestCmd, iter_id: &str) -> String {
     "iteration graph exited non-zero: {}",
     String::from_utf8_lossy(&output.stderr)
   );
-  String::from_utf8_lossy(&output.stdout).into_owned()
+  let raw = String::from_utf8_lossy(&output.stdout).into_owned();
+  normalize_ids(&raw)
+}
+
+/// Replace 8-char gest ID sequences (chars `k`–`z`) with `[ID]`.
+fn normalize_ids(s: &str) -> String {
+  let is_id_char = |c: char| matches!(c, 'k'..='z');
+
+  let mut result = String::with_capacity(s.len());
+  let chars: Vec<char> = s.chars().collect();
+  let mut i = 0;
+
+  while i < chars.len() {
+    if i + 8 <= chars.len() && chars[i..i + 8].iter().all(|&c| is_id_char(c)) {
+      let before_ok = i == 0 || !is_id_char(chars[i - 1]);
+      let after_ok = i + 8 >= chars.len() || !is_id_char(chars[i + 8]);
+      if before_ok && after_ok {
+        result.push_str("[ID]");
+        i += 8;
+        continue;
+      }
+    }
+    result.push(chars[i]);
+    i += 1;
+  }
+
+  result
 }
 
 #[test]
-fn it_renders_phase_header_and_summary_line() {
-  let g = GestCmd::new();
-  let iter_id = g.create_iteration_with_phases("Sprint", &[&["a task"]]);
-
-  let out = graph(&g, &iter_id);
-
-  assert!(out.contains("Sprint"), "output should contain iteration title: {out}");
-  assert!(
-    out.contains("1 phase \u{00B7} 1 task"),
-    "output should contain summary line: {out}"
-  );
-  assert!(
-    out.contains("\u{25C6}  Phase 1"),
-    "output should contain phase header: {out}"
-  );
-}
-
-#[test]
-fn it_renders_branch_connectors_for_multi_task_phases() {
-  let g = GestCmd::new();
-  let iter_id = g.create_iteration_with_phases("Sprint", &[&["one", "two", "three"]]);
-
-  let out = graph(&g, &iter_id);
-
-  assert!(
-    out.contains("\u{251C}\u{2500}\u{256E}\u{2500}\u{256E}"),
-    "output should contain three-wide branch open: {out}"
-  );
-  assert!(
-    out.contains("\u{2570}\u{2500}\u{256F}\u{2500}\u{256F}"),
-    "output should contain three-wide rounded branch close on the last phase: {out}"
-  );
-}
-
-#[test]
-fn it_renders_continuation_line_between_phases() {
-  let g = GestCmd::new();
-  let iter_id = g.create_iteration_with_phases("Sprint", &[&["one"], &["two"]]);
-
-  let out = graph(&g, &iter_id);
-
-  let continuation_lines = out.lines().filter(|l| l.trim() == "\u{2502}").count();
-  assert!(
-    continuation_lines >= 1,
-    "expected at least one continuation line between phases, got: {out}"
-  );
-}
-
-#[test]
-fn it_renders_priority_badge_when_task_has_priority() {
-  let g = GestCmd::new();
-  let iter_id = g.create_iteration("Sprint");
-  let task_id = g.create_task("prioritized");
-  g.cmd()
-    .args(["task", "update", &task_id, "--priority", "1"])
-    .assert()
-    .success();
-  g.cmd()
-    .args(["iteration", "add", &iter_id, &task_id])
-    .assert()
-    .success();
-
-  let out = graph(&g, &iter_id);
-
-  assert!(out.contains("[P1]"), "output should contain priority badge: {out}");
-}
-
-#[test]
-fn it_renders_blocked_and_blocking_indicators() {
+fn it_renders_a_blocked_task_with_blocked_and_blocking_indicators() {
   let g = GestCmd::new();
   let iter_id = g.create_iteration("Sprint");
   let blocker = g.create_task("blocker task");
@@ -104,16 +61,77 @@ fn it_renders_blocked_and_blocking_indicators() {
 
   let out = graph(&g, &iter_id);
 
-  assert!(
-    out.contains("\u{2297} blocked"),
-    "output should contain blocked status badge: {out}"
+  insta::assert_snapshot!(out);
+}
+
+#[test]
+fn it_renders_a_single_task_phase_without_branches() {
+  let g = GestCmd::new();
+  let iter_id = g.create_iteration_with_phases("Sprint", &[&["solo task"]]);
+
+  let out = graph(&g, &iter_id);
+
+  insta::assert_snapshot!(out);
+}
+
+#[test]
+fn it_renders_branch_connectors_for_multi_task_phases() {
+  let g = GestCmd::new();
+  let iter_id = g.create_iteration_with_phases("Sprint", &[&["first task", "second task", "third task"]]);
+
+  let out = graph(&g, &iter_id);
+
+  insta::assert_snapshot!(out);
+}
+
+#[test]
+fn it_renders_continuation_lines_between_phases() {
+  let g = GestCmd::new();
+  let iter_id = g.create_iteration_with_phases(
+    "Sprint",
+    &[&["phase one task"], &["phase two task"], &["phase three task"]],
   );
-  assert!(
-    out.contains("! blocking"),
-    "output should contain blocking indicator: {out}"
-  );
-  assert!(
-    out.contains("blocked-by"),
-    "output should contain blocked-by reference: {out}"
-  );
+
+  let out = graph(&g, &iter_id);
+
+  insta::assert_snapshot!(out);
+}
+
+#[test]
+fn it_renders_phase_header_and_summary_line() {
+  let g = GestCmd::new();
+  let iter_id = g.create_iteration_with_phases("Sprint", &[&["a task"]]);
+
+  let out = graph(&g, &iter_id);
+
+  insta::assert_snapshot!(out);
+}
+
+#[test]
+fn it_renders_priority_badge_when_task_has_priority() {
+  let g = GestCmd::new();
+  let iter_id = g.create_iteration("Sprint");
+  let task_id = g.create_task("priority task");
+  g.cmd()
+    .args(["task", "update", &task_id, "--priority", "1"])
+    .assert()
+    .success();
+  g.cmd()
+    .args(["iteration", "add", &iter_id, &task_id])
+    .assert()
+    .success();
+
+  let out = graph(&g, &iter_id);
+
+  insta::assert_snapshot!(out);
+}
+
+#[test]
+fn it_renders_without_priority_column_when_absent() {
+  let g = GestCmd::new();
+  let iter_id = g.create_iteration_with_phases("Sprint", &[&["no priority"]]);
+
+  let out = graph(&g, &iter_id);
+
+  insta::assert_snapshot!(out);
 }

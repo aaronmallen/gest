@@ -1,18 +1,24 @@
-use std::collections::HashSet;
-
 use crate::support::helpers::{GestCmd, rendered_prefix_len, strip_ansi};
 
-/// Compute the minimum unique prefix length over a set of IDs (each truncated
-/// to at most 8 characters), matching `ui::components::atoms::id::min_unique_prefix`.
-fn min_unique_prefix(ids: &[String]) -> usize {
+/// Compute per-ID unique prefix lengths over a set of IDs (each truncated to at
+/// most 8 characters), matching `ui::components::atoms::id::unique_prefix_lengths`.
+fn unique_prefix_lengths(ids: &[String]) -> Vec<usize> {
   let shorts: Vec<String> = ids.iter().map(|id| id.chars().take(8).collect()).collect();
-  for len in 1..=8 {
-    let prefixes: HashSet<&str> = shorts.iter().map(|s| &s[..len.min(s.len())]).collect();
-    if prefixes.len() == shorts.len() {
-      return len;
-    }
-  }
-  8
+  shorts
+    .iter()
+    .enumerate()
+    .map(|(i, s)| {
+      let mut len = 1usize;
+      for (j, other) in shorts.iter().enumerate() {
+        if i == j {
+          continue;
+        }
+        let common = s.chars().zip(other.chars()).take_while(|(a, b)| a == b).count();
+        len = len.max((common + 1).min(8));
+      }
+      len
+    })
+    .collect()
 }
 
 #[test]
@@ -28,9 +34,9 @@ fn it_highlights_per_entity_pool_prefixes_in_search() {
     .map(|i| g.create_iteration(&format!("needle iteration {i}")))
     .collect();
 
-  let expected_task_prefix = min_unique_prefix(&task_ids);
-  let expected_artifact_prefix = min_unique_prefix(&artifact_ids);
-  let expected_iteration_prefix = min_unique_prefix(&iteration_ids);
+  let task_prefix_lengths = unique_prefix_lengths(&task_ids);
+  let artifact_prefix_lengths = unique_prefix_lengths(&artifact_ids);
+  let iteration_prefix_lengths = unique_prefix_lengths(&iteration_ids);
 
   // Run search with colors forced on so prefix highlighting is observable.
   let output = g
@@ -56,33 +62,36 @@ fn it_highlights_per_entity_pool_prefixes_in_search() {
   }
 
   // Verify per-entity prefix lengths in colored output.
-  for id in &task_ids {
+  for (i, id) in task_ids.iter().enumerate() {
     let short: String = id.chars().take(8).collect();
     let got = rendered_prefix_len(&stdout, &short)
       .unwrap_or_else(|| panic!("could not find rendered task id {short} in:\n{stdout}"));
     assert_eq!(
-      got, expected_task_prefix,
-      "task id {short}: expected prefix_len {expected_task_prefix}, got {got}"
+      got, task_prefix_lengths[i],
+      "task id {short}: expected prefix_len {}, got {got}",
+      task_prefix_lengths[i]
     );
   }
 
-  for id in &artifact_ids {
+  for (i, id) in artifact_ids.iter().enumerate() {
     let short: String = id.chars().take(8).collect();
     let got = rendered_prefix_len(&stdout, &short)
       .unwrap_or_else(|| panic!("could not find rendered artifact id {short} in:\n{stdout}"));
     assert_eq!(
-      got, expected_artifact_prefix,
-      "artifact id {short}: expected prefix_len {expected_artifact_prefix}, got {got}"
+      got, artifact_prefix_lengths[i],
+      "artifact id {short}: expected prefix_len {}, got {got}",
+      artifact_prefix_lengths[i]
     );
   }
 
-  for id in &iteration_ids {
+  for (i, id) in iteration_ids.iter().enumerate() {
     let short: String = id.chars().take(8).collect();
     let got = rendered_prefix_len(&stdout, &short)
       .unwrap_or_else(|| panic!("could not find rendered iteration id {short} in:\n{stdout}"));
     assert_eq!(
-      got, expected_iteration_prefix,
-      "iteration id {short}: expected prefix_len {expected_iteration_prefix}, got {got}"
+      got, iteration_prefix_lengths[i],
+      "iteration id {short}: expected prefix_len {}, got {got}",
+      iteration_prefix_lengths[i]
     );
   }
 }

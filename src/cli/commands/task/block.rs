@@ -47,11 +47,8 @@ impl Command {
     let source_task = repo::task::find_required_by_id(&conn, source_id.clone()).await?;
     let envelope = Envelope::load_one(&conn, EntityType::Task, source_task.id(), &source_task, true).await?;
 
-    let prefix_len = if source_task.status().is_terminal() {
-      repo::task::shortest_all_prefix(&conn, project_id).await?
-    } else {
-      repo::task::shortest_active_prefix(&conn, project_id).await?
-    };
+    let prefix_map = repo::task::per_id_prefix_lengths(&conn, project_id).await?;
+    let prefix_len = prefix_map.get(&source_id.to_string()).copied().unwrap_or(1);
 
     let short_id = source_id.short();
     self.output.print_envelope(&envelope, &short_id, || {

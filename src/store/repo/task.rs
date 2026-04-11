@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::Utc;
 use libsql::{Connection, Value};
 
@@ -10,7 +12,7 @@ use crate::{
     },
     repo::iteration::StatusCounts,
   },
-  ui::components::min_unique_prefix,
+  ui::components::{min_unique_prefix, prefix_lengths_two_tier},
 };
 
 pub(super) const SELECT_COLUMNS: &str = "\
@@ -169,6 +171,30 @@ pub async fn shortest_all_prefix(conn: &Connection, project_id: &Id) -> Result<u
   let ids = collect_ids(conn, "SELECT id FROM tasks WHERE project_id = ?1", project_id).await?;
   let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
   Ok(min_unique_prefix(&refs))
+}
+
+/// Return per-ID prefix lengths for all tasks in the project using two-tier
+/// resolution: active (non-terminal) IDs are resolved against the active
+/// pool only, while terminal IDs are resolved against the full pool.
+///
+/// Returns a `HashMap<String, usize>` mapping each full task ID to its
+/// minimum unique prefix length.
+pub async fn per_id_prefix_lengths(conn: &Connection, project_id: &Id) -> Result<HashMap<String, usize>, Error> {
+  log::debug!("repo::task::per_id_prefix_lengths");
+  let active_ids = collect_ids(
+    conn,
+    "SELECT id FROM tasks WHERE project_id = ?1 AND status NOT IN ('done', 'cancelled')",
+    project_id,
+  )
+  .await?;
+  let all_ids = collect_ids(conn, "SELECT id FROM tasks WHERE project_id = ?1", project_id).await?;
+
+  let active_refs: Vec<&str> = active_ids.iter().map(String::as_str).collect();
+  let all_refs: Vec<&str> = all_ids.iter().map(String::as_str).collect();
+
+  let pool_lengths = prefix_lengths_two_tier(&active_refs, &all_refs);
+
+  Ok(all_ids.into_iter().zip(pool_lengths).collect())
 }
 
 /// Return task counts grouped by status for a project in a single query.

@@ -77,8 +77,8 @@ impl Command {
 
     let envelope = Envelope::load_one(&conn, EntityType::Task, task.id(), &task, true).await?;
 
-    // Claim moves to in-progress, which is active.
-    let prefix_len = repo::task::shortest_active_prefix(&conn, project_id).await?;
+    let prefix_map = repo::task::per_id_prefix_lengths(&conn, project_id).await?;
+    let prefix_len = prefix_map.get(&id.to_string()).copied().unwrap_or(1);
 
     let short_id = task.id().short();
     self.output.print_envelope(&envelope, &short_id, || {

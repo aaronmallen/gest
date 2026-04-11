@@ -138,11 +138,8 @@ impl Command {
 
     let envelope = Envelope::load_one(&conn, EntityType::Task, task.id(), &task, true).await?;
 
-    let prefix_len = if task.status().is_terminal() {
-      repo::task::shortest_all_prefix(&conn, project_id).await?
-    } else {
-      repo::task::shortest_active_prefix(&conn, project_id).await?
-    };
+    let prefix_map = repo::task::per_id_prefix_lengths(&conn, project_id).await?;
+    let prefix_len = prefix_map.get(&task.id().to_string()).copied().unwrap_or(1);
 
     let short_id = task.id().short();
     log::info!("created task {short_id}");

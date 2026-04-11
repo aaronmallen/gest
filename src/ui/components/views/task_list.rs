@@ -11,10 +11,14 @@ use crate::ui::components::{
 pub struct TaskEntry {
   /// Short ID of the task blocking this one, if any; swaps the row icon to blocked.
   pub blocked_by: Option<String>,
+  /// Per-ID prefix length for the blocked-by ID, if any.
+  pub blocked_by_prefix_len: Option<usize>,
   /// Whether this task blocks others, which renders a `blocking` indicator.
   pub blocking: bool,
   /// Short ID string displayed as the leading column.
   pub id: String,
+  /// Per-ID prefix length for this entry's ID.
+  pub prefix_len: usize,
   /// Optional priority level rendered as a `[P<n>]` badge.
   pub priority: Option<u8>,
   /// Task status string driving icon, title styling, and status badge.
@@ -28,15 +32,13 @@ pub struct TaskEntry {
 /// Full task list view using Grid for column alignment.
 pub struct Component {
   entries: Vec<TaskEntry>,
-  prefix_len: usize,
 }
 
 impl Component {
-  /// Create a list view from the entries, using `prefix_len` highlighted chars in each ID.
-  pub fn new(entries: Vec<TaskEntry>, prefix_len: usize) -> Self {
+  /// Create a list view from the entries, using per-entry `prefix_len` highlighted chars in each ID.
+  pub fn new(entries: Vec<TaskEntry>) -> Self {
     Self {
       entries,
-      prefix_len,
     }
   }
 }
@@ -59,7 +61,7 @@ impl Display for Component {
         Icon::status(&entry.status)
       };
 
-      let id = Id::new(&entry.id).prefix_len(self.prefix_len);
+      let id = Id::new(&entry.id).prefix_len(entry.prefix_len);
 
       let priority_str = match entry.priority {
         Some(p) => Badge::new(format!("[P{p}]"), *theme.task_list_priority()).to_string(),
@@ -86,15 +88,12 @@ impl Display for Component {
         String::new()
       };
 
-      // Indicators reuse the list's prefix pool. The blocked-by IDs may
-      // belong to a different pool than the row task, but threading two
-      // pools through every entry would complicate the API for marginal
-      // value, so we accept the row task's pool as the indicator pool too.
       let blocked_by_ids: Vec<&str> = entry.blocked_by.as_deref().into_iter().collect();
+      let blocked_by_pl = entry.blocked_by_prefix_len.unwrap_or(entry.prefix_len);
       let indicators_str = Indicators::new()
         .blocking(entry.blocking)
         .blocked_by(blocked_by_ids)
-        .prefix_len(self.prefix_len)
+        .prefix_len(blocked_by_pl)
         .to_string();
 
       let mut row = Row::new()

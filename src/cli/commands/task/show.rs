@@ -29,14 +29,8 @@ impl Command {
 
     let envelope = Envelope::load_one(&conn, EntityType::Task, task.id(), &task, true).await?;
 
-    // Highlighted prefix tracks the task's own pool: an active task gets
-    // the active-only minimum, while a terminal task uses the all-rows
-    // minimum so the prefix in the heading round-trips through `task show`.
-    let prefix_len = if task.status().is_terminal() {
-      repo::task::shortest_all_prefix(&conn, project_id).await?
-    } else {
-      repo::task::shortest_active_prefix(&conn, project_id).await?
-    };
+    let prefix_map = repo::task::per_id_prefix_lengths(&conn, project_id).await?;
+    let prefix_len = prefix_map.get(&task.id().to_string()).copied().unwrap_or(1);
 
     let tags = repo::tag::for_entity(&conn, EntityType::Task, task.id()).await?;
 

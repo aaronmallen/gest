@@ -254,7 +254,8 @@ fn table_to_entity_type(table: repo::resolve::Table) -> EntityType {
   match table {
     repo::resolve::Table::Artifacts => EntityType::Artifact,
     repo::resolve::Table::Iterations => EntityType::Iteration,
-    repo::resolve::Table::Notes | repo::resolve::Table::Projects | repo::resolve::Table::Tasks => EntityType::Task,
+    repo::resolve::Table::Notes | repo::resolve::Table::Tasks => EntityType::Task,
+    repo::resolve::Table::Projects => unreachable!("projects are not entities"),
   }
 }
 

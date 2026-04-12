@@ -312,6 +312,38 @@ pub async fn find_by_path(conn: &Connection, path: &Path) -> Result<Option<Proje
   }
 }
 
+/// Counts of entities owned by a project, used for confirmation prompts.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct EntityCounts {
+  /// Number of artifacts owned by the project.
+  pub artifacts: usize,
+  /// Number of iterations owned by the project.
+  pub iterations: usize,
+  /// Number of tasks owned by the project.
+  pub tasks: usize,
+  /// Number of workspace paths attached to the project.
+  pub workspaces: usize,
+}
+
+/// Return counts of workspaces and owned entities for a project.
+///
+/// Used by the archive confirmation prompt to show what will be affected.
+pub async fn entity_counts(conn: &Connection, id: &Id) -> Result<EntityCounts, Error> {
+  log::debug!("repo::project::entity_counts");
+  let id_str = id.to_string();
+
+  let artifacts = count_rows(conn, "artifacts", "project_id", &id_str).await?;
+  let iterations = count_rows(conn, "iterations", "project_id", &id_str).await?;
+  let tasks = count_rows(conn, "tasks", "project_id", &id_str).await?;
+  let workspaces = count_rows(conn, "project_workspaces", "project_id", &id_str).await?;
+
+  Ok(EntityCounts {
+    artifacts,
+    iterations,
+    tasks,
+    workspaces,
+  })
+}
 /// Clear the `archived_at` timestamp on a project, restoring it to active.
 pub async fn unarchive(conn: &Connection, id: &Id) -> Result<(), Error> {
   log::debug!("repo::project::unarchive");
@@ -336,6 +368,19 @@ async fn collect_entity_ids(conn: &Connection, table: &str, project_id: &Id) -> 
     ids.push(id);
   }
   Ok(ids)
+}
+
+/// Count rows in `table` where `column` equals `value`.
+async fn count_rows(conn: &Connection, table: &str, column: &str, value: &str) -> Result<usize, Error> {
+  let sql = format!("SELECT COUNT(*) FROM {table} WHERE {column} = ?1");
+  let mut rows = conn.query(&sql, [value.to_string()]).await?;
+  match rows.next().await? {
+    Some(row) => {
+      let count: i64 = row.get(0)?;
+      Ok(count as usize)
+    }
+    None => Ok(0),
+  }
 }
 
 /// Walk from `start` upward through ancestor directories looking for a `.gest`

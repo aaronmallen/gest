@@ -1,9 +1,11 @@
-//! `gest project` subcommand tree for showing, attaching, and listing projects.
+//! `gest project` subcommand tree for showing, archiving, attaching, and listing projects.
 
+mod archive;
 mod attach;
 mod delete;
 mod detach;
 mod list;
+mod unarchive;
 
 use clap::{Args, Subcommand};
 
@@ -21,6 +23,8 @@ pub struct Command {
 
 #[derive(Debug, Subcommand)]
 enum Sub {
+  /// Soft-archive a project, hiding it and its entities from default list views.
+  Archive(archive::Command),
   /// Attach the current directory to an existing project as a workspace.
   Attach(attach::Command),
   /// Delete a project and all of its owned entities.
@@ -31,6 +35,8 @@ enum Sub {
   /// List all known projects.
   #[command(visible_alias = "ls")]
   List(list::Command),
+  /// Restore an archived project to active status.
+  Unarchive(unarchive::Command),
 }
 
 impl Command {
@@ -38,10 +44,12 @@ impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
     log::debug!("project: entry");
     match &self.subcommand {
+      Some(Sub::Archive(command)) => command.call(context).await,
       Some(Sub::Attach(command)) => command.call(context).await,
       Some(Sub::Delete(command)) => command.call(context).await,
       Some(Sub::Detach(command)) => command.call(context).await,
       Some(Sub::List(command)) => command.call(context).await,
+      Some(Sub::Unarchive(command)) => command.call(context).await,
       None => self.show(context).await,
     }
   }

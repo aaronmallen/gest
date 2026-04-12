@@ -29,6 +29,7 @@ impl Table {
   ///
   /// Active means:
   /// - artifacts: not archived (`archived_at IS NULL`)
+  /// - projects: not archived (`archived_at IS NULL`)
   /// - tasks: not in a terminal state (`status NOT IN ('done', 'cancelled')`)
   /// - iterations: not in a terminal state (`status NOT IN ('completed', 'cancelled')`)
   /// - notes: no active concept — always returns `None`

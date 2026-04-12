@@ -17,14 +17,14 @@ gest purge [OPTIONS]
 Each flag enables a specific category of data to purge. When none are given,
 all categories are selected.
 
-| Flag              | Description                                  |
-|-------------------|----------------------------------------------|
-| `--tasks`         | Purge terminal tasks (done/cancelled)        |
-| `--iterations`    | Purge terminal iterations (completed/cancelled) |
-| `--artifacts`     | Purge archived artifacts                     |
-| `--projects`      | Purge archived projects (non-undoable)       |
-| `--relationships` | Purge dangling relationship rows             |
-| `--tombstones`    | Purge orphan tombstone files                 |
+| Flag              | Description                                      |
+|-------------------|--------------------------------------------------|
+| `--tasks`         | Purge terminal tasks (done/cancelled)            |
+| `--iterations`    | Purge terminal iterations (completed/cancelled)  |
+| `--artifacts`     | Purge archived artifacts                         |
+| `--projects`      | Purge archived projects (non-undoable)           |
+| `--relationships` | Purge dangling relationship rows                 |
+| `--tombstones`    | Purge orphan tombstone files                     |
 
 ## Options
 

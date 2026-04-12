@@ -45,6 +45,12 @@ pub fn tombstone_iteration(gest_dir: Option<&Path>, id: &Id, deleted_at: DateTim
   tombstone_yaml(gest_dir.map(|d| paths::iteration_path(d, id)).as_deref(), deleted_at)
 }
 
+/// Tombstone the on-disk `project.yaml` file. No-op if `gest_dir` is `None`
+/// or the file is missing.
+pub fn tombstone_project(gest_dir: Option<&Path>, deleted_at: DateTime<Utc>) -> Result<(), Error> {
+  tombstone_yaml(gest_dir.map(paths::project_path).as_deref(), deleted_at)
+}
+
 /// Tombstone the on-disk file for a task. No-op if `gest_dir` is `None` or
 /// the file is missing.
 pub fn tombstone_task(gest_dir: Option<&Path>, id: &Id, deleted_at: DateTime<Utc>) -> Result<(), Error> {
@@ -95,7 +101,6 @@ fn split_frontmatter(raw: &str) -> Result<(&str, &str), Error> {
   Ok((front, body))
 }
 
-#[allow(dead_code)]
 fn tombstone_yaml(path: Option<&Path>, deleted_at: DateTime<Utc>) -> Result<(), Error> {
   let Some(path) = path else { return Ok(()) };
   if !path.exists() {
@@ -217,6 +222,50 @@ mod tests {
           .get(YamlValue::String("status".into()))
           .and_then(YamlValue::as_str),
         Some("active")
+      );
+    }
+  }
+
+  mod tombstone_project {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn it_is_a_noop_when_gest_dir_is_none() {
+      tombstone_project(None, sample_deleted_at()).unwrap();
+    }
+
+    #[test]
+    fn it_is_a_noop_when_file_is_missing() {
+      let tmp = TempDir::new().unwrap();
+
+      tombstone_project(Some(tmp.path()), sample_deleted_at()).unwrap();
+    }
+
+    #[test]
+    fn it_sets_deleted_at_and_preserves_other_fields() {
+      let tmp = TempDir::new().unwrap();
+      let path = paths::project_path(tmp.path());
+      fs::write(
+        &path,
+        "id: kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk\ncreated_at: 2026-04-01T00:00:00Z\nupdated_at: 2026-04-01T00:00:00Z\n",
+      )
+      .unwrap();
+
+      tombstone_project(Some(tmp.path()), sample_deleted_at()).unwrap();
+
+      let value: YamlValue = yaml_serde::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+      let mapping = value.as_mapping().unwrap();
+      assert_eq!(
+        mapping
+          .get(YamlValue::String("deleted_at".into()))
+          .and_then(YamlValue::as_str),
+        Some("2026-04-08T12:00:00+00:00")
+      );
+      assert_eq!(
+        mapping.get(YamlValue::String("id".into())).and_then(YamlValue::as_str),
+        Some("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
       );
     }
   }

@@ -24,6 +24,7 @@ const sidebars: SidebarsConfig = {
         'cli/tag',
         'cli/search',
         'cli/project',
+        'cli/purge',
         'cli/migrate',
         'cli/undo',
         'cli/serve',

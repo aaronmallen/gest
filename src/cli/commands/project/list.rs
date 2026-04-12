@@ -13,6 +13,9 @@ use crate::{
 /// List all known projects.
 #[derive(Args, Debug)]
 pub struct Command {
+  /// Show all projects, including archived.
+  #[arg(long, short)]
+  all: bool,
   #[command(flatten)]
   limit: LimitArgs,
   #[command(flatten)]
@@ -24,7 +27,7 @@ impl Command {
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
     log::debug!("project list: entry");
     let conn = context.store().connect().await?;
-    let mut projects = repo::project::all(&conn).await?;
+    let mut projects = repo::project::all(&conn, self.all).await?;
     self.limit.apply(&mut projects);
 
     let id_shorts: Vec<String> = projects.iter().map(|p| p.id().short()).collect();
@@ -52,6 +55,7 @@ impl Command {
       .zip(id_shorts.iter())
       .zip(prefix_lens.iter())
       .map(|((project, id_short), &prefix_len)| ProjectEntry {
+        archived: project.archived_at().is_some(),
         id: id_short.clone(),
         prefix_len,
         root: project.root().display().to_string(),

@@ -3,12 +3,14 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ui::components::{
-  atoms::{Column, Id, Title},
+  atoms::{Badge, Column, Id, Title},
   molecules::{EmptyList, Grid, GroupedList, Row},
 };
 
 /// A single project entry for the list view.
 pub struct ProjectEntry {
+  /// Whether the project is archived, which dims its row and appends a badge.
+  pub archived: bool,
   /// Short ID string displayed as the leading column.
   pub id: String,
   /// Number of highlighted prefix characters for this entry's ID.
@@ -44,9 +46,23 @@ impl Display for Component {
 
     for entry in &self.entries {
       let id = Id::new(&entry.id).prefix_len(entry.prefix_len);
-      let root = Title::new(&entry.root, *theme.project_list_root());
 
-      let row = Row::new().col(Column::natural(id)).col(Column::natural(root));
+      let root_style = if entry.archived {
+        *theme.project_list_root_archived()
+      } else {
+        *theme.project_list_root()
+      };
+      let root = Title::new(&entry.root, root_style);
+
+      let mut row = Row::new().col(Column::natural(id)).col(Column::natural(root));
+
+      if entry.archived {
+        row = row.col(Column::natural(Badge::new(
+          "[archived]",
+          *theme.project_list_archived_badge(),
+        )));
+      }
+
       grid.push(row);
     }
 

@@ -260,7 +260,9 @@ These are the token keys currently recognized by gest.
 
 ### Projects
 
+- `project.list.archived.badge`
 - `project.list.root`
+- `project.list.root.archived`
 - `project.show.value`
 
 ### Search

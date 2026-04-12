@@ -329,6 +329,11 @@ impl GestCmd {
     );
   }
 
+  /// Return the path to the local SQLite database file used by this GestCmd instance.
+  pub fn db_path(&self) -> std::path::PathBuf {
+    self.temp_dir.path().join(".gest-data/gest.db")
+  }
+
   /// Return the temp directory path.
   pub fn temp_dir_path(&self) -> &Path {
     self.temp_dir.path()

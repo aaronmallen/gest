@@ -106,7 +106,9 @@ pub const ALL_TOKENS: &[&str] = &[
   "note.detail.value",
   "note.list.body",
   "note.list.id",
+  "project.list.archived.badge",
   "project.list.root",
+  "project.list.root.archived",
   "project.show.value",
   "search.expand.separator",
   "search.no_results.hint",
@@ -424,7 +426,11 @@ pub struct Theme {
   note_list_id: Style,
 
   #[get = "pub"]
+  project_list_archived_badge: Style,
+  #[get = "pub"]
   project_list_root: Style,
+  #[get = "pub"]
+  project_list_root_archived: Style,
   #[get = "pub"]
   project_show_value: Style,
 
@@ -603,7 +609,9 @@ impl Default for Theme {
       note_list_body: Style::new().fg(c(TextMuted)),
       note_list_id: Style::new().fg(c(Primary)),
 
+      project_list_archived_badge: Style::new().fg(c(TextDim)),
       project_list_root: Style::new().fg(c(Text)),
+      project_list_root_archived: Style::new().fg(c(TextDim)),
       project_show_value: Style::new().fg(c(Text)),
 
       search_expand_separator: Style::new().fg(c(Border)),
@@ -801,7 +809,9 @@ impl Theme {
       "note.list.body" => Some(&mut self.note_list_body),
       "note.list.id" => Some(&mut self.note_list_id),
 
+      "project.list.archived.badge" => Some(&mut self.project_list_archived_badge),
       "project.list.root" => Some(&mut self.project_list_root),
+      "project.list.root.archived" => Some(&mut self.project_list_root_archived),
       "project.show.value" => Some(&mut self.project_show_value),
 
       "search.expand.separator" => Some(&mut self.search_expand_separator),
@@ -970,7 +980,9 @@ fn palette_for_token(key: &str) -> Option<Palette> {
     "note.list.body" => Some(TextMuted),
     "note.list.id" => Some(Primary),
 
+    "project.list.archived.badge" => Some(TextDim),
     "project.list.root" => Some(Text),
+    "project.list.root.archived" => Some(TextDim),
     "project.show.value" => Some(Text),
 
     "search.expand.separator" => Some(Border),
@@ -1016,8 +1028,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_has_118_token_keys() {
-      assert_eq!(ALL_TOKENS.len(), 118);
+    fn it_has_120_token_keys() {
+      assert_eq!(ALL_TOKENS.len(), 120);
     }
 
     #[test]

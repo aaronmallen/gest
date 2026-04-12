@@ -33,15 +33,18 @@ pub struct DeleteSummary {
   pub tasks: usize,
 }
 
-/// Return all projects ordered by creation time (newest first).
-pub async fn all(conn: &Connection) -> Result<Vec<Project>, Error> {
-  log::debug!("repo::project::all");
-  let mut rows = conn
-    .query(
-      "SELECT id, root, archived_at, created_at, updated_at FROM projects ORDER BY created_at DESC",
-      (),
-    )
-    .await?;
+/// Return projects ordered by creation time (newest first).
+///
+/// When `include_archived` is false, only active (non-archived) projects are
+/// returned. Pass `true` to include archived projects in the result set.
+pub async fn all(conn: &Connection, include_archived: bool) -> Result<Vec<Project>, Error> {
+  log::debug!("repo::project::all include_archived={include_archived}");
+  let sql = if include_archived {
+    "SELECT id, root, archived_at, created_at, updated_at FROM projects ORDER BY created_at DESC"
+  } else {
+    "SELECT id, root, archived_at, created_at, updated_at FROM projects WHERE archived_at IS NULL ORDER BY created_at DESC"
+  };
+  let mut rows = conn.query(sql, ()).await?;
 
   let mut projects = Vec::new();
   while let Some(row) = rows.next().await? {
@@ -381,10 +384,37 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn it_excludes_archived_projects_by_default() {
+      let (_store, conn, _tmp) = setup().await;
+
+      create(&conn, "/tmp/active").await.unwrap();
+      let archived = create(&conn, "/tmp/archived").await.unwrap();
+      archive(&conn, archived.id()).await.unwrap();
+
+      let projects = all(&conn, false).await.unwrap();
+
+      assert_eq!(projects.len(), 1);
+      assert_eq!(projects[0].root().to_string_lossy(), "/tmp/active");
+    }
+
+    #[tokio::test]
+    async fn it_includes_archived_projects_when_requested() {
+      let (_store, conn, _tmp) = setup().await;
+
+      create(&conn, "/tmp/active").await.unwrap();
+      let archived = create(&conn, "/tmp/archived").await.unwrap();
+      archive(&conn, archived.id()).await.unwrap();
+
+      let projects = all(&conn, true).await.unwrap();
+
+      assert_eq!(projects.len(), 2);
+    }
+
+    #[tokio::test]
     async fn it_returns_an_empty_vec_when_empty() {
       let (_store, conn, _tmp) = setup().await;
 
-      let projects = all(&conn).await.unwrap();
+      let projects = all(&conn, false).await.unwrap();
       assert_eq!(projects.len(), 0);
     }
 
@@ -395,7 +425,7 @@ mod tests {
       let p1 = create(&conn, "/tmp/first").await.unwrap();
       let p2 = create(&conn, "/tmp/second").await.unwrap();
 
-      let projects = all(&conn).await.unwrap();
+      let projects = all(&conn, false).await.unwrap();
       assert_eq!(projects.len(), 2);
       assert_eq!(projects[0].id(), p2.id());
       assert_eq!(projects[1].id(), p1.id());

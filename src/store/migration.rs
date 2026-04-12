@@ -18,6 +18,7 @@ mod m00011_create_iteration_tasks;
 mod m00012_create_transactions;
 mod m00013_create_transaction_events;
 mod m00014_create_sync_digests;
+mod m00015_add_projects_archived_at;
 
 use libsql::{Connection, Error as DbError};
 
@@ -47,6 +48,7 @@ const MIGRATIONS: &[Migration] = &[
   m00012_create_transactions::MIGRATION,
   m00013_create_transaction_events::MIGRATION,
   m00014_create_sync_digests::MIGRATION,
+  m00015_add_projects_archived_at::MIGRATION,
 ];
 
 /// Run all pending migrations against the given connection.

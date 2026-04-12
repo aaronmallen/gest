@@ -24,6 +24,9 @@ use crate::store::{
 /// is immediately visible in diffs when a project is tombstoned.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct ProjectFile {
+  /// When the project was soft-archived; absent for active projects.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  archived_at: Option<DateTime<Utc>>,
   /// Tombstone instant; absent for live projects.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   deleted_at: Option<DateTime<Utc>>,
@@ -59,13 +62,15 @@ pub async fn read_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
   let mut existing = conn
     .query("SELECT root FROM projects WHERE id = ?1", [file.id.to_string()])
     .await?;
+  let archived_at_str = file.archived_at.map(|dt| dt.to_rfc3339());
   if let Some(row) = existing.next().await? {
     let root: String = row.get(0)?;
     conn
       .execute(
-        "UPDATE projects SET created_at = ?2, updated_at = ?3, root = ?4 WHERE id = ?1",
-        [
+        "UPDATE projects SET archived_at = ?2, created_at = ?3, updated_at = ?4, root = ?5 WHERE id = ?1",
+        libsql::params![
           file.id.to_string(),
+          archived_at_str,
           file.created_at.to_rfc3339(),
           file.updated_at.to_rfc3339(),
           root,
@@ -79,10 +84,11 @@ pub async fn read_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
       .unwrap_or_default();
     conn
       .execute(
-        "INSERT INTO projects (id, root, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-        [
+        "INSERT INTO projects (id, root, archived_at, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        libsql::params![
           file.id.to_string(),
           root,
+          archived_at_str,
           file.created_at.to_rfc3339(),
           file.updated_at.to_rfc3339(),
         ],
@@ -97,7 +103,7 @@ pub async fn read_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
 pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
   let mut rows = conn
     .query(
-      "SELECT id, created_at, updated_at FROM projects WHERE id = ?1",
+      "SELECT id, archived_at, created_at, updated_at FROM projects WHERE id = ?1",
       [project_id.to_string()],
     )
     .await?;
@@ -105,11 +111,19 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     return Ok(());
   };
   let id_str: String = row.get(0)?;
-  let created_at: String = row.get(1)?;
-  let updated_at: String = row.get(2)?;
+  let archived_at: Option<String> = row.get(1)?;
+  let created_at: String = row.get(2)?;
+  let updated_at: String = row.get(3)?;
   let id: Id = id_str
     .parse()
     .map_err(|e: String| Error::Io(std::io::Error::other(e)))?;
+  let archived_at = archived_at
+    .map(|s| {
+      DateTime::parse_from_rfc3339(&s)
+        .map(|dt| dt.with_timezone(&Utc))
+        .map_err(|e| Error::Io(std::io::Error::other(e.to_string())))
+    })
+    .transpose()?;
   let created_at = DateTime::parse_from_rfc3339(&created_at)
     .map_err(|e| Error::Io(std::io::Error::other(e.to_string())))?
     .with_timezone(&Utc);
@@ -118,6 +132,7 @@ pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> R
     .with_timezone(&Utc);
 
   let file = ProjectFile {
+    archived_at,
     deleted_at: None,
     id,
     created_at,
@@ -174,6 +189,7 @@ mod tests {
 
       let path = gest_dir.join("project.yaml");
       let tombstoned = ProjectFile {
+        archived_at: None,
         deleted_at: Some(Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap()),
         id: id.clone(),
         created_at: Utc.with_ymd_and_hms(2026, 4, 8, 0, 0, 0).unwrap(),

@@ -14,6 +14,9 @@ use crate::store::Error;
 /// is assigned a stable [`Id`] at creation time.
 #[derive(Clone, Debug, Deserialize, Eq, Getters, PartialEq, Serialize)]
 pub struct Model {
+  /// When the project was soft-archived, or `None` if it is active.
+  #[get = "pub"]
+  archived_at: Option<DateTime<Utc>>,
   /// When the project was first registered.
   #[get = "pub"]
   created_at: DateTime<Utc>,
@@ -33,8 +36,15 @@ impl Model {
   ///
   /// The id and timestamps come from the synced file (so collaborators share
   /// a stable identity), while `root` is the local checkout path.
-  pub fn from_synced_parts(id: Id, root: PathBuf, created_at: DateTime<Utc>, updated_at: DateTime<Utc>) -> Self {
+  pub fn from_synced_parts(
+    id: Id,
+    root: PathBuf,
+    archived_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+  ) -> Self {
     Self {
+      archived_at,
       created_at,
       id,
       root,
@@ -46,6 +56,7 @@ impl Model {
   pub fn new(root: PathBuf) -> Self {
     let now = Utc::now();
     Self {
+      archived_at: None,
       created_at: now,
       id: Id::new(),
       root,
@@ -56,17 +67,25 @@ impl Model {
 
 /// Converts a database row into a [`Model`].
 ///
-/// Expects columns in order: `id`, `root`, `created_at`, `updated_at`.
+/// Expects columns in order: `id`, `root`, `archived_at`, `created_at`, `updated_at`.
 impl TryFrom<Row> for Model {
   type Error = Error;
 
   fn try_from(row: Row) -> Result<Self, Self::Error> {
     let id: String = row.get(0)?;
     let root: String = row.get(1)?;
-    let created_at: String = row.get(2)?;
-    let updated_at: String = row.get(3)?;
+    let archived_at: Option<String> = row.get(2)?;
+    let created_at: String = row.get(3)?;
+    let updated_at: String = row.get(4)?;
 
     let id: Id = id.parse().map_err(Error::InvalidValue)?;
+    let archived_at = archived_at
+      .map(|s| {
+        DateTime::parse_from_rfc3339(&s)
+          .map(|dt| dt.with_timezone(&Utc))
+          .map_err(|e| Error::InvalidValue(e.to_string()))
+      })
+      .transpose()?;
     let created_at = DateTime::parse_from_rfc3339(&created_at)
       .map(|dt| dt.with_timezone(&Utc))
       .map_err(|e| Error::InvalidValue(e.to_string()))?;
@@ -75,6 +94,7 @@ impl TryFrom<Row> for Model {
       .map_err(|e| Error::InvalidValue(e.to_string()))?;
 
     Ok(Self {
+      archived_at,
       created_at,
       id,
       root: PathBuf::from(root),

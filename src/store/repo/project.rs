@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use chrono::Utc;
 use libsql::Connection;
 
 use crate::store::{
@@ -12,7 +13,7 @@ pub async fn all(conn: &Connection) -> Result<Vec<Project>, Error> {
   log::debug!("repo::project::all");
   let mut rows = conn
     .query(
-      "SELECT id, root, created_at, updated_at FROM projects ORDER BY created_at DESC",
+      "SELECT id, root, archived_at, created_at, updated_at FROM projects ORDER BY created_at DESC",
       (),
     )
     .await?;
@@ -22,6 +23,24 @@ pub async fn all(conn: &Connection) -> Result<Vec<Project>, Error> {
     projects.push(Project::try_from(row)?);
   }
   Ok(projects)
+}
+
+/// Soft-archive a project by setting `archived_at` to now and deleting all
+/// associated workspace rows in a single operation.
+pub async fn archive(conn: &Connection, id: &Id) -> Result<(), Error> {
+  log::debug!("repo::project::archive");
+  let now = Utc::now().to_rfc3339();
+  let id_str = id.to_string();
+  conn
+    .execute(
+      "UPDATE projects SET archived_at = ?1, updated_at = ?1 WHERE id = ?2",
+      [now.clone(), id_str.clone()],
+    )
+    .await?;
+  conn
+    .execute("DELETE FROM project_workspaces WHERE project_id = ?1", [id_str])
+    .await?;
+  Ok(())
 }
 
 /// Attach a workspace path to a project, creating a new [`ProjectWorkspace`].
@@ -64,7 +83,7 @@ pub async fn create(conn: &Connection, root: impl Into<PathBuf>) -> Result<Proje
     Some(path) if path.is_file() => {
       let contents = std::fs::read_to_string(&path)?;
       let stored: ProjectFile = yaml_serde::from_str(&contents)?;
-      Project::from_synced_parts(stored.id, root.clone(), stored.created_at, stored.updated_at)
+      Project::from_synced_parts(stored.id, root.clone(), None, stored.created_at, stored.updated_at)
     }
     _ => Project::new(root),
   };
@@ -125,7 +144,7 @@ pub async fn find_by_id(conn: &Connection, id: impl Into<Id>) -> Result<Option<P
   let id = id.into();
   let mut rows = conn
     .query(
-      "SELECT id, root, created_at, updated_at FROM projects WHERE id = ?1",
+      "SELECT id, root, archived_at, created_at, updated_at FROM projects WHERE id = ?1",
       [id.to_string()],
     )
     .await?;
@@ -146,7 +165,7 @@ pub async fn find_by_path(conn: &Connection, path: &Path) -> Result<Option<Proje
 
   let mut rows = conn
     .query(
-      "SELECT DISTINCT p.id, p.root, p.created_at, p.updated_at \
+      "SELECT DISTINCT p.id, p.root, p.archived_at, p.created_at, p.updated_at \
       FROM projects p \
       LEFT JOIN project_workspaces pw ON pw.project_id = p.id \
       WHERE p.root = ?1 OR pw.path = ?1 \
@@ -159,6 +178,19 @@ pub async fn find_by_path(conn: &Connection, path: &Path) -> Result<Option<Proje
     Some(row) => Ok(Some(Project::try_from(row)?)),
     None => Ok(None),
   }
+}
+
+/// Clear the `archived_at` timestamp on a project, restoring it to active.
+pub async fn unarchive(conn: &Connection, id: &Id) -> Result<(), Error> {
+  log::debug!("repo::project::unarchive");
+  let now = Utc::now().to_rfc3339();
+  conn
+    .execute(
+      "UPDATE projects SET archived_at = NULL, updated_at = ?1 WHERE id = ?2",
+      [now, id.to_string()],
+    )
+    .await?;
+  Ok(())
 }
 
 /// Walk from `start` upward through ancestor directories looking for a `.gest`
@@ -213,6 +245,46 @@ mod tests {
       assert_eq!(projects.len(), 2);
       assert_eq!(projects[0].id(), p2.id());
       assert_eq!(projects[1].id(), p1.id());
+    }
+  }
+
+  mod archive {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_deletes_associated_workspaces() {
+      let (_store, conn, _tmp) = setup().await;
+      let project = create(&conn, "/tmp/archive-ws").await.unwrap();
+      attach_workspace(&conn, project.id(), "/tmp/ws1").await.unwrap();
+      attach_workspace(&conn, project.id(), "/tmp/ws2").await.unwrap();
+
+      archive(&conn, project.id()).await.unwrap();
+
+      let mut rows = conn
+        .query(
+          "SELECT COUNT(*) FROM project_workspaces WHERE project_id = ?1",
+          [project.id().to_string()],
+        )
+        .await
+        .unwrap();
+      let row = rows.next().await.unwrap().unwrap();
+      let count: i64 = row.get(0).unwrap();
+      assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn it_sets_archived_at() {
+      let (_store, conn, _tmp) = setup().await;
+      let project = create(&conn, "/tmp/archive-test").await.unwrap();
+
+      assert_eq!(project.archived_at(), &None);
+
+      archive(&conn, project.id()).await.unwrap();
+
+      let found = find_by_id(&conn, project.id().clone()).await.unwrap().unwrap();
+      assert!(found.archived_at().is_some());
     }
   }
 
@@ -409,6 +481,24 @@ mod tests {
       let root = tmp.path().to_path_buf();
 
       assert_eq!(find_gest_dir(&root), None);
+    }
+  }
+
+  mod unarchive {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_clears_archived_at() {
+      let (_store, conn, _tmp) = setup().await;
+      let project = create(&conn, "/tmp/unarchive-test").await.unwrap();
+      archive(&conn, project.id()).await.unwrap();
+
+      unarchive(&conn, project.id()).await.unwrap();
+
+      let found = find_by_id(&conn, project.id().clone()).await.unwrap().unwrap();
+      assert_eq!(found.archived_at(), &None);
     }
   }
 }

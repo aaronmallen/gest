@@ -72,9 +72,15 @@ impl Command {
     let id_refs: Vec<&str> = id_full_strs.iter().map(String::as_str).collect();
     let prefix_lens = repo::artifact::prefix_lengths(&conn, project_id, &id_refs).await?;
 
+    let artifact_ids: Vec<Id> = artifacts.iter().map(|a| a.id().clone()).collect();
+    let tag_map = repo::tag::for_entities(&conn, EntityType::Artifact, &artifact_ids).await?;
+
     let mut entries = Vec::new();
     for (i, (artifact, id_short)) in artifacts.iter().zip(id_shorts.iter()).enumerate() {
-      let tags = repo::tag::for_entity(&conn, EntityType::Artifact, artifact.id()).await?;
+      let tags: Vec<String> = tag_map
+        .get(artifact.id())
+        .map(|tags| tags.iter().map(|t| t.label().to_string()).collect())
+        .unwrap_or_default();
       entries.push(ArtifactEntry {
         archived: artifact.is_archived(),
         id: id_short.clone(),

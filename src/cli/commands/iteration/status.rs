@@ -32,40 +32,35 @@ impl Command {
       0
     };
 
-    if self.output.json {
-      let json = serde_json::json!({
-        "id": id.to_string(),
-        "title": iteration.title(),
-        "status": iteration.status().to_string(),
-        "phases": max_phase.unwrap_or(0),
-        "total_tasks": counts.total,
-        "open": counts.open,
-        "in_progress": counts.in_progress,
-        "done": counts.done,
-        "cancelled": counts.cancelled,
-        "progress": progress,
-      });
-      println!("{}", serde_json::to_string_pretty(&json)?);
-      return Ok(());
-    }
+    let status_json = serde_json::json!({
+      "id": id.to_string(),
+      "title": iteration.title(),
+      "status": iteration.status().to_string(),
+      "phases": max_phase.unwrap_or(0),
+      "total_tasks": counts.total,
+      "open": counts.open,
+      "in_progress": counts.in_progress,
+      "done": counts.done,
+      "cancelled": counts.cancelled,
+      "progress": progress,
+    });
 
-    if self.output.quiet {
-      println!("{}", id.short());
-      return Ok(());
-    }
-
-    let fields = FieldList::new()
-      .field("iteration", iteration.title().to_string())
-      .field("status", iteration.status().to_string())
-      .field("phases", max_phase.unwrap_or(0).to_string())
-      .field("total tasks", counts.total.to_string())
-      .field("open", counts.open.to_string())
-      .field("in progress", counts.in_progress.to_string())
-      .field("done", counts.done.to_string())
-      .field("cancelled", counts.cancelled.to_string())
-      .field("progress", format!("{progress}%"));
-
-    println!("{fields}");
-    Ok(())
+    self.output.print_raw_or(
+      &status_json,
+      || id.short().to_string(),
+      || {
+        FieldList::new()
+          .field("iteration", iteration.title().to_string())
+          .field("status", iteration.status().to_string())
+          .field("phases", max_phase.unwrap_or(0).to_string())
+          .field("total tasks", counts.total.to_string())
+          .field("open", counts.open.to_string())
+          .field("in progress", counts.in_progress.to_string())
+          .field("done", counts.done.to_string())
+          .field("cancelled", counts.cancelled.to_string())
+          .field("progress", format!("{progress}%"))
+          .to_string()
+      },
+    )
   }
 }

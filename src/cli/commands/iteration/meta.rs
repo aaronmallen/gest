@@ -1,13 +1,12 @@
 //! Subcommands for reading and writing iteration metadata.
 
-mod bare;
 mod get;
 mod set;
 mod unset;
 
 use clap::{Args, Subcommand};
 
-use crate::{AppContext, cli::Error, ui::json};
+use crate::{AppContext, actions, cli::Error, ui::json};
 
 /// Read or write iteration metadata fields.
 #[derive(Args, Debug)]
@@ -43,7 +42,7 @@ impl Command {
           .id
           .as_deref()
           .ok_or_else(|| Error::MetaKeyNotFound("<id>".to_string()))?;
-        bare::call(context, id, &self.output).await
+        actions::meta::bare::<actions::Iteration>(context, id, &self.output).await
       }
     }
   }

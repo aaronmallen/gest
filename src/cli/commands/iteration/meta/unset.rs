@@ -1,15 +1,6 @@
 use clap::Args;
 
-use crate::{
-  AppContext,
-  cli::Error,
-  store::{
-    meta,
-    model::{iteration::Patch, primitives::EntityType},
-    repo,
-  },
-  ui::{components::SuccessMessage, envelope::Envelope, json},
-};
+use crate::{AppContext, actions, cli::Error, ui::json};
 
 /// Remove a metadata value from an iteration at a dot-delimited path.
 #[derive(Args, Debug)]
@@ -25,36 +16,6 @@ pub struct Command {
 impl Command {
   /// Remove the metadata value at the given dot-path from the iteration within a recorded transaction.
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
-    log::debug!("iteration meta unset: entry");
-    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
-    let conn = context.store().connect().await?;
-    let id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Iterations, &self.id).await?;
-    let iteration = repo::iteration::find_required_by_id(&conn, id.clone()).await?;
-
-    let mut metadata = iteration.metadata().clone();
-    if !meta::unset_path(&mut metadata, &self.path) {
-      return Err(Error::MetaKeyNotFound(self.path.clone()));
-    }
-
-    let before = serde_json::to_value(&iteration)?;
-    let tx = repo::transaction::begin(&conn, project_id, "iteration meta unset").await?;
-
-    let patch = Patch {
-      metadata: Some(metadata),
-      ..Default::default()
-    };
-    repo::iteration::update(&conn, &id, &patch).await?;
-    repo::transaction::record_event(&conn, tx.id(), "iterations", &id.to_string(), "modified", Some(&before)).await?;
-
-    let updated = repo::iteration::find_required_by_id(&conn, id.clone()).await?;
-    let short_id = id.short();
-    let envelope = Envelope::load_one(&conn, EntityType::Iteration, &id, &updated, true).await?;
-    self.output.print_envelope(&envelope, &short_id, || {
-      SuccessMessage::new("unset metadata")
-        .id(id.short())
-        .field("path", self.path.clone())
-        .to_string()
-    })?;
-    Ok(())
+    actions::meta::unset::<actions::Iteration>(context, &self.id, &self.path, &self.output).await
   }
 }

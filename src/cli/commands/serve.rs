@@ -11,6 +11,7 @@ use crate::{
   AppContext,
   cli::Error,
   config::{self, env::GEST_CONFIG},
+  ui::components::SuccessMessage,
   web::CsrfKey,
 };
 
@@ -49,7 +50,8 @@ impl Command {
 
     let addr = SocketAddr::from((bind_address, port));
     let url = format!("http://{addr}");
-    println!("  starting gest dashboard at {url}");
+    let msg = SuccessMessage::new("starting gest dashboard").field("url", url.clone());
+    println!("{msg}");
 
     if open && let Err(e) = open::that(&url) {
       log::warn!("failed to open browser: {e}");

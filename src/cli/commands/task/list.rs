@@ -75,9 +75,15 @@ impl Command {
 
     let prefix_map = repo::task::per_id_prefix_lengths(&conn, project_id).await?;
 
+    let task_ids: Vec<Id> = tasks.iter().map(|t| t.id().clone()).collect();
+    let tag_map = repo::tag::for_entities(&conn, EntityType::Task, &task_ids).await?;
+
     let mut entries = Vec::new();
     for task in &tasks {
-      let tags = repo::tag::for_entity(&conn, EntityType::Task, task.id()).await?;
+      let tags: Vec<String> = tag_map
+        .get(task.id())
+        .map(|tags| tags.iter().map(|t| t.label().to_string()).collect())
+        .unwrap_or_default();
       let prefix_len = prefix_map.get(&task.id().to_string()).copied().unwrap_or(1);
       entries.push(TaskEntry {
         blocked_by: None,

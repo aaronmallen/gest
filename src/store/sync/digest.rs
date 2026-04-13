@@ -39,6 +39,18 @@ pub async fn is_unchanged(
   Ok(cached == digest)
 }
 
+/// Remove the cached digest for `relative_path` so that a follow-up
+/// `undo` + export cycle sees the cache as stale and rewrites the file.
+pub async fn invalidate(conn: &Connection, project_id: &Id, relative_path: &str) -> Result<(), Error> {
+  conn
+    .execute(
+      "DELETE FROM sync_digests WHERE relative_path = ?1 AND project_id = ?2",
+      [relative_path.to_owned(), project_id.to_string()],
+    )
+    .await?;
+  Ok(())
+}
+
 /// Insert or update the cached digest for `(project_id, relative_path)`.
 pub async fn record(conn: &Connection, project_id: &Id, relative_path: &str, digest: &str) -> Result<(), Error> {
   conn

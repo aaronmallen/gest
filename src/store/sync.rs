@@ -5,7 +5,7 @@
 //! files described in ADR-0016. The orchestrator under [`orchestrator`] walks
 //! every entity adapter under [`entities`] in dependency order.
 
-mod digest;
+pub mod digest;
 mod entities;
 mod orchestrator;
 pub mod paths;

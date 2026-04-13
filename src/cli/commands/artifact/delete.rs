@@ -3,7 +3,11 @@ use clap::Args;
 use crate::{
   AppContext,
   cli::{Error, prompt},
-  store::{model::primitives::EntityType, repo, sync::tombstone},
+  store::{
+    model::primitives::EntityType,
+    repo,
+    sync::{digest, paths, tombstone},
+  },
   ui::{components::SuccessMessage, envelope::Envelope, json},
 };
 
@@ -58,22 +62,12 @@ impl Command {
 
     let deleted_at = chrono::Utc::now();
     tombstone::tombstone_artifact(context.gest_dir().as_deref(), artifact.id(), deleted_at)?;
-    // Drop the sync-digest entry for the tombstoned file so that if the user
-    // later runs `undo`, the subsequent export will see the cache as stale
-    // and rewrite a clean (non-tombstoned) file from the restored row. Without
-    // this, the cached digest still matches the pre-delete content and the
-    // stale tombstone would be re-imported and delete the row again.
-    if let Some(gest_dir) = context.gest_dir().as_deref() {
-      let relative = format!("{}/{}.md", crate::store::sync::paths::ARTIFACT_DIR, artifact.id());
-      conn
-        .execute(
-          "DELETE FROM sync_digests WHERE relative_path = ?1 AND project_id = ?2",
-          [relative, project_id.to_string()],
-        )
-        .await
-        .map_err(crate::store::Error::from)?;
-      let _ = gest_dir;
-    }
+    digest::invalidate(
+      &conn,
+      project_id,
+      &format!("{}/{}.md", paths::ARTIFACT_DIR, artifact.id()),
+    )
+    .await?;
 
     let short_id = artifact.id().short();
     self.output.print_envelope(&envelope, &short_id, || {

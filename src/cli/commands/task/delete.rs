@@ -6,7 +6,7 @@ use crate::{
   store::{
     model::primitives::{EntityType, Id},
     repo,
-    sync::{paths, tombstone},
+    sync::{digest, paths, tombstone},
   },
   ui::{components::SuccessMessage, envelope::Envelope, json},
 };
@@ -75,7 +75,7 @@ impl Command {
 
     let deleted_at = chrono::Utc::now();
     tombstone::tombstone_task(context.gest_dir().as_deref(), task.id(), deleted_at)?;
-    invalidate_sync_digest(&conn, project_id, task.id()).await?;
+    digest::invalidate(&conn, project_id, &format!("{}/{}.yaml", paths::TASK_DIR, task.id())).await?;
 
     let short_id = task.id().short();
     self.output.print_envelope(&envelope, &short_id, || {
@@ -91,20 +91,6 @@ impl Command {
     })?;
     Ok(())
   }
-}
-
-/// Drop the digest-cache entry for the tombstoned task file so that a
-/// follow-up `undo` can rewrite a clean file from the restored row.
-async fn invalidate_sync_digest(conn: &libsql::Connection, project_id: &Id, task_id: &Id) -> Result<(), Error> {
-  let relative = format!("{}/{}.yaml", paths::TASK_DIR, task_id);
-  conn
-    .execute(
-      "DELETE FROM sync_digests WHERE relative_path = ?1 AND project_id = ?2",
-      [relative, project_id.to_string()],
-    )
-    .await
-    .map_err(crate::store::Error::from)?;
-  Ok(())
 }
 
 /// Return every iteration id that currently holds this task in its

@@ -4,9 +4,9 @@ use crate::{
   AppContext,
   cli::{Error, prompt},
   store::{
-    model::primitives::{EntityType, Id},
+    model::primitives::EntityType,
     repo,
-    sync::{paths, tombstone},
+    sync::{digest, paths, tombstone},
   },
   ui::{components::SuccessMessage, envelope::Envelope, json},
 };
@@ -66,7 +66,12 @@ impl Command {
 
     let deleted_at = chrono::Utc::now();
     tombstone::tombstone_iteration(context.gest_dir().as_deref(), iteration.id(), deleted_at)?;
-    invalidate_sync_digest(&conn, project_id, iteration.id()).await?;
+    digest::invalidate(
+      &conn,
+      project_id,
+      &format!("{}/{}.yaml", paths::ITERATION_DIR, iteration.id()),
+    )
+    .await?;
 
     let short_id = iteration.id().short();
     self.output.print_envelope(&envelope, &short_id, || {
@@ -82,19 +87,4 @@ impl Command {
     })?;
     Ok(())
   }
-}
-
-/// Drop the digest-cache entry for the tombstoned iteration file so that a
-/// follow-up `undo` can rewrite a clean file from the restored row without
-/// being short-circuited by the stale-but-matching digest.
-async fn invalidate_sync_digest(conn: &libsql::Connection, project_id: &Id, iteration_id: &Id) -> Result<(), Error> {
-  let relative = format!("{}/{}.yaml", paths::ITERATION_DIR, iteration_id);
-  conn
-    .execute(
-      "DELETE FROM sync_digests WHERE relative_path = ?1 AND project_id = ?2",
-      [relative, project_id.to_string()],
-    )
-    .await
-    .map_err(crate::store::Error::from)?;
-  Ok(())
 }

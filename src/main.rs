@@ -1,3 +1,4 @@
+mod actions;
 mod cli;
 mod config;
 mod io;

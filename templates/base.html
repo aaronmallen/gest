@@ -719,8 +719,33 @@
       {% block content %}{% endblock %}
     </main>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <script src="/static/forms.js"></script>
   <script nonce="__CSP_NONCE__">
+    // -- Mermaid initialization --
+    (function() {
+      if (typeof mermaid === 'undefined') return;
+      mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+
+      // Convert pulldown-cmark fenced blocks (pre>code.language-mermaid) into
+      // div.mermaid elements that the library can process, then render them.
+      window.__renderMermaid = function(root) {
+        var codes = (root || document).querySelectorAll('.md-content pre code.language-mermaid');
+        if (codes.length === 0) return;
+        var nodes = [];
+        codes.forEach(function(code) {
+          var pre = code.parentElement;
+          var div = document.createElement('div');
+          div.className = 'mermaid';
+          div.textContent = code.textContent;
+          pre.parentElement.replaceChild(div, pre);
+          nodes.push(div);
+        });
+        mermaid.run({ nodes: nodes });
+      };
+      window.__renderMermaid();
+    })();
+
     // -- SSE live reload --
     (function() {
       if (!document.body.hasAttribute('data-live-reload')) return;
@@ -751,7 +776,10 @@
           .then(function(res) { return res.text(); })
           .then(function(html) {
             var main = document.getElementById('main-content');
-            if (main) main.innerHTML = html;
+            if (main) {
+              main.innerHTML = html;
+              if (window.__renderMermaid) window.__renderMermaid(main);
+            }
             fetching = false;
           })
           .catch(function() { fetching = false; });

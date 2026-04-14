@@ -27,6 +27,7 @@
             preview.classList.add("active");
             textarea.style.display = "none";
             btn.textContent = "Edit";
+            if (window.__renderMermaid) window.__renderMermaid(preview);
           });
       }
     });

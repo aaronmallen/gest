@@ -1,9 +1,11 @@
 //! Security headers middleware.
 //!
 //! Adds standard security headers to every HTTP response:
-//! - `Content-Security-Policy` -- restricts resource origins and uses a
-//!   per-request nonce for inline `<script>` and `<style>` tags instead of
-//!   the much weaker `'unsafe-inline'`.
+//! - `Content-Security-Policy` -- restricts resource origins.  Inline
+//!   `<script>` tags use a per-request nonce; `style-src` allows
+//!   `'unsafe-inline'` because Mermaid.js injects `<style>` elements at
+//!   runtime.  The jsDelivr CDN is allowed in `script-src` so the browser
+//!   can load the Mermaid library.
 //! - `Permissions-Policy` -- denies access to browser capabilities the
 //!   dashboard does not use (camera, microphone, geolocation, etc.).
 //! - `Referrer-Policy: no-referrer` -- prevents leaking URLs to third parties
@@ -71,16 +73,19 @@ pub async fn add_security_headers(request: Request, next: Next) -> Response {
 
 /// Build the `Content-Security-Policy` header value for a request.
 ///
-/// When a per-request nonce is available, inline `<script>` and `<style>` tags
-/// are authorized via `'nonce-<value>'`. When it is not, the policy omits
-/// inline sources entirely rather than falling back to `'unsafe-inline'`.
+/// When a per-request nonce is available, inline `<script>` tags are
+/// authorized via `'nonce-<value>'`.  `style-src` always includes
+/// `'unsafe-inline'` because Mermaid.js injects `<style>` elements at
+/// render time.  The jsDelivr CDN is allowed in `script-src` so the
+/// browser can load the Mermaid library.
 fn build_csp_header(nonce: Option<&str>) -> String {
-  let (script_src, style_src) = match nonce {
-    Some(n) => (format!("'self' 'nonce-{n}'"), format!("'self' 'nonce-{n}'")),
-    None => ("'self'".to_owned(), "'self'".to_owned()),
+  let script_src = match nonce {
+    Some(n) => format!("'self' 'nonce-{n}' https://cdn.jsdelivr.net"),
+    None => "'self' https://cdn.jsdelivr.net".to_owned(),
   };
   format!(
-    "default-src 'self'; script-src {script_src}; style-src {style_src}; \
+    "default-src 'self'; script-src {script_src}; \
+      style-src 'self' 'unsafe-inline'; \
       img-src 'self'; connect-src 'self'; \
       frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
   )
@@ -96,11 +101,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_embeds_the_nonce_in_script_and_style_sources_when_present() {
+    fn it_embeds_the_nonce_in_script_src_when_present() {
       let csp = build_csp_header(Some("abc123"));
 
-      assert!(csp.contains("script-src 'self' 'nonce-abc123'"));
-      assert!(csp.contains("style-src 'self' 'nonce-abc123'"));
+      assert!(csp.contains("script-src 'self' 'nonce-abc123' https://cdn.jsdelivr.net"));
+    }
+
+    #[test]
+    fn it_allows_jsdelivr_cdn_in_script_src() {
+      let with_nonce = build_csp_header(Some("x"));
+      let without_nonce = build_csp_header(None);
+
+      assert!(with_nonce.contains("https://cdn.jsdelivr.net"));
+      assert!(without_nonce.contains("https://cdn.jsdelivr.net"));
+    }
+
+    #[test]
+    fn it_allows_unsafe_inline_in_style_src_for_mermaid() {
+      let with_nonce = build_csp_header(Some("x"));
+      let without_nonce = build_csp_header(None);
+
+      assert!(with_nonce.contains("style-src 'self' 'unsafe-inline'"));
+      assert!(without_nonce.contains("style-src 'self' 'unsafe-inline'"));
+    }
+
+    #[test]
+    fn it_never_allows_unsafe_inline_in_script_src() {
+      let with_nonce = build_csp_header(Some("x"));
+      let without_nonce = build_csp_header(None);
+
+      // Extract just the script-src directive
+      let extract_script_src = |csp: &str| {
+        csp
+          .split(';')
+          .find(|d| d.trim().starts_with("script-src"))
+          .unwrap()
+          .to_owned()
+      };
+
+      assert!(!extract_script_src(&with_nonce).contains("'unsafe-inline'"));
+      assert!(!extract_script_src(&without_nonce).contains("'unsafe-inline'"));
     }
 
     #[test]
@@ -112,15 +152,6 @@ mod tests {
     }
 
     #[test]
-    fn it_never_emits_unsafe_inline_regardless_of_nonce_presence() {
-      let with_nonce = build_csp_header(Some("x"));
-      let without_nonce = build_csp_header(None);
-
-      assert!(!with_nonce.contains("'unsafe-inline'"));
-      assert!(!without_nonce.contains("'unsafe-inline'"));
-    }
-
-    #[test]
     fn it_sets_frame_ancestors_to_none_to_block_framing() {
       let csp = build_csp_header(None);
 
@@ -128,12 +159,13 @@ mod tests {
     }
 
     #[test]
-    fn it_uses_self_only_when_the_nonce_is_missing() {
+    fn it_falls_back_to_self_for_script_src_when_nonce_is_missing() {
       let csp = build_csp_header(None);
 
       assert_eq!(
         csp,
-        "default-src 'self'; script-src 'self'; style-src 'self'; \
+        "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; \
+          style-src 'self' 'unsafe-inline'; \
           img-src 'self'; connect-src 'self'; \
           frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
       );

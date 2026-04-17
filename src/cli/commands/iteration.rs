@@ -16,6 +16,7 @@ mod reopen;
 mod show;
 mod status;
 mod tag;
+mod unlink;
 mod untag;
 mod update;
 
@@ -68,6 +69,8 @@ enum Sub {
   Status(status::Command),
   /// Add a tag to an iteration.
   Tag(tag::Command),
+  /// Remove a relationship between an iteration and another entity.
+  Unlink(unlink::Command),
   /// Remove a tag from an iteration.
   Untag(untag::Command),
   /// Update an iteration.
@@ -96,6 +99,7 @@ impl Command {
       Sub::Show(cmd) => cmd.call(context).await,
       Sub::Status(cmd) => cmd.call(context).await,
       Sub::Tag(cmd) => cmd.call(context).await,
+      Sub::Unlink(cmd) => cmd.call(context).await,
       Sub::Untag(cmd) => cmd.call(context).await,
       Sub::Update(cmd) => cmd.call(context).await,
     }

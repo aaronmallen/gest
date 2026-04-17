@@ -21,6 +21,7 @@ gest iteration <COMMAND> [OPTIONS]
 | [`delete`](#iteration-delete)     |         | Delete an iteration and drop its task memberships    |
 | [`graph`](#iteration-graph)       |         | Display the phased execution graph                   |
 | [`link`](#iteration-link)         |         | Create a relationship between entities               |
+| [`unlink`](#iteration-unlink)     |         | Remove a relationship between entities               |
 | [`list`](#iteration-list)         | `ls`    | List iterations with optional filters                |
 | [`meta`](#iteration-meta)         |         | Read or write metadata fields                        |
 | [`next`](#iteration-next)         |         | Find or claim the next available task                |
@@ -289,33 +290,91 @@ gest iteration graph abc123
 
 ## iteration link
 
-Create a relationship between an iteration and another entity.
+Create a relationship between an iteration and another entity. For iteration-to-iteration
+links a reciprocal row is written automatically, so linking `A blocks B` also records
+`B blocked-by A`.
 
 ```text
-gest iteration link [OPTIONS] <ID> <REL> <TARGET_ID>
+gest iteration link [OPTIONS] <ID> <TARGET> [--rel <REL>]
 ```
 
 ### Arguments
 
-| Argument      | Description                                                                      |
-|---------------|----------------------------------------------------------------------------------|
-| `<ID>`        | Iteration ID or unique prefix                                                    |
-| `<REL>`       | Relationship type: `blocked-by`, `blocks`, `child-of`, `parent-of`, `relates-to` |
-| `<TARGET_ID>` | Target iteration or artifact ID or unique prefix                                 |
+| Argument   | Description                                      |
+|------------|--------------------------------------------------|
+| `<ID>`     | Iteration ID or unique prefix                    |
+| `<TARGET>` | Target iteration or artifact ID or unique prefix |
 
 ### Options
 
-| Flag          | Description                                        |
-|---------------|----------------------------------------------------|
-| `--artifact`  | Target is an artifact instead of an iteration      |
-| `-j, --json`  | Output the iteration as JSON after linking         |
-| `-q, --quiet` | Output only the iteration ID                       |
+| Flag          | Description                                                                                              |
+|---------------|----------------------------------------------------------------------------------------------------------|
+| `--artifact`  | Target is an artifact instead of an iteration                                                            |
+| `--rel <REL>` | Relationship type: `blocked-by`, `blocks`, `child-of`, `parent-of`, `relates-to` (default: `relates-to`) |
+| `-j, --json`  | Output the iteration as JSON after linking                                                               |
+| `-q, --quiet` | Output only the iteration ID                                                                             |
 
 ### Examples
 
 ```sh
+gest iteration link abc123 def456 --rel blocks
+gest iteration link abc123 art789 --artifact --rel relates-to
+```
+
+:::caution Deprecated: positional `<REL>`
+
+Earlier releases accepted a positional `<REL>` argument between `<ID>` and `<TARGET>`:
+
+```sh
+# Deprecated; still works but emits a warning
 gest iteration link abc123 blocks def456
-gest iteration link abc123 relates-to art789 --artifact
+```
+
+This form is still accepted for backward compatibility but prints a deprecation warning
+to stderr and will be removed in a future major version. Prefer `--rel <type>`.
+:::
+
+---
+
+## iteration unlink
+
+Remove a relationship between an iteration and another entity. For iteration-to-iteration
+edges, both the named row and its reciprocal are deleted atomically in a single
+transaction, mirroring how `iteration link` creates both halves. `gest undo` restores
+the deleted edges.
+
+```text
+gest iteration unlink [OPTIONS] <ID> <TARGET>
+```
+
+### Arguments
+
+| Argument   | Description                                      |
+|------------|--------------------------------------------------|
+| `<ID>`     | Iteration ID or unique prefix                    |
+| `<TARGET>` | Target iteration or artifact ID or unique prefix |
+
+### Options
+
+| Flag          | Description                                                                    |
+|---------------|--------------------------------------------------------------------------------|
+| `--artifact`  | Target is an artifact instead of an iteration                                  |
+| `--rel <REL>` | Filter to relationships of this type. Required when multiple edges exist       |
+| `-j, --json`  | Output the iteration as JSON after unlinking                                   |
+| `-q, --quiet` | Output only the iteration ID                                                   |
+
+If exactly one relationship exists between the source and target, `--rel` is optional.
+If multiple exist and `--rel` is omitted, the command exits with an error listing the
+candidate rel-types. If no matching relationship exists, the command exits with an error.
+
+### Examples
+
+```sh
+# Remove an iteration-to-iteration blocks edge (also removes the reciprocal blocked-by row)
+gest iteration unlink abc123 def456 --rel blocks
+
+# Remove a link to an artifact
+gest iteration unlink abc123 art789 --artifact
 ```
 
 ---

@@ -25,6 +25,7 @@ gest task <COMMAND> [OPTIONS]
 | [`tag`](#task-tag)           |         | Add tags to a task                                                  |
 | [`untag`](#task-untag)       |         | Remove tags from a task                                             |
 | [`link`](#task-link)         |         | Create a relationship between entities                              |
+| [`unlink`](#task-unlink)     |         | Remove a relationship between entities                              |
 | [`meta`](#task-meta)         |         | Read or write metadata fields                                       |
 | [`note`](#task-note)         |         | Manage notes on a task                                              |
 
@@ -483,6 +484,52 @@ gest task link abc123 blocks def456
 
 # Task relates to an artifact
 gest task link abc123 relates-to art789 --artifact
+```
+
+---
+
+## task unlink
+
+Remove a relationship between a task and another task or artifact. Deletion is recorded
+in the transaction log, so `gest undo` restores the edge.
+
+```text
+gest task unlink [OPTIONS] <ID> <TARGET>
+```
+
+### Arguments
+
+| Argument   | Description                                  |
+|------------|----------------------------------------------|
+| `<ID>`     | Source task ID or unique prefix              |
+| `<TARGET>` | Target task or artifact ID or unique prefix  |
+
+### Options
+
+| Flag                          | Description                                                                        |
+|-------------------------------|------------------------------------------------------------------------------------|
+| `--artifact`                  | Target is an artifact instead of a task                                            |
+| `--rel <REL>`                 | Filter to relationships of this type. Required when multiple edges exist           |
+| `--target-type <TARGET_TYPE>` | Target entity type: `task`, `artifact`, or `iteration` (default: `task`)           |
+| `-j, --json`                  | Output the task as JSON after unlinking                                            |
+| `-q, --quiet`                 | Output only the task ID                                                            |
+
+If exactly one relationship exists between the source and target, `--rel` is optional.
+If multiple relationships exist and `--rel` is omitted, the command exits with an error
+listing the candidate rel-types. If no matching relationship exists, the command exits
+with an error.
+
+### Examples
+
+```sh
+# Remove a single relates-to edge (no --rel needed when unambiguous)
+gest task unlink abc123 def456
+
+# Remove the `blocks` edge when multiple edges exist between the pair
+gest task unlink abc123 def456 --rel blocks
+
+# Remove a link to an artifact
+gest task unlink abc123 art789 --artifact
 ```
 
 ---

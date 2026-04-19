@@ -11,7 +11,7 @@ use crate::{
       primitives::Id,
     },
   },
-  ui::components::prefix_lengths_two_tier,
+  ui::components::{prefix_lengths_two_tier, unique_prefix_length_for_id},
 };
 
 pub(super) const SELECT_COLUMNS: &str = "\
@@ -128,6 +128,54 @@ pub async fn find_required_by_id(conn: &Connection, id: impl Into<Id>) -> Result
   find_by_id(conn, id.clone())
     .await?
     .ok_or_else(|| Error::NotFound(format!("artifact {}", id.short())))
+}
+
+/// Return the minimum unique prefix length for a single artifact in the project.
+///
+/// Narrows the disambiguation pool to artifacts whose ID shares at least the
+/// first character with `id` — an ID that differs at character 0 can never
+/// force the prefix longer than 1, so omitting it preserves the same result
+/// as [`prefix_lengths`] while avoiding a full-table scan.
+///
+/// Uses two-tier resolution: if the target is active (not archived) it is
+/// resolved against the active pool only; otherwise it is resolved against
+/// the full pool.
+pub async fn prefix_length_for_id(conn: &Connection, project_id: &Id, id: &str) -> Result<usize, Error> {
+  log::debug!("repo::artifact::prefix_length_for_id");
+  let Some(first_char) = id.chars().next() else {
+    return Ok(1);
+  };
+  let like_pattern = format!("{first_char}%");
+
+  let mut rows = conn
+    .query(
+      "SELECT id, archived_at IS NULL FROM artifacts \
+        WHERE project_id = ?1 AND id LIKE ?2",
+      libsql::params![project_id.to_string(), like_pattern],
+    )
+    .await?;
+
+  let mut active_ids: Vec<String> = Vec::new();
+  let mut all_ids: Vec<String> = Vec::new();
+  let mut target_active = false;
+  while let Some(row) = rows.next().await? {
+    let row_id: String = row.get(0)?;
+    let is_active: i64 = row.get(1)?;
+    if is_active != 0 {
+      if row_id == id {
+        target_active = true;
+      }
+      active_ids.push(row_id.clone());
+    }
+    all_ids.push(row_id);
+  }
+
+  let pool: Vec<&str> = if target_active {
+    active_ids.iter().map(String::as_str).collect()
+  } else {
+    all_ids.iter().map(String::as_str).collect()
+  };
+  Ok(unique_prefix_length_for_id(id, &pool))
 }
 
 /// Return per-ID prefix lengths for a set of artifacts using a two-tier pool:
@@ -315,6 +363,98 @@ mod tests {
       assert_eq!(artifact.title(), "My spec");
       assert_eq!(artifact.body(), "# Spec\nSome content");
       assert!(!artifact.is_archived());
+    }
+  }
+
+  mod prefix_length_for_id_fn {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_matches_prefix_lengths_for_active_artifact() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let mut ids = Vec::new();
+      for i in 0..3 {
+        let a = create(
+          &conn,
+          &pid,
+          &New {
+            title: format!("Active {i}"),
+            ..Default::default()
+          },
+        )
+        .await
+        .unwrap();
+        ids.push(a.id().to_string());
+      }
+
+      let id_refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+      let batch = prefix_lengths(&conn, &pid, &id_refs).await.unwrap();
+      for (i, id) in ids.iter().enumerate() {
+        let narrow = prefix_length_for_id(&conn, &pid, id).await.unwrap();
+        assert_eq!(narrow, batch[i], "narrow path disagreed for active id {id}");
+      }
+    }
+
+    #[tokio::test]
+    async fn it_matches_prefix_lengths_for_archived_artifact() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let active = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Active".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      let archived_row = create(
+        &conn,
+        &pid,
+        &New {
+          title: "To archive".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      archive(&conn, archived_row.id()).await.unwrap();
+
+      let ids = vec![active.id().to_string(), archived_row.id().to_string()];
+      let id_refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+      let batch = prefix_lengths(&conn, &pid, &id_refs).await.unwrap();
+
+      let active_narrow = prefix_length_for_id(&conn, &pid, &ids[0]).await.unwrap();
+      let archived_narrow = prefix_length_for_id(&conn, &pid, &ids[1]).await.unwrap();
+
+      assert_eq!(active_narrow, batch[0]);
+      assert_eq!(archived_narrow, batch[1]);
+    }
+
+    #[tokio::test]
+    async fn it_returns_one_when_no_other_artifacts_exist() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let artifact = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Only".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+
+      let got = prefix_length_for_id(&conn, &pid, &artifact.id().to_string())
+        .await
+        .unwrap();
+
+      assert_eq!(got, 1);
     }
   }
 

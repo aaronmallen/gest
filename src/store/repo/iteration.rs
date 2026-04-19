@@ -11,7 +11,7 @@ use crate::{
       primitives::{Id, IterationStatus},
     },
   },
-  ui::components::prefix_lengths_two_tier,
+  ui::components::{prefix_lengths_two_tier, unique_prefix_length_for_id},
 };
 
 pub(super) const SELECT_COLUMNS: &str = "\
@@ -275,6 +275,54 @@ pub async fn task_status_counts_batch(
     }
   }
   Ok(map)
+}
+
+/// Return the minimum unique prefix length for a single iteration in the project.
+///
+/// Narrows the disambiguation pool to iterations whose ID shares at least
+/// the first character with `id` — an ID that differs at character 0 can
+/// never force the prefix longer than 1, so omitting it preserves the same
+/// result as [`prefix_lengths_for_project`] while avoiding a full-table scan.
+///
+/// Uses two-tier resolution: if the target is non-terminal it is resolved
+/// against the active pool only; otherwise it is resolved against the full
+/// pool.
+pub async fn prefix_length_for_id(conn: &Connection, project_id: &Id, id: &str) -> Result<usize, Error> {
+  log::debug!("repo::iteration::prefix_length_for_id");
+  let Some(first_char) = id.chars().next() else {
+    return Ok(1);
+  };
+  let like_pattern = format!("{first_char}%");
+
+  let mut rows = conn
+    .query(
+      "SELECT id, status NOT IN ('completed', 'cancelled') FROM iterations \
+        WHERE project_id = ?1 AND id LIKE ?2",
+      libsql::params![project_id.to_string(), like_pattern],
+    )
+    .await?;
+
+  let mut active_ids: Vec<String> = Vec::new();
+  let mut all_ids: Vec<String> = Vec::new();
+  let mut target_active = false;
+  while let Some(row) = rows.next().await? {
+    let row_id: String = row.get(0)?;
+    let is_active: i64 = row.get(1)?;
+    if is_active != 0 {
+      if row_id == id {
+        target_active = true;
+      }
+      active_ids.push(row_id.clone());
+    }
+    all_ids.push(row_id);
+  }
+
+  let pool: Vec<&str> = if target_active {
+    active_ids.iter().map(String::as_str).collect()
+  } else {
+    all_ids.iter().map(String::as_str).collect()
+  };
+  Ok(unique_prefix_length_for_id(id, &pool))
 }
 
 /// Return per-ID prefix lengths using two-tier resolution: active iterations
@@ -740,6 +788,105 @@ mod tests {
       assert_eq!(iteration.title(), "Sprint 1");
       assert_eq!(iteration.status(), IterationStatus::Active);
       assert!(iteration.completed_at().is_none());
+    }
+  }
+
+  mod prefix_length_for_id_fn {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_matches_prefix_lengths_for_active_iteration() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let mut ids = Vec::new();
+      for i in 0..3 {
+        let iter = create(
+          &conn,
+          &pid,
+          &New {
+            title: format!("Active {i}"),
+            ..Default::default()
+          },
+        )
+        .await
+        .unwrap();
+        ids.push(iter.id().to_string());
+      }
+
+      let id_refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+      let batch = prefix_lengths_for_project(&conn, &pid, &id_refs).await.unwrap();
+      for (i, id) in ids.iter().enumerate() {
+        let narrow = prefix_length_for_id(&conn, &pid, id).await.unwrap();
+        assert_eq!(narrow, batch[i], "narrow path disagreed for active id {id}");
+      }
+    }
+
+    #[tokio::test]
+    async fn it_matches_prefix_lengths_for_terminal_iteration() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let active = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Active".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      let completed = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Completed".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      update(
+        &conn,
+        completed.id(),
+        &Patch {
+          status: Some(IterationStatus::Completed),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+
+      let ids = vec![active.id().to_string(), completed.id().to_string()];
+      let id_refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+      let batch = prefix_lengths_for_project(&conn, &pid, &id_refs).await.unwrap();
+
+      let active_narrow = prefix_length_for_id(&conn, &pid, &ids[0]).await.unwrap();
+      let completed_narrow = prefix_length_for_id(&conn, &pid, &ids[1]).await.unwrap();
+
+      assert_eq!(active_narrow, batch[0]);
+      assert_eq!(completed_narrow, batch[1]);
+    }
+
+    #[tokio::test]
+    async fn it_returns_one_when_no_other_iterations_exist() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let iter = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Only".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+
+      let got = prefix_length_for_id(&conn, &pid, &iter.id().to_string()).await.unwrap();
+
+      assert_eq!(got, 1);
     }
   }
 

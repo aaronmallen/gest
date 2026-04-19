@@ -12,7 +12,7 @@ use crate::{
     },
     repo::iteration::StatusCounts,
   },
-  ui::components::prefix_lengths_two_tier,
+  ui::components::{prefix_lengths_two_tier, unique_prefix_length_for_id},
 };
 
 pub(super) const SELECT_COLUMNS: &str = "\
@@ -197,6 +197,54 @@ pub async fn per_id_prefix_lengths(conn: &Connection, project_id: &Id) -> Result
   let pool_lengths = prefix_lengths_two_tier(&active_refs, &all_refs);
 
   Ok(all_ids.into_iter().zip(pool_lengths).collect())
+}
+
+/// Return the minimum unique prefix length for a single task in the project.
+///
+/// Narrows the disambiguation pool to tasks whose ID shares at least the
+/// first character with `id` — an ID that differs at character 0 can never
+/// force the prefix longer than 1, so omitting it preserves the same result
+/// as [`per_id_prefix_lengths`] while avoiding a full-table scan.
+///
+/// Uses two-tier resolution: if the target is non-terminal it is resolved
+/// against the active pool only; otherwise it is resolved against the full
+/// pool, matching the semantics of [`per_id_prefix_lengths`].
+pub async fn prefix_length_for_id(conn: &Connection, project_id: &Id, id: &str) -> Result<usize, Error> {
+  log::debug!("repo::task::prefix_length_for_id");
+  let Some(first_char) = id.chars().next() else {
+    return Ok(1);
+  };
+  let like_pattern = format!("{first_char}%");
+
+  let mut rows = conn
+    .query(
+      "SELECT id, status NOT IN ('done', 'cancelled') FROM tasks \
+        WHERE project_id = ?1 AND id LIKE ?2",
+      libsql::params![project_id.to_string(), like_pattern],
+    )
+    .await?;
+
+  let mut active_ids: Vec<String> = Vec::new();
+  let mut all_ids: Vec<String> = Vec::new();
+  let mut target_active = false;
+  while let Some(row) = rows.next().await? {
+    let row_id: String = row.get(0)?;
+    let is_active: i64 = row.get(1)?;
+    if is_active != 0 {
+      if row_id == id {
+        target_active = true;
+      }
+      active_ids.push(row_id.clone());
+    }
+    all_ids.push(row_id);
+  }
+
+  let pool: Vec<&str> = if target_active {
+    active_ids.iter().map(String::as_str).collect()
+  } else {
+    all_ids.iter().map(String::as_str).collect()
+  };
+  Ok(unique_prefix_length_for_id(id, &pool))
 }
 
 /// Return task counts grouped by status for a project in a single query.
@@ -488,6 +536,95 @@ mod tests {
 
       let found = find_by_id(&conn, Id::new()).await.unwrap();
       assert_eq!(found, None);
+    }
+  }
+
+  mod prefix_length_for_id_fn {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_matches_per_id_prefix_lengths_for_active_task() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let mut ids = Vec::new();
+      for i in 0..4 {
+        let t = create(
+          &conn,
+          &pid,
+          &New {
+            title: format!("Open {i}"),
+            ..Default::default()
+          },
+        )
+        .await
+        .unwrap();
+        ids.push(t.id().to_string());
+      }
+
+      let map = per_id_prefix_lengths(&conn, &pid).await.unwrap();
+      for id in &ids {
+        let narrow = prefix_length_for_id(&conn, &pid, id).await.unwrap();
+        assert_eq!(narrow, map[id], "narrow path disagreed for active id {id}");
+      }
+    }
+
+    #[tokio::test]
+    async fn it_matches_per_id_prefix_lengths_for_terminal_task() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let active = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Active".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+      let done = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Done".into(),
+          status: Some(TaskStatus::Done),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+
+      let map = per_id_prefix_lengths(&conn, &pid).await.unwrap();
+
+      let active_narrow = prefix_length_for_id(&conn, &pid, &active.id().to_string())
+        .await
+        .unwrap();
+      let done_narrow = prefix_length_for_id(&conn, &pid, &done.id().to_string()).await.unwrap();
+
+      assert_eq!(active_narrow, map[&active.id().to_string()]);
+      assert_eq!(done_narrow, map[&done.id().to_string()]);
+    }
+
+    #[tokio::test]
+    async fn it_returns_one_when_no_other_tasks_exist() {
+      let (_store, conn, _tmp, pid) = setup().await;
+
+      let task = create(
+        &conn,
+        &pid,
+        &New {
+          title: "Only".into(),
+          ..Default::default()
+        },
+      )
+      .await
+      .unwrap();
+
+      let got = prefix_length_for_id(&conn, &pid, &task.id().to_string()).await.unwrap();
+
+      assert_eq!(got, 1);
     }
   }
 

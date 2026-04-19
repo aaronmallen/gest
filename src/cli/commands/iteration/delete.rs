@@ -29,7 +29,8 @@ pub struct Command {
 }
 
 impl Command {
-  /// Confirm and cascade-delete the iteration along with its task memberships, tags, notes, and relationships, writing a tombstone file.
+  /// Confirm and cascade-delete the iteration along with its task memberships, tags, notes, and
+  /// relationships, writing a tombstone file.
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
     log::debug!("iteration delete: entry");
     let _ = self.force;

@@ -30,7 +30,8 @@ pub struct Command {
 }
 
 impl Command {
-  /// Confirm and cascade-delete the task along with its notes, tags, relationships, and iteration memberships, writing a tombstone file.
+  /// Confirm and cascade-delete the task along with its notes, tags, relationships, and iteration
+  /// memberships, writing a tombstone file.
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
     log::debug!("task delete: entry");
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;

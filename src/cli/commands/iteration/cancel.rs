@@ -2,16 +2,10 @@ use clap::Args;
 
 use crate::{
   AppContext,
-  actions::{Iteration, Prefixable},
+  actions::{Iteration, transition::transition_status},
   cli::Error,
-  store::{
-    model::{
-      iteration::Patch,
-      primitives::{EntityType, IterationStatus},
-    },
-    repo,
-  },
-  ui::{components::SuccessMessage, envelope::Envelope, json},
+  store::model::primitives::IterationStatus,
+  ui::json,
 };
 
 /// Cancel an iteration.
@@ -26,47 +20,15 @@ pub struct Command {
 impl Command {
   /// Transition the iteration to `cancelled` within a recorded transaction.
   pub async fn call(&self, context: &AppContext) -> Result<(), Error> {
-    log::debug!("iteration cancel: entry");
-    let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
-    let conn = context.store().connect().await?;
-
-    let id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Iterations, &self.id).await?;
-    let before_iter = repo::iteration::find_by_id(&conn, id.clone())
-      .await?
-      .ok_or(Error::UninitializedProject)?;
-    let before = serde_json::to_value(&before_iter)?;
-    let tx = repo::transaction::begin(&conn, project_id, "iteration cancel").await?;
-    let patch = Patch {
-      status: Some(IterationStatus::Cancelled),
-      ..Default::default()
-    };
-
-    let iteration = repo::iteration::update(&conn, &id, &patch).await?;
-    repo::transaction::record_semantic_event(
-      &conn,
-      tx.id(),
-      "iterations",
-      &id.to_string(),
-      "modified",
-      Some(&before),
-      Some("cancelled"),
-      Some(&before_iter.status().to_string()),
-      Some(&iteration.status().to_string()),
+    transition_status::<Iteration>(
+      context,
+      &self.id,
+      IterationStatus::Cancelled,
+      "iteration cancel",
+      "cancelled",
+      "cancelled iteration",
+      &self.output,
     )
-    .await?;
-
-    let prefix_len = Iteration::prefix_length(&conn, project_id, &iteration.id().to_string()).await?;
-
-    let short_id = iteration.id().short();
-    let envelope = Envelope::load_one(&conn, EntityType::Iteration, &id, &iteration, true).await?;
-    self.output.print_envelope(&envelope, &short_id, || {
-      log::info!("cancelled iteration");
-      SuccessMessage::new("cancelled iteration")
-        .id(iteration.id().short())
-        .prefix_len(prefix_len)
-        .field("title", iteration.title().to_string())
-        .to_string()
-    })?;
-    Ok(())
+    .await
   }
 }

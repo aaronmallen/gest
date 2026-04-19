@@ -6,12 +6,6 @@
 //! resolve → load before-snapshot → begin transaction → patch → record event
 //! → emit envelope. Entity-specific details are provided through the
 //! [`HasStatus`] trait.
-//!
-//! The module-level `#[allow(dead_code)]` is temporary: callers migrate to
-//! [`transition_status`] in task 2A, after which the generic becomes
-//! reachable and the allow can be dropped.
-
-#![allow(dead_code)]
 
 use std::fmt::Display;
 

@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::Utc;
 use libsql::{Connection, Value};
+use serde_json::{Map, Value as JsonValue};
 
 use crate::store::{
   Error,
@@ -215,6 +216,28 @@ pub async fn for_entity(conn: &Connection, entity_type: EntityType, entity_id: &
     relationships.push(Model::try_from(row)?);
   }
   Ok(relationships)
+}
+
+/// Build the JSON payload stored in the audit log for a relationship row.
+///
+/// The object shape mirrors the `relationships` table column set so
+/// [`crate::store::repo::transaction::undo`] can re-insert the row verbatim via
+/// an `INSERT` whose column list is the object's key set.
+// Callers migrate to this shared helper in phase 2 (task xovpkxwo); until then
+// the byte-identical duplicates in `task/unlink.rs` and `iteration/unlink.rs`
+// remain and this function has no in-crate users outside the test module.
+#[allow(dead_code)]
+pub fn relationship_audit_payload(rel: &Model) -> JsonValue {
+  let mut map = Map::new();
+  map.insert("id".into(), JsonValue::String(rel.id().to_string()));
+  map.insert("rel_type".into(), JsonValue::String(rel.rel_type().to_string()));
+  map.insert("source_id".into(), JsonValue::String(rel.source_id().to_string()));
+  map.insert("source_type".into(), JsonValue::String(rel.source_type().to_string()));
+  map.insert("target_id".into(), JsonValue::String(rel.target_id().to_string()));
+  map.insert("target_type".into(), JsonValue::String(rel.target_type().to_string()));
+  map.insert("created_at".into(), JsonValue::String(rel.created_at().to_rfc3339()));
+  map.insert("updated_at".into(), JsonValue::String(rel.updated_at().to_rfc3339()));
+  JsonValue::Object(map)
 }
 
 #[cfg(test)]
@@ -598,6 +621,82 @@ mod tests {
       let rels_t2 = for_entity(&conn, EntityType::Task, &t2).await.unwrap();
 
       assert_eq!(rels_t2.len(), 1);
+    }
+  }
+
+  mod relationship_audit_payload_fn {
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn it_builds_an_object_matching_the_relationships_schema() {
+      let (_store, conn, _tmp, t1, t2) = setup().await;
+
+      let rel = create(
+        &conn,
+        RelationshipType::Blocks,
+        EntityType::Task,
+        &t1,
+        EntityType::Task,
+        &t2,
+      )
+      .await
+      .unwrap();
+
+      let payload = relationship_audit_payload(&rel);
+
+      assert_eq!(
+        payload,
+        json!({
+          "id": rel.id().to_string(),
+          "rel_type": rel.rel_type().to_string(),
+          "source_id": rel.source_id().to_string(),
+          "source_type": rel.source_type().to_string(),
+          "target_id": rel.target_id().to_string(),
+          "target_type": rel.target_type().to_string(),
+          "created_at": rel.created_at().to_rfc3339(),
+          "updated_at": rel.updated_at().to_rfc3339(),
+        })
+      );
+    }
+
+    #[tokio::test]
+    async fn it_emits_a_json_object() {
+      let (_store, conn, _tmp, t1, t2) = setup().await;
+
+      let rel = create(
+        &conn,
+        RelationshipType::RelatesTo,
+        EntityType::Task,
+        &t1,
+        EntityType::Task,
+        &t2,
+      )
+      .await
+      .unwrap();
+
+      let payload = relationship_audit_payload(&rel);
+
+      assert!(payload.is_object());
+      let map = payload.as_object().unwrap();
+      let mut keys: Vec<&str> = map.keys().map(String::as_str).collect();
+      keys.sort();
+
+      assert_eq!(
+        keys,
+        vec![
+          "created_at",
+          "id",
+          "rel_type",
+          "source_id",
+          "source_type",
+          "target_id",
+          "target_type",
+          "updated_at",
+        ]
+      );
     }
   }
 }

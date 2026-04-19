@@ -4,12 +4,6 @@
 //! an optional trailing hint. A dedicated empty-state message replaces the row
 //! block when no rows are pushed, letting callers hand a single component both
 //! the "nothing to do" and "here's what happened" paths.
-//!
-//! Builder entry points are exercised through the unit tests in this file; the
-//! first production consumer (`cli::commands::purge`) adopts the component in a
-//! follow-up task, so the non-test binary sees these as dead code until then.
-
-#![cfg_attr(not(test), allow(dead_code))]
 
 use std::fmt::{self, Display, Formatter};
 
@@ -62,6 +56,7 @@ impl Component {
   }
 
   /// Report whether any rows have been pushed.
+  #[allow(dead_code)]
   pub fn is_empty(&self) -> bool {
     self.rows.is_empty()
   }

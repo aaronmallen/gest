@@ -8,10 +8,16 @@ use crate::{
   cli::{Error, prompt},
   store::{
     model::primitives::{EntityType, Id},
-    repo::{self, purge::Scope},
+    repo::{
+      self,
+      purge::{
+        ArchivedArtifacts, ArchivedProjects, DanglingRelationships, OrphanTombstones, Scope, TerminalIterations,
+        TerminalTasks,
+      },
+    },
     sync::tombstone,
   },
-  ui::components::SuccessMessage,
+  ui::components::{SuccessMessage, Summary},
 };
 
 /// Purge terminal, archived, and orphaned data from the store.
@@ -111,44 +117,12 @@ impl Command {
     let total =
       tasks.total() + iterations.total() + artifacts.count + projects.count + relationships.count + tombstones.count;
 
+    let summary = build_summary(&tasks, &iterations, &artifacts, &projects, &relationships, &tombstones);
+    println!("{summary}");
+
     if total == 0 {
-      println!("Nothing to purge.");
       return Ok(());
     }
-
-    // Build summary lines.
-    let mut summary_lines = Vec::new();
-    if tasks.total() > 0 {
-      summary_lines.push(format!(
-        "  tasks: {} ({} done, {} cancelled)",
-        tasks.total(),
-        tasks.done,
-        tasks.cancelled
-      ));
-    }
-    if iterations.total() > 0 {
-      summary_lines.push(format!(
-        "  iterations: {} ({} completed, {} cancelled)",
-        iterations.total(),
-        iterations.completed,
-        iterations.cancelled
-      ));
-    }
-    if artifacts.count > 0 {
-      summary_lines.push(format!("  artifacts: {}", artifacts.count));
-    }
-    if projects.count > 0 {
-      summary_lines.push(format!("  projects: {} (non-undoable)", projects.count));
-    }
-    if relationships.count > 0 {
-      summary_lines.push(format!("  relationships: {}", relationships.count));
-    }
-    if tombstones.count > 0 {
-      summary_lines.push(format!("  tombstones: {}", tombstones.count));
-    }
-
-    let summary = summary_lines.join("\n");
-    println!("Purge summary:\n{summary}");
 
     if self.dry_run {
       return Ok(());
@@ -219,12 +193,54 @@ impl Command {
       }
     }
 
-    let message = SuccessMessage::new("Purged").field("total", total.to_string());
-    println!("{message}");
-    println!("Run `gest undo` to restore.");
+    let completion = Summary::new()
+      .success(SuccessMessage::new("Purged").field("total", total.to_string()))
+      .hint("Run `gest undo` to restore.");
+    println!("{completion}");
 
     Ok(())
   }
+}
+
+/// Build the purge-summary block rendered before the confirmation prompt.
+///
+/// When every selector reports zero the block renders with an `empty_message`
+/// in place of the row list; otherwise it renders the title followed by one
+/// row per non-empty selector.
+fn build_summary(
+  tasks: &TerminalTasks,
+  iterations: &TerminalIterations,
+  artifacts: &ArchivedArtifacts,
+  projects: &ArchivedProjects,
+  relationships: &DanglingRelationships,
+  tombstones: &OrphanTombstones,
+) -> Summary {
+  let mut summary = Summary::new()
+    .title("Purge summary:")
+    .empty_message("Nothing to purge.");
+
+  if tasks.total() > 0 {
+    let detail = format!("{} done, {} cancelled", tasks.done, tasks.cancelled);
+    summary = summary.row_with_detail("tasks", tasks.total(), Some(detail));
+  }
+  if iterations.total() > 0 {
+    let detail = format!("{} completed, {} cancelled", iterations.completed, iterations.cancelled);
+    summary = summary.row_with_detail("iterations", iterations.total(), Some(detail));
+  }
+  if artifacts.count > 0 {
+    summary = summary.row("artifacts", artifacts.count);
+  }
+  if projects.count > 0 {
+    summary = summary.row_with_detail("projects", projects.count, Some("non-undoable"));
+  }
+  if relationships.count > 0 {
+    summary = summary.row("relationships", relationships.count);
+  }
+  if tombstones.count > 0 {
+    summary = summary.row("tombstones", tombstones.count);
+  }
+
+  summary
 }
 
 /// Collect `(project_id, gest_dir_path)` pairs for tombstone scanning.

@@ -5,10 +5,6 @@
 /// Returns `None` when no non-empty top-level heading is present. Lines with
 /// leading or trailing whitespace are trimmed before the `# ` prefix check, so
 /// indented headings are still recognized.
-// Callers migrate to this shared helper in phase 2 (task kyywvzuv); until then
-// the byte-identical duplicates in `task/create.rs` and `artifact/create.rs`
-// remain and this function has no in-crate users.
-#[allow(dead_code)]
 pub fn extract_heading(input: &str) -> Option<String> {
   for line in input.lines() {
     let trimmed = line.trim();

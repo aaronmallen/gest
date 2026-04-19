@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::{
   AppContext,
-  cli::{Error, meta_args, tag_arg},
+  cli::{Error, commands::helpers::extract_heading, meta_args, tag_arg},
   store::{
     model::{
       artifact::New,
@@ -231,45 +231,5 @@ impl Command {
     } else {
       Err(Error::Editor("artifact title is required".into()))
     }
-  }
-}
-
-/// Extract the text of the first markdown `# heading` from the input.
-fn extract_heading(input: &str) -> Option<String> {
-  for line in input.lines() {
-    let trimmed = line.trim();
-    if let Some(heading) = trimmed.strip_prefix("# ") {
-      let heading = heading.trim();
-      if !heading.is_empty() {
-        return Some(heading.to_string());
-      }
-    }
-  }
-  None
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn it_extracts_heading_from_markdown() {
-    let input = "# This is a test\n\nthis is the body";
-
-    assert_eq!(extract_heading(input), Some("This is a test".into()));
-  }
-
-  #[test]
-  fn it_returns_none_when_no_heading() {
-    let input = "just some text\nno heading here";
-
-    assert_eq!(extract_heading(input), None);
-  }
-
-  #[test]
-  fn it_skips_empty_headings() {
-    let input = "# \n# Real heading";
-
-    assert_eq!(extract_heading(input), Some("Real heading".into()));
   }
 }

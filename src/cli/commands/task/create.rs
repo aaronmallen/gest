@@ -5,7 +5,11 @@ use libsql::Connection;
 
 use crate::{
   AppContext,
-  cli::{Error, commands::task::priority::parse_priority, meta_args, tag_arg},
+  cli::{
+    Error,
+    commands::{helpers::extract_heading, task::priority::parse_priority},
+    meta_args, tag_arg,
+  },
   store::{
     model::{
       primitives::{AuthorType, EntityType, Id, RelationshipType, TaskStatus},
@@ -210,20 +214,6 @@ impl Command {
   }
 }
 
-/// Extract the text of the first markdown `# heading` from the input.
-fn extract_heading(input: &str) -> Option<String> {
-  for line in input.lines() {
-    let trimmed = line.trim();
-    if let Some(heading) = trimmed.strip_prefix("# ") {
-      let heading = heading.trim();
-      if !heading.is_empty() {
-        return Some(heading.to_string());
-      }
-    }
-  }
-  None
-}
-
 /// Parse a link spec in the format `rel:target` or just `target` (defaults to relates-to).
 fn parse_link_spec(spec: &str) -> Result<(RelationshipType, String), Error> {
   if let Some((rel_str, target)) = spec.split_once(':') {
@@ -265,22 +255,6 @@ fn table_to_entity_type(table: repo::resolve::Table) -> EntityType {
 #[cfg(test)]
 mod tests {
   use super::*;
-
-  mod extract_heading_fn {
-    use super::*;
-
-    #[test]
-    fn it_extracts_heading_from_markdown() {
-      let input = "# Fix the bug\n\ndetails here";
-      assert_eq!(extract_heading(input), Some("Fix the bug".into()));
-    }
-
-    #[test]
-    fn it_returns_none_when_no_heading() {
-      let input = "just text";
-      assert_eq!(extract_heading(input), None);
-    }
-  }
 
   mod parse_link_spec_fn {
     use pretty_assertions::assert_eq;

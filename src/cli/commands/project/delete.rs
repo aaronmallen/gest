@@ -3,7 +3,7 @@ use clap::Args;
 use crate::{
   AppContext,
   cli::{Error, prompt},
-  store::repo,
+  store::repo::{self, resolve::Table},
   ui::{components::SuccessMessage, json},
 };
 
@@ -30,14 +30,14 @@ impl Command {
     log::debug!("project delete: entry");
     let conn = context.store().connect().await?;
 
-    let id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Projects, &self.id).await?;
+    let id = repo::resolve::resolve_id(&conn, Table::Projects, &self.id).await?;
     let project = repo::project::find_by_id(&conn, id.clone())
       .await?
       .ok_or_else(|| Error::Argument(format!("project {} not found", id.short())))?;
 
-    let task_count = count_owned(&conn, "tasks", &id).await?;
-    let iteration_count = count_owned(&conn, "iterations", &id).await?;
-    let artifact_count = count_owned(&conn, "artifacts", &id).await?;
+    let task_count = repo::project::count_owned(&conn, Table::Tasks, &id).await?;
+    let iteration_count = repo::project::count_owned(&conn, Table::Iterations, &id).await?;
+    let artifact_count = repo::project::count_owned(&conn, Table::Artifacts, &id).await?;
 
     let target = format!(
       "project {} ({}). This will delete {} tasks, {} iterations, {} artifacts, \
@@ -86,20 +86,4 @@ impl Command {
     }
     Ok(())
   }
-}
-
-/// Count rows in `table` belonging to the given project.
-async fn count_owned(
-  conn: &libsql::Connection,
-  table: &str,
-  project_id: &crate::store::model::primitives::Id,
-) -> Result<i64, Error> {
-  let sql = format!("SELECT COUNT(*) FROM {table} WHERE project_id = ?1");
-  let mut rows = conn
-    .query(&sql, [project_id.to_string()])
-    .await
-    .map_err(crate::store::Error::from)?;
-  let row = rows.next().await.map_err(crate::store::Error::from)?.unwrap();
-  let count: i64 = row.get(0).map_err(crate::store::Error::from)?;
-  Ok(count)
 }

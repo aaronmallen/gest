@@ -9,7 +9,7 @@ use crate::store::{
     Project, ProjectWorkspace,
     primitives::{EntityType, Id},
   },
-  repo::entity,
+  repo::{entity, resolve::Table},
   sync::{paths, tombstone},
 };
 
@@ -95,6 +95,20 @@ pub async fn attach_workspace(
   Ok(ws)
 }
 
+/// Count rows in `table` owned by the given project (matching `project_id`).
+pub async fn count_owned(conn: &Connection, table: Table, project_id: &Id) -> Result<usize, Error> {
+  let ident = table.as_sql_ident();
+  let sql = format!("SELECT COUNT(*) FROM {ident} WHERE project_id = ?1");
+  let mut rows = conn.query(&sql, [project_id.to_string()]).await?;
+  match rows.next().await? {
+    Some(row) => {
+      let count: i64 = row.get(0)?;
+      Ok(count as usize)
+    }
+    None => Ok(0),
+  }
+}
+
 /// Create a new project for the given root path.
 ///
 /// If a `.gest/project.yaml` already exists at the root or any ancestor
@@ -178,9 +192,9 @@ pub async fn delete(
   log::debug!("repo::project::delete");
 
   // 1. Enumerate owned entities.
-  let task_ids = collect_entity_ids(conn, "tasks", id).await?;
-  let iteration_ids = collect_entity_ids(conn, "iterations", id).await?;
-  let artifact_ids = collect_entity_ids(conn, "artifacts", id).await?;
+  let task_ids = collect_entity_ids(conn, Table::Tasks, id).await?;
+  let iteration_ids = collect_entity_ids(conn, Table::Iterations, id).await?;
+  let artifact_ids = collect_entity_ids(conn, Table::Artifacts, id).await?;
 
   // 2. Cascade-delete each entity. We use a dummy transaction id since we
   //    are not recording undo events, but delete_with_cascade requires one.
@@ -330,12 +344,11 @@ pub struct EntityCounts {
 /// Used by the archive confirmation prompt to show what will be affected.
 pub async fn entity_counts(conn: &Connection, id: &Id) -> Result<EntityCounts, Error> {
   log::debug!("repo::project::entity_counts");
-  let id_str = id.to_string();
 
-  let artifacts = count_rows(conn, "artifacts", "project_id", &id_str).await?;
-  let iterations = count_rows(conn, "iterations", "project_id", &id_str).await?;
-  let tasks = count_rows(conn, "tasks", "project_id", &id_str).await?;
-  let workspaces = count_rows(conn, "project_workspaces", "project_id", &id_str).await?;
+  let artifacts = count_owned(conn, Table::Artifacts, id).await?;
+  let iterations = count_owned(conn, Table::Iterations, id).await?;
+  let tasks = count_owned(conn, Table::Tasks, id).await?;
+  let workspaces = count_project_workspaces(conn, id).await?;
 
   Ok(EntityCounts {
     artifacts,
@@ -358,8 +371,9 @@ pub async fn unarchive(conn: &Connection, id: &Id) -> Result<(), Error> {
 }
 
 /// Collect all entity ids from a table that belong to the given project.
-async fn collect_entity_ids(conn: &Connection, table: &str, project_id: &Id) -> Result<Vec<Id>, Error> {
-  let sql = format!("SELECT id FROM {table} WHERE project_id = ?1");
+async fn collect_entity_ids(conn: &Connection, table: Table, project_id: &Id) -> Result<Vec<Id>, Error> {
+  let ident = table.as_sql_ident();
+  let sql = format!("SELECT id FROM {ident} WHERE project_id = ?1");
   let mut rows = conn.query(&sql, [project_id.to_string()]).await?;
   let mut ids = Vec::new();
   while let Some(row) = rows.next().await? {
@@ -370,10 +384,17 @@ async fn collect_entity_ids(conn: &Connection, table: &str, project_id: &Id) -> 
   Ok(ids)
 }
 
-/// Count rows in `table` where `column` equals `value`.
-async fn count_rows(conn: &Connection, table: &str, column: &str, value: &str) -> Result<usize, Error> {
-  let sql = format!("SELECT COUNT(*) FROM {table} WHERE {column} = ?1");
-  let mut rows = conn.query(&sql, [value.to_string()]).await?;
+/// Count `project_workspaces` rows belonging to the given project.
+///
+/// `project_workspaces` is not an entity table in [`Table`], so its count uses
+/// a hand-written query rather than the shared [`count_owned`] helper.
+async fn count_project_workspaces(conn: &Connection, project_id: &Id) -> Result<usize, Error> {
+  let mut rows = conn
+    .query(
+      "SELECT COUNT(*) FROM project_workspaces WHERE project_id = ?1",
+      [project_id.to_string()],
+    )
+    .await?;
   match rows.next().await? {
     Some(row) => {
       let count: i64 = row.get(0)?;

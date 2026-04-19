@@ -20,6 +20,13 @@ use crate::store::{
   sync::{Error, paths, yaml},
 };
 
+/// Upsert SQL for the `iterations` table.
+const UPSERT_ITERATION_SQL: &str = "INSERT INTO iterations \
+  (id, project_id, completed_at, created_at, description, metadata, status, title, updated_at) \
+  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
+  ON CONFLICT(id) DO UPDATE SET \
+    completed_at = ?3, description = ?5, metadata = ?6, status = ?7, title = ?8, updated_at = ?9";
+
 /// On-disk wrapper for `.gest/iteration/<id>.yaml`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct IterationFile {
@@ -330,9 +337,7 @@ async fn upsert_iteration(conn: &Connection, project_id: &Id, file: &IterationFi
   let metadata_str = serde_json::to_string(&file.metadata).unwrap_or_else(|_| "{}".to_string());
   conn
     .execute(
-      "INSERT INTO iterations (id, project_id, completed_at, created_at, description, metadata, status, title, updated_at) \
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
-        ON CONFLICT(id) DO UPDATE SET completed_at = ?3, description = ?5, metadata = ?6, status = ?7, title = ?8, updated_at = ?9",
+      UPSERT_ITERATION_SQL,
       libsql::params![
         file.id.to_string(),
         project_id.to_string(),

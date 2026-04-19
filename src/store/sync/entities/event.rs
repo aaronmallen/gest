@@ -25,6 +25,20 @@ use crate::store::{
   sync::{paths, yaml},
 };
 
+/// Insert SQL for importing a synced event into `transaction_events`.
+const INSERT_TRANSACTION_EVENT_SQL: &str = "INSERT INTO transaction_events \
+  (id, transaction_id, before_data, created_at, event_type, row_id, table_name, semantic_type, old_value, new_value) \
+  VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
+  ON CONFLICT(id) DO NOTHING";
+
+/// Select SQL for the audit-log subset of `transaction_events` scoped to a project.
+const SELECT_TRANSACTION_EVENTS_SQL: &str = "SELECT \
+  te.id, te.table_name, te.row_id, te.event_type, te.semantic_type, te.old_value, te.new_value, te.created_at \
+  FROM transaction_events te \
+  JOIN transactions t ON t.id = te.transaction_id \
+  WHERE t.project_id = ?1 AND te.semantic_type IS NOT NULL \
+  ORDER BY te.created_at, te.id";
+
 /// On-disk wrapper for `.gest/event/<yyyy-mm>/<id>.yaml`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct EventFile {
@@ -83,10 +97,7 @@ pub async fn read_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
     }
     conn
       .execute(
-        "INSERT INTO transaction_events \
-          (id, transaction_id, before_data, created_at, event_type, row_id, table_name, semantic_type, old_value, new_value) \
-          VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
-          ON CONFLICT(id) DO NOTHING",
+        INSERT_TRANSACTION_EVENT_SQL,
         libsql::params![
           file.id.to_string(),
           synthetic_tx.to_string(),
@@ -117,14 +128,7 @@ pub async fn read_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Re
 pub async fn write_all(conn: &Connection, project_id: &Id, gest_dir: &Path) -> Result<(), Error> {
   let mut alive: HashSet<String> = HashSet::new();
   let mut rows = conn
-    .query(
-      "SELECT te.id, te.table_name, te.row_id, te.event_type, te.semantic_type, te.old_value, te.new_value, te.created_at \
-        FROM transaction_events te \
-        JOIN transactions t ON t.id = te.transaction_id \
-        WHERE t.project_id = ?1 AND te.semantic_type IS NOT NULL \
-        ORDER BY te.created_at, te.id",
-      [project_id.to_string()],
-    )
+    .query(SELECT_TRANSACTION_EVENTS_SQL, [project_id.to_string()])
     .await?;
   while let Some(row) = rows.next().await? {
     let id_str: String = row.get(0)?;
@@ -214,8 +218,10 @@ mod tests {
     let when = Utc.with_ymd_and_hms(2026, 4, 8, 12, 0, 0).unwrap();
     conn
       .execute(
-        "INSERT INTO transaction_events (id, transaction_id, created_at, event_type, row_id, table_name, semantic_type, old_value, new_value) \
-          VALUES (?1, ?2, ?3, 'modified', 'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk', 'tasks', 'status-change', 'open', 'in-progress')",
+        "INSERT INTO transaction_events \
+          (id, transaction_id, created_at, event_type, row_id, table_name, semantic_type, old_value, new_value) \
+          VALUES (?1, ?2, ?3, 'modified', 'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk', \
+          'tasks', 'status-change', 'open', 'in-progress')",
         libsql::params![event_id.to_string(), tx_id.to_string(), when.to_rfc3339()],
       )
       .await

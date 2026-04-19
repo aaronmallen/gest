@@ -55,7 +55,7 @@ impl Command {
       view = view.note(note.id().short(), note.body());
     }
 
-    print!("{view}");
+    crate::io::pager::page(&format!("{view}"), context)?;
     Ok(())
   }
 }

@@ -62,7 +62,7 @@ impl Command {
     )
     .prefix_len(prefix_len);
 
-    print!("{view}");
+    crate::io::pager::page(&format!("{view}"), context)?;
     Ok(())
   }
 }

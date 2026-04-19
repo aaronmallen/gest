@@ -16,6 +16,71 @@ fn it_creates_a_task() {
 }
 
 #[test]
+fn it_infers_title_from_first_heading_when_piping_stdin() {
+  let g = GestCmd::new();
+  let input = "# Piped task title\n\nfollowed by a body paragraph.\n";
+
+  let output = g
+    .cmd()
+    .args(["task", "create"])
+    .write_stdin(input)
+    .output()
+    .expect("task create failed to run");
+
+  assert!(
+    output.status.success(),
+    "task create exited non-zero: {}",
+    String::from_utf8_lossy(&output.stderr)
+  );
+  let stdout = String::from_utf8_lossy(&output.stdout);
+  assert!(stdout.contains("created task"), "got: {stdout}");
+  assert!(stdout.contains("Piped task title"), "got: {stdout}");
+}
+
+#[test]
+fn it_uses_explicit_title_and_stdin_as_description() {
+  let g = GestCmd::new();
+  let body = "some body text without a heading\n";
+
+  let output = g
+    .cmd()
+    .args(["task", "create", "Explicit title"])
+    .write_stdin(body)
+    .output()
+    .expect("task create failed to run");
+
+  assert!(
+    output.status.success(),
+    "task create exited non-zero: {}",
+    String::from_utf8_lossy(&output.stderr)
+  );
+  let stdout = String::from_utf8_lossy(&output.stdout);
+  assert!(stdout.contains("Explicit title"), "got: {stdout}");
+}
+
+#[test]
+fn it_errors_when_stdin_has_no_heading_and_no_title_arg() {
+  let g = GestCmd::new();
+
+  let output = g
+    .cmd()
+    .args(["task", "create"])
+    .write_stdin("no heading here\njust body text\n")
+    .output()
+    .expect("task create failed to run");
+
+  assert!(
+    !output.status.success(),
+    "task create without title or heading should fail"
+  );
+  let stderr = String::from_utf8_lossy(&output.stderr);
+  assert!(
+    stderr.contains("heading") || stderr.contains("title"),
+    "expected error mentioning heading/title, got: {stderr}"
+  );
+}
+
+#[test]
 fn it_drops_blank_entries_from_stray_commas_in_tags() {
   let g = GestCmd::new();
 

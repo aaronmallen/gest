@@ -55,7 +55,7 @@ function HomepageHeader(): ReactNode {
         <div className={styles.buttons}>
           <Link
             className="button button--primary button--lg"
-            to="/docs/0.5/getting-started/installation">
+            to="/docs/0.5/getting-started/how-to-use-gest">
             Get Started
           </Link>
           <Link

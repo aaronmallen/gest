@@ -2,11 +2,11 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
   docsSidebar: [
-    'index',
     {
       type: 'category',
       label: 'Getting Started',
       items: [
+        'getting-started/how-to-use-gest',
         'getting-started/installation',
         'getting-started/quick-start',
         'getting-started/concepts',

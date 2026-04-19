@@ -256,6 +256,9 @@ fn table_to_entity_type(table: repo::resolve::Table) -> EntityType {
     repo::resolve::Table::Iterations => EntityType::Iteration,
     repo::resolve::Table::Notes | repo::resolve::Table::Tasks => EntityType::Task,
     repo::resolve::Table::Projects => unreachable!("projects are not entities"),
+    repo::resolve::Table::EntityTags | repo::resolve::Table::IterationTasks | repo::resolve::Table::Relationships => {
+      unreachable!("audit-only tables are not entity-resolution targets")
+    }
   }
 }
 

@@ -5,26 +5,69 @@ use crate::store::{
   model::primitives::{EntityType, Id},
 };
 
-/// Tables that can be searched by ID prefix resolution.
+/// Tables that can be searched by ID prefix resolution or referenced in
+/// persisted audit rows (e.g. `transaction_events.table_name`).
 ///
 /// Using an enum (instead of raw `&str`) guarantees that every SQL string built
-/// in this module interpolates a canonical, hand-audited identifier — no
-/// caller-controlled table name can ever reach a SQL format string.
+/// against one of these tables interpolates a canonical, hand-audited
+/// identifier — no caller-controlled table name can ever reach a SQL format
+/// string. The allowlist is closed: [`Table::from_sql_ident`] is the gate
+/// call sites use to reject any unknown name stored in the database.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Table {
   /// The `artifacts` table.
   Artifacts,
+  /// The `entity_tags` join table associating tags with arbitrary entities.
+  //
+  // Constructed only via `from_sql_ident` today; call sites migrate to this
+  // variant in a follow-up phase.
+  #[allow(dead_code)]
+  EntityTags,
+  /// The `iteration_tasks` join table assigning tasks to iteration phases.
+  //
+  // Constructed only via `from_sql_ident` today; call sites migrate to this
+  // variant in a follow-up phase.
+  #[allow(dead_code)]
+  IterationTasks,
   /// The `iterations` table.
   Iterations,
   /// The `notes` table.
   Notes,
   /// The `projects` table.
   Projects,
+  /// The `relationships` table linking entities via typed directed edges.
+  //
+  // Constructed only via `from_sql_ident` today; call sites migrate to this
+  // variant in a follow-up phase.
+  #[allow(dead_code)]
+  Relationships,
   /// The `tasks` table.
   Tasks,
 }
 
 impl Table {
+  /// Parses a SQL table identifier back into a [`Table`] variant.
+  ///
+  /// Returns `None` for any identifier outside the closed allowlist. This is
+  /// the gate that rejects caller- or database-controlled table names (e.g.
+  /// `transaction_events.table_name` rows) before they are interpolated into
+  /// dynamic SQL.
+  // Consumers migrate to this API in a follow-up phase.
+  #[allow(dead_code)]
+  pub fn from_sql_ident(s: &str) -> Option<Self> {
+    match s {
+      "artifacts" => Some(Self::Artifacts),
+      "entity_tags" => Some(Self::EntityTags),
+      "iteration_tasks" => Some(Self::IterationTasks),
+      "iterations" => Some(Self::Iterations),
+      "notes" => Some(Self::Notes),
+      "projects" => Some(Self::Projects),
+      "relationships" => Some(Self::Relationships),
+      "tasks" => Some(Self::Tasks),
+      _ => None,
+    }
+  }
+
   /// Returns the SQL fragment that filters this table to its "active" set.
   ///
   /// Active means:
@@ -32,12 +75,12 @@ impl Table {
   /// - projects: not archived (`archived_at IS NULL`)
   /// - tasks: not in a terminal state (`status NOT IN ('done', 'cancelled')`)
   /// - iterations: not in a terminal state (`status NOT IN ('completed', 'cancelled')`)
-  /// - notes: no active concept — always returns `None`
+  /// - notes, entity_tags, iteration_tasks, relationships: no active concept — always returns `None`
   pub fn active_filter(self) -> Option<&'static str> {
     match self {
       Self::Artifacts | Self::Projects => Some("archived_at IS NULL"),
+      Self::EntityTags | Self::IterationTasks | Self::Notes | Self::Relationships => None,
       Self::Iterations => Some("status NOT IN ('completed', 'cancelled')"),
-      Self::Notes => None,
       Self::Tasks => Some("status NOT IN ('done', 'cancelled')"),
     }
   }
@@ -50,9 +93,12 @@ impl Table {
   pub fn as_sql_ident(self) -> &'static str {
     match self {
       Self::Artifacts => "artifacts",
+      Self::EntityTags => "entity_tags",
+      Self::IterationTasks => "iteration_tasks",
       Self::Iterations => "iterations",
       Self::Notes => "notes",
       Self::Projects => "projects",
+      Self::Relationships => "relationships",
       Self::Tasks => "tasks",
     }
   }
@@ -290,15 +336,48 @@ mod tests {
     #[test]
     fn it_returns_canonical_sql_ident_for_each_variant() {
       assert_eq!(Table::Artifacts.as_sql_ident(), "artifacts");
+      assert_eq!(Table::EntityTags.as_sql_ident(), "entity_tags");
+      assert_eq!(Table::IterationTasks.as_sql_ident(), "iteration_tasks");
       assert_eq!(Table::Iterations.as_sql_ident(), "iterations");
       assert_eq!(Table::Notes.as_sql_ident(), "notes");
       assert_eq!(Table::Projects.as_sql_ident(), "projects");
+      assert_eq!(Table::Relationships.as_sql_ident(), "relationships");
       assert_eq!(Table::Tasks.as_sql_ident(), "tasks");
     }
 
     #[test]
-    fn it_returns_no_active_filter_for_notes() {
+    fn it_returns_no_active_filter_for_audit_only_tables() {
+      assert_eq!(Table::EntityTags.active_filter(), None);
+      assert_eq!(Table::IterationTasks.active_filter(), None);
       assert_eq!(Table::Notes.active_filter(), None);
+      assert_eq!(Table::Relationships.active_filter(), None);
+    }
+
+    #[test]
+    fn it_round_trips_every_variant_through_from_sql_ident() {
+      let all = [
+        Table::Artifacts,
+        Table::EntityTags,
+        Table::IterationTasks,
+        Table::Iterations,
+        Table::Notes,
+        Table::Projects,
+        Table::Relationships,
+        Table::Tasks,
+      ];
+      for t in all {
+        assert_eq!(Table::from_sql_ident(t.as_sql_ident()), Some(t));
+      }
+    }
+
+    #[test]
+    fn it_returns_none_from_sql_ident_for_unknown_identifier() {
+      assert_eq!(Table::from_sql_ident(""), None);
+      assert_eq!(Table::from_sql_ident("transactions"), None);
+      assert_eq!(Table::from_sql_ident("transaction_events"), None);
+      assert_eq!(Table::from_sql_ident("Artifacts"), None);
+      assert_eq!(Table::from_sql_ident("artifacts;--"), None);
+      assert_eq!(Table::from_sql_ident("unknown_table"), None);
     }
   }
 

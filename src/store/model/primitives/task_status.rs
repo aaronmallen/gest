@@ -6,9 +6,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 /// The lifecycle status of a task.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
-#[derive(Default)]
 pub enum Primitive {
   /// Terminal: task was abandoned before completion.
   Cancelled,

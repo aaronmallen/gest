@@ -1,3 +1,9 @@
+---
+title: gest artifact
+description: gest artifact — create, update, and manage spec, ADR, and RFC artifacts alongside your project with gest, the agentic workflow CLI.
+keywords: [gest artifact CLI, spec tracking for AI coding, ADR, RFC, design docs, agentic workflow CLI]
+---
+
 # gest artifact
 
 Create, update, list, and manage artifacts. Artifacts store documents such as specs, ADRs,

@@ -1,3 +1,9 @@
+---
+title: Agent Usage
+description: How Claude Code, Cursor, Aider, Copilot Workspace, and other AI coding agents use gest to track tasks and run in parallel across isolated workspaces.
+keywords: [Claude Code, Cursor, Aider, Copilot Workspace, parallel AI agents, agentic workflow CLI]
+---
+
 # Agent Usage
 
 Gest is designed to work with AI coding agents. Any agent that can run shell

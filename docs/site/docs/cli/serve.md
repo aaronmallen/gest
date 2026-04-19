@@ -1,3 +1,9 @@
+---
+title: gest serve
+description: gest serve — start the built-in web dashboard to browse tasks, artifacts, iterations, and kanban boards while parallel AI agents run.
+keywords: [gest serve, web dashboard, kanban board, agentic workflow CLI, parallel AI agents]
+---
+
 # gest serve
 
 Alias: `gest s`

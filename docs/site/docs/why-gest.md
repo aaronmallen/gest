@@ -1,3 +1,9 @@
+---
+title: Why gest?
+description: Why gest exists — turn agent-generated plans into parallel workstreams without losing track of what depends on what.
+keywords: [agentic workflow CLI, AI agent task tracker, parallel AI agents, spec tracking for AI coding, task dependency graph]
+---
+
 # Why gest?
 
 AI agents are good at generating tasks. They decompose a feature request into dozens of subtasks,

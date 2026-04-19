@@ -1,3 +1,9 @@
+---
+title: gest generate
+description: gest generate — produce shell completions and man pages for the gest CLI, the agentic workflow CLI for parallel AI agents.
+keywords: [gest generate, shell completions, man pages, agentic workflow CLI]
+---
+
 # gest generate
 
 Generate shell completions and man pages for gest.

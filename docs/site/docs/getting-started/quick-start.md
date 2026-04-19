@@ -1,3 +1,9 @@
+---
+title: Quick Start
+description: Quick start for gest — initialize a store, create tasks and artifacts, link them into iterations, and run parallel AI agents across phased workspaces.
+keywords: [gest quick start, agentic workflow CLI tutorial, AI agent task tracker setup, parallel AI agents, phased iterations]
+---
+
 # Quick Start
 
 This guide walks through gest's core workflow: initializing a store, creating tasks and

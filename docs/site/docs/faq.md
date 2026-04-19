@@ -1,3 +1,9 @@
+---
+title: FAQ
+description: Frequently asked questions about gest — the agentic workflow CLI for parallel AI agents. How it differs from Jira and GitHub Issues, agent compatibility, and more.
+keywords: [gest FAQ, agentic workflow CLI, AI agent task tracker, AI-assisted development CLI, Claude Code task manager]
+---
+
 # FAQ
 
 ## What is gest?

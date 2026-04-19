@@ -1,3 +1,9 @@
+---
+title: gest iteration
+description: gest iteration — group tasks into phased execution plans for parallel or sequential runs across multiple AI agent workspaces.
+keywords: [gest iteration CLI, phased execution plan, parallel AI agents, task phases, agentic workflow CLI]
+---
+
 # gest iteration
 
 Manage iterations -- execution plans that group tasks into phases. Iterations let you

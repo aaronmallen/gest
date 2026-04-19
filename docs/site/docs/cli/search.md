@@ -1,3 +1,9 @@
+---
+title: gest search
+description: gest search — full-text search across tasks, artifacts, and iterations with structured filters by type, status, and tag.
+keywords: [gest search, full-text search, task search, artifact search, agentic workflow CLI]
+---
+
 # gest search
 
 Search across tasks, artifacts, and iterations by keyword. The query is matched against titles, descriptions, and body

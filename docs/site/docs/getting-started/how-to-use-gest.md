@@ -1,6 +1,7 @@
 ---
 title: How to use gest
 description: A guided walkthrough of gest, from a rough idea to parallel execution, using a real feature from the gest repo.
+keywords: [agentic workflow CLI, parallel AI agents, Claude Code, spec tracking for AI coding, AI-assisted development CLI, gest walkthrough]
 ---
 
 # How to use gest

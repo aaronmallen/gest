@@ -9,9 +9,9 @@ import styles from './index.module.css';
 
 const features = [
   {
-    title: '⚡ Parallel Execution',
+    title: '⚡ Parallel AI Agents',
     description:
-      'Group tasks into phased iterations with dependency tracking. Tasks in the same phase run concurrently across workspaces — no more sequential, single-context-window bottlenecks.',
+      'Group tasks into phased iterations with dependency tracking. Tasks in the same phase run concurrently across isolated agent workspaces — no more sequential, single-context-window bottlenecks.',
   },
   {
     title: '🖥️ Web Dashboard',
@@ -19,14 +19,14 @@ const features = [
       'Browse tasks, artifacts, and iterations in a built-in web UI. Inspect status at a glance, view kanban boards, search across everything, and read rendered Markdown — all from gest serve.',
   },
   {
-    title: '📄 Artifacts & Specs',
+    title: '📄 Specs, ADRs & Artifacts',
     description:
       'Store specs, ADRs, RFCs, and design documents as versioned Markdown with YAML frontmatter. Keep architectural decisions next to the code they describe.',
   },
   {
-    title: '🤖 Agent-Native',
+    title: '🤖 Agent-Native CLI',
     description:
-      'Every command supports --json output. Agents read the work queue, claim tasks, update status, and store artifacts — all through the CLI without any special integration.',
+      'Every command supports --json output. Claude Code, Cursor, Aider, Copilot Workspace, and other agentic coding tools read the work queue, claim tasks, update status, and store artifacts through the same CLI you use by hand.',
   },
   {
     title: '🗂️ SQLite-First, Git-Friendly',
@@ -49,7 +49,7 @@ function HomepageHeader(): ReactNode {
           {siteConfig.title}
         </Heading>
         <p className={styles.heroSubtitle}>
-          Parallel execution for AI-assisted development
+          Agentic workflow CLI for parallel AI agents
         </p>
         <p className={styles.heroTagline}>{siteConfig.tagline}</p>
         <div className={styles.buttons}>
@@ -100,7 +100,9 @@ function HomepageFeatures(): ReactNode {
 export default function Home(): ReactNode {
   const { siteConfig } = useDocusaurusContext();
   return (
-    <Layout title={siteConfig.title} description={siteConfig.tagline}>
+    <Layout
+      title="Agentic workflow CLI for parallel AI agents"
+      description={siteConfig.tagline}>
       <HomepageHeader />
       <main>
         <HomepageFeatures />

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://gest.aaronmallen.dev/sitemap.xml

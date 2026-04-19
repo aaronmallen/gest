@@ -1,3 +1,9 @@
+---
+title: gest task
+description: gest task — create, update, list, and manage tasks in gest, the agentic workflow CLI for parallel AI agents. Includes --json output for agents.
+keywords: [gest task CLI, AI agent task tracker, task create, task update, task list, agentic workflow CLI]
+---
+
 # gest task
 
 Create, update, list, and manage tasks. Tasks represent units of work with a title,

@@ -1,3 +1,9 @@
+---
+title: Installation
+description: Install gest — the agentic workflow CLI for parallel AI agents — via install script, Homebrew, Cargo, or a precompiled binary on macOS, Linux, or Windows.
+keywords: [install gest, agentic workflow CLI install, AI agent task tracker setup, gest CLI download, Homebrew, Cargo]
+---
+
 # Installation
 
 ## Quick Install (macOS and Linux)

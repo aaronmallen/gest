@@ -1,3 +1,9 @@
+---
+title: Core Concepts
+description: Core concepts in gest — tasks, artifacts, iterations, links, and tags — and how they connect into phased execution plans for parallel AI agents.
+keywords: [gest concepts, tasks, artifacts, iterations, phased execution plan, parallel AI agents]
+---
+
 # Core Concepts
 
 Gest manages three primary entity types -- tasks, artifacts, and iterations -- and connects them

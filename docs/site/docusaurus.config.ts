@@ -2,9 +2,26 @@ import { themes as prismThemes } from 'prism-react-renderer';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
+const description =
+  'Agentic workflow CLI for parallel AI agents — track specs, tasks, and iterations ' +
+  'across Claude Code, Cursor, Aider, and Copilot Workspace.';
+
+const keywords = [
+  'AI agent task tracker',
+  'agentic workflow CLI',
+  'parallel AI agents',
+  'spec tracking for AI coding',
+  'AI-assisted development CLI',
+  'gest',
+  'Claude Code',
+  'Cursor',
+  'Aider',
+  'Copilot Workspace',
+].join(', ');
+
 const config: Config = {
   title: 'gest',
-  tagline: 'Track AI-agent-generated tasks and artifacts alongside your project',
+  tagline: description,
   favicon: 'favicon.ico',
 
   future: {
@@ -26,6 +43,29 @@ const config: Config = {
   },
 
   staticDirectories: ['public'],
+
+  headTags: [
+    {
+      tagName: 'script',
+      attributes: {
+        type: 'application/ld+json',
+      },
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'gest',
+        description,
+        url: 'https://gest.aaronmallen.dev',
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: 'macOS, Linux, Windows',
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'USD',
+        },
+      }),
+    },
+  ],
 
   i18n: {
     defaultLocale: 'en',
@@ -51,11 +91,33 @@ const config: Config = {
         theme: {
           customCss: './src/css/custom.css',
         },
+        sitemap: {
+          lastmod: 'date',
+          changefreq: 'weekly',
+          priority: 0.5,
+          ignorePatterns: [
+            '/docs/0.3/**',
+            '/docs/0.4/**',
+            '/docs/**/changelog',
+          ],
+          filename: 'sitemap.xml',
+        },
       } satisfies Preset.Options,
     ],
   ],
 
   themeConfig: {
+    image: 'og-card.png',
+    metadata: [
+      { name: 'description', content: description },
+      { name: 'keywords', content: keywords },
+      { property: 'og:type', content: 'website' },
+      { property: 'og:image:alt', content: 'gest — agentic workflow CLI for parallel AI agents' },
+      { property: 'og:image:width', content: '1200' },
+      { property: 'og:image:height', content: '630' },
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:image:alt', content: 'gest — agentic workflow CLI for parallel AI agents' },
+    ],
     tableOfContents: {
       minHeadingLevel: 2,
       maxHeadingLevel: 2,

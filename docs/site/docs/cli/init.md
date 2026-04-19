@@ -1,3 +1,9 @@
+---
+title: gest init
+description: gest init — register a project with gest in the global SQLite database, or pass --local to mirror data into a .gest/ directory for version control.
+keywords: [gest init, initialize gest project, SQLite setup, local sync, agentic workflow CLI]
+---
+
 # gest init
 
 Initialize gest for the current directory. This registers a project row in the global

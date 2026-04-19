@@ -18,15 +18,17 @@ pub enum Table {
   /// The `artifacts` table.
   Artifacts,
   /// The `entity_tags` join table associating tags with arbitrary entities.
-  //
-  // Constructed only via `from_sql_ident` today; call sites migrate to this
-  // variant in a follow-up phase.
+  ///
+  /// Constructed only via [`Table::from_sql_ident`] during transaction replay;
+  /// no direct call site exists yet, so the variant may appear unused in
+  /// cross-crate analyses.
   #[allow(dead_code)]
   EntityTags,
   /// The `iteration_tasks` join table assigning tasks to iteration phases.
-  //
-  // Constructed only via `from_sql_ident` today; call sites migrate to this
-  // variant in a follow-up phase.
+  ///
+  /// Constructed only via [`Table::from_sql_ident`] during transaction replay;
+  /// no direct call site exists yet, so the variant may appear unused in
+  /// cross-crate analyses.
   #[allow(dead_code)]
   IterationTasks,
   /// The `iterations` table.
@@ -36,9 +38,10 @@ pub enum Table {
   /// The `projects` table.
   Projects,
   /// The `relationships` table linking entities via typed directed edges.
-  //
-  // Constructed only via `from_sql_ident` today; call sites migrate to this
-  // variant in a follow-up phase.
+  ///
+  /// Constructed only via [`Table::from_sql_ident`] during transaction replay;
+  /// no direct call site exists yet, so the variant may appear unused in
+  /// cross-crate analyses.
   #[allow(dead_code)]
   Relationships,
   /// The `tasks` table.
@@ -52,8 +55,6 @@ impl Table {
   /// the gate that rejects caller- or database-controlled table names (e.g.
   /// `transaction_events.table_name` rows) before they are interpolated into
   /// dynamic SQL.
-  // Consumers migrate to this API in a follow-up phase.
-  #[allow(dead_code)]
   pub fn from_sql_ident(s: &str) -> Option<Self> {
     match s {
       "artifacts" => Some(Self::Artifacts),
@@ -115,8 +116,6 @@ impl Table {
   /// The lists are kept in sync by hand with the migration DDL under
   /// `src/store/migration/`; any schema change must update the matching
   /// variant here.
-  // Consumers migrate to this API in a follow-up phase.
-  #[allow(dead_code)]
   pub fn columns(self) -> &'static [&'static str] {
     match self {
       Self::Artifacts => &[
@@ -181,8 +180,6 @@ impl Table {
   /// Returns `true` iff `column` is an allowlisted identifier on this table.
   ///
   /// Convenience wrapper over [`Table::columns`] for single-key checks.
-  // Consumers migrate to this API in a follow-up phase.
-  #[allow(dead_code)]
   pub fn has_column(self, column: &str) -> bool {
     self.columns().contains(&column)
   }

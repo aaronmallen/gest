@@ -54,6 +54,19 @@ the sync layer will rewrite the mirror from the new database on the next command
 invocation — the old TOML files will be replaced with fresh JSON/Markdown output
 that reflects the current database state.
 
+## Exit Codes
+
+| Code | When                                                      |
+|------|-----------------------------------------------------------|
+| 0    | Success (warnings about dangling refs do not fail)        |
+| 64   | Bad flags or unknown `--from` version                     |
+| 65   | Legacy TOML/Markdown files are malformed                  |
+| 66   | Source `.gest/` directory could not be found              |
+| 74   | Could not read legacy files or write the new database     |
+| 78   | Could not load user config                                |
+
+See [Exit Codes](./exit-codes.md) for the full contract.
+
 ## Troubleshooting
 
 If migration reports warnings like `could not resolve link ref: tasks/<id>`, it
@@ -65,4 +78,4 @@ just have fewer links than the source directory claimed.
 
 For a step-by-step walkthrough — including a pre-migration checklist, a table
 of how v0.4.x data maps into v0.5.0 tables, post-migration verification steps,
-and rollback instructions — see [Migrating from v0.4.x to v0.5.0](../migration/v0-4-to-v0-5.md).
+and rollback instructions — see [Migrating from v0.4.x to v0.5.0](/docs/0.5/migration/v0-4-to-v0-5).

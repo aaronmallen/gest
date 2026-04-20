@@ -22,6 +22,7 @@ This directory contains Architecture Decision Records (ADRs) for the project.
 | [0014] | libsql for Remote Database Support               | Active               | 2026-04-06 |
 | [0015] | Atoms/Molecules/Views UI Architecture            | Active               | 2026-04-06 |
 | [0016] | Per-entity .gest/ layout as live source of truth | Active               | 2026-04-08 |
+| [0017] | Exit Code Contract for the gest CLI              | Active               | 2026-04-09 |
 
 ADRs document significant architectural decisions, the context in which they were made, and their consequences. See
 [Writing ADRs] for the process and template.
@@ -42,4 +43,5 @@ ADRs document significant architectural decisions, the context in which they wer
 [0014]: https://github.com/aaronmallen/gest/blob/main/docs/design/0014-libsql-for-remote-database-support.md
 [0015]: https://github.com/aaronmallen/gest/blob/main/docs/design/0015-atoms-molecules-views-ui.md
 [0016]: https://github.com/aaronmallen/gest/blob/main/docs/design/0016-per-entity-gest-layout-as-live-source-of-truth.md
+[0017]: https://github.com/aaronmallen/gest/blob/main/docs/design/0017-exit-code-contract.md
 [Writing ADRs]: https://github.com/aaronmallen/gest/blob/main/docs/process/writing-adrs.md

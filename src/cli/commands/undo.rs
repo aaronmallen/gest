@@ -20,7 +20,7 @@ impl Command {
     let transactions = repo::transaction::latest_undoable_n(&conn, project_id, self.steps).await?;
 
     if transactions.is_empty() {
-      return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "nothing to undo").into());
+      return Err(crate::store::Error::NothingToUndo.into());
     }
 
     for tx in &transactions {

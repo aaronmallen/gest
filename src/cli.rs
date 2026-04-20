@@ -7,6 +7,8 @@ pub mod prompt;
 pub mod tag_arg;
 pub mod web_notify;
 
+use std::process::ExitCode;
+
 use clap::{ArgAction, CommandFactory, Parser, Subcommand};
 use getset::Getters;
 use yansi::Paint;
@@ -99,18 +101,32 @@ pub enum Error {
   /// A configuration loading or validation error.
   #[error(transparent)]
   Config(#[from] crate::config::Error),
-  /// An editor launch error.
+  /// An editor launch or editor-process failure.
+  ///
+  /// Reserved for true editor-invocation failures (spawn, non-zero exit, no
+  /// `$EDITOR`, etc.). Domain state-transition errors that were historically
+  /// routed through this variant should use [`Error::InvalidState`] instead.
   #[error("{0}")]
   Editor(String),
+  /// A domain state-transition error: the target is not in a state that
+  /// accepts the requested transition (e.g. "iteration is not active",
+  /// "phase has non-terminal tasks", "refusing to save empty body").
+  #[error("{0}")]
+  InvalidState(String),
   /// An I/O error (e.g. writing to the filesystem).
   #[error(transparent)]
   Io(#[from] std::io::Error),
   /// A metadata key was not found on the entity.
   #[error("metadata key not found: {0}")]
   MetaKeyNotFound(String),
-  /// The requested resource is not available (e.g. no unblocked tasks).
+  /// No tasks are available to claim (iteration `next` on an empty-but-valid
+  /// iteration).
+  #[error("no available tasks")]
+  NoTasksAvailable,
+  /// A domain entity was not found (lookup returned `None` where the caller
+  /// expected a row).
   #[error("{0}")]
-  NotAvailable(String),
+  NotFound(String),
   /// A serialization error (e.g. snapshotting entity state for transactions).
   #[error(transparent)]
   Serialize(#[from] serde_json::Error),
@@ -123,6 +139,55 @@ pub enum Error {
   /// The current directory has not been initialized as a gest project.
   #[error("not a gest project (run `gest init` to initialize)")]
   UninitializedProject,
+}
+
+impl Error {
+  /// The process exit code associated with this error, per the sysexits.h
+  /// mapping documented in ADR "Exit Code Contract for the gest CLI".
+  ///
+  /// The `Store` variant is unwrapped: the inner `store::Error` is inspected
+  /// so semantically distinct store failures (missing entity vs ambiguous
+  /// prefix vs filesystem I/O) surface as the matching sysexits code rather
+  /// than collapsing to a generic `EX_IOERR`.
+  ///
+  /// | Code | Name          | Variants                                                       |
+  /// |------|---------------|----------------------------------------------------------------|
+  /// | 64   | EX_USAGE      | `Argument`, `Store(InvalidPrefix)`                             |
+  /// | 65   | EX_DATAERR    | `Serialize`, `TomlSerialize`, `Store(Serialization \| Yaml)`   |
+  /// | 66   | EX_NOINPUT    | `NotFound`, `MetaKeyNotFound`, `Store(NotFound \| Ambiguous)`  |
+  /// | 69   | EX_UNAVAILABLE| `InvalidState`, `Store(NothingToUndo)`                         |
+  /// | 70   | EX_SOFTWARE   | `Editor`                                                       |
+  /// | 74   | EX_IOERR      | `Io`, `Store(Database \| InvalidValue \| Io)`                  |
+  /// | 75   | EX_TEMPFAIL   | `NoTasksAvailable`                                             |
+  /// | 78   | EX_CONFIG     | `Config`, `UninitializedProject`, `Store(Config)`              |
+  pub fn exit_code(&self) -> ExitCode {
+    ExitCode::from(self.exit_code_u8())
+  }
+
+  /// The raw sysexits code as a `u8`. Exposed alongside [`Self::exit_code`]
+  /// so tests and callers can compare codes directly without round-tripping
+  /// through `ExitCode` (which does not implement `PartialEq`).
+  pub fn exit_code_u8(&self) -> u8 {
+    use crate::store::Error as StoreError;
+    match self {
+      Self::Argument(_) => 64,
+      Self::Serialize(_) | Self::TomlSerialize(_) => 65,
+      Self::MetaKeyNotFound(_) | Self::NotFound(_) => 66,
+      Self::InvalidState(_) => 69,
+      Self::Editor(_) => 70,
+      Self::Io(_) => 74,
+      Self::Store(inner) => match inner {
+        StoreError::InvalidPrefix(_) => 64,
+        StoreError::Serialization(_) | StoreError::Yaml(_) => 65,
+        StoreError::Ambiguous(..) | StoreError::NotFound(_) => 66,
+        StoreError::NothingToUndo => 69,
+        StoreError::Config(_) => 78,
+        StoreError::Database(_) | StoreError::InvalidValue(_) | StoreError::Io(_) => 74,
+      },
+      Self::NoTasksAvailable => 75,
+      Self::Config(_) | Self::UninitializedProject => 78,
+    }
+  }
 }
 
 /// Enum of all available subcommands.
@@ -380,6 +445,128 @@ mod tests {
       let app = App::try_parse_from(["gest", "version", "--no-pager"]).unwrap();
 
       assert!(*app.no_pager());
+    }
+  }
+
+  mod error_exit_code {
+    use super::*;
+
+    fn assert_exit_code(err: Error, expected: u8) {
+      let actual = err.exit_code_u8();
+
+      assert_eq!(actual, expected, "variant {err:?} -> expected {expected}, got {actual}");
+    }
+
+    #[test]
+    fn it_maps_argument_to_64() {
+      assert_exit_code(Error::Argument("bad flag".into()), 64);
+    }
+
+    #[test]
+    fn it_maps_config_to_78() {
+      let err = Error::Config(crate::config::Error::XDGDirNotFound("config"));
+
+      assert_exit_code(err, 78);
+    }
+
+    #[test]
+    fn it_maps_editor_to_70() {
+      assert_exit_code(Error::Editor("editor failed".into()), 70);
+    }
+
+    #[test]
+    fn it_maps_invalid_state_to_69() {
+      assert_exit_code(Error::InvalidState("iteration is not active".into()), 69);
+    }
+
+    #[test]
+    fn it_maps_io_to_74() {
+      let io_err = std::io::Error::new(std::io::ErrorKind::Other, "boom");
+
+      assert_exit_code(Error::Io(io_err), 74);
+    }
+
+    #[test]
+    fn it_maps_meta_key_not_found_to_66() {
+      assert_exit_code(Error::MetaKeyNotFound("foo.bar".into()), 66);
+    }
+
+    #[test]
+    fn it_maps_no_tasks_available_to_75() {
+      assert_exit_code(Error::NoTasksAvailable, 75);
+    }
+
+    #[test]
+    fn it_maps_not_found_to_66() {
+      assert_exit_code(Error::NotFound("project not found".into()), 66);
+    }
+
+    #[test]
+    fn it_maps_serialize_to_65() {
+      let json_err = serde_json::from_str::<serde_json::Value>("{not json").unwrap_err();
+
+      assert_exit_code(Error::Serialize(json_err), 65);
+    }
+
+    #[test]
+    fn it_maps_store_io_to_74() {
+      let io_err = std::io::Error::new(std::io::ErrorKind::Other, "db gone");
+      let store_err = crate::store::Error::Io(io_err);
+
+      assert_exit_code(Error::Store(store_err), 74);
+    }
+
+    #[test]
+    fn it_maps_store_invalid_value_to_74() {
+      assert_exit_code(Error::Store(crate::store::Error::InvalidValue("bad row".into())), 74);
+    }
+
+    #[test]
+    fn it_maps_store_invalid_prefix_to_64() {
+      assert_exit_code(Error::Store(crate::store::Error::InvalidPrefix("xx".into())), 64);
+    }
+
+    #[test]
+    fn it_maps_store_not_found_to_66() {
+      assert_exit_code(Error::Store(crate::store::Error::NotFound("task abc".into())), 66);
+    }
+
+    #[test]
+    fn it_maps_store_ambiguous_to_66() {
+      assert_exit_code(Error::Store(crate::store::Error::Ambiguous("abc".into(), 3)), 66);
+    }
+
+    #[test]
+    fn it_maps_store_nothing_to_undo_to_69() {
+      assert_exit_code(Error::Store(crate::store::Error::NothingToUndo), 69);
+    }
+
+    #[test]
+    fn it_maps_store_serialization_to_65() {
+      let json_err = serde_json::from_str::<serde_json::Value>("{not json").unwrap_err();
+
+      assert_exit_code(Error::Store(crate::store::Error::Serialization(json_err)), 65);
+    }
+
+    #[test]
+    fn it_maps_store_config_to_78() {
+      let cfg_err = crate::config::Error::XDGDirNotFound("config");
+
+      assert_exit_code(Error::Store(crate::store::Error::Config(cfg_err)), 78);
+    }
+
+    #[test]
+    fn it_maps_toml_serialize_to_65() {
+      // Force a toml::ser::Error by trying to serialize an unsupported top-level
+      // type (a bare integer, not a table).
+      let toml_err = toml::to_string(&42_i32).unwrap_err();
+
+      assert_exit_code(Error::TomlSerialize(toml_err), 65);
+    }
+
+    #[test]
+    fn it_maps_uninitialized_project_to_78() {
+      assert_exit_code(Error::UninitializedProject, 78);
     }
   }
 }

@@ -49,7 +49,7 @@ impl Command {
 
     let before_artifact = repo::artifact::find_by_id(&conn, id.clone())
       .await?
-      .ok_or(Error::UninitializedProject)?;
+      .ok_or_else(|| Error::NotFound(format!("artifact not found: {}", self.id)))?;
 
     let body = if self.edit {
       let edited = crate::io::editor::edit_text_with_suffix(before_artifact.body(), ".md")

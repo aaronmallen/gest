@@ -58,3 +58,14 @@ gest serve --port 8080 --no-open
 # Bind to all interfaces
 gest serve --bind 0.0.0.0
 ```
+
+## Exit Codes
+
+| Code | When                                                      |
+|------|-----------------------------------------------------------|
+| 0    | Success (graceful shutdown)                               |
+| 64   | Bad flags or invalid bind address/port                    |
+| 74   | Could not bind to the requested port or open the store    |
+| 78   | Not a gest project (run `gest init`)                      |
+
+See [Exit Codes](./exit-codes.md) for the full contract.

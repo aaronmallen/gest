@@ -61,7 +61,7 @@ impl Command {
           Some(r) => format!(" with rel-type {r}"),
           None => String::new(),
         };
-        return Err(Error::Argument(format!(
+        return Err(Error::NotFound(format!(
           "no relationship found between {} and {}{}",
           source_id.short(),
           target_id.short(),

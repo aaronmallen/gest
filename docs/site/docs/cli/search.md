@@ -115,3 +115,15 @@ gest search "is:task tag:urgent" --expand
 # JSON output for scripting
 gest search "status:open" --json
 ```
+
+## Exit Codes
+
+| Code | When                                                  |
+|------|-------------------------------------------------------|
+| 0    | Success (including zero matches)                      |
+| 64   | Bad flags or malformed query syntax                   |
+| 65   | Could not serialize results to JSON                   |
+| 74   | Store I/O error                                       |
+| 78   | Not a gest project (run `gest init`)                  |
+
+See [Exit Codes](./exit-codes.md) for the full contract.

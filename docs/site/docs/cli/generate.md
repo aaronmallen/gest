@@ -21,6 +21,16 @@ gest generate <COMMAND> [OPTIONS]
 | [`completions`](#generate-completions) | Print shell completion scripts to stdout |
 | [`man-pages`](#generate-man-pages)     | Write man page files to a directory      |
 
+## Exit Codes
+
+| Code | When                                                     |
+|------|----------------------------------------------------------|
+| 0    | Success                                                  |
+| 64   | Bad flags or unknown shell target                        |
+| 74   | Could not write completions or man pages to the target   |
+
+See [Exit Codes](./exit-codes.md) for the full contract.
+
 ---
 
 ## generate completions

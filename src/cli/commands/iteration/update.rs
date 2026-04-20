@@ -42,7 +42,7 @@ impl Command {
     let id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Iterations, &self.id).await?;
     let before_iter = repo::iteration::find_by_id(&conn, id.clone())
       .await?
-      .ok_or(Error::UninitializedProject)?;
+      .ok_or_else(|| Error::NotFound(format!("iteration not found: {}", self.id)))?;
 
     let metadata = if self.metadata.is_empty() && self.metadata_json.is_empty() {
       None

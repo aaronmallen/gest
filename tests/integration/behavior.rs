@@ -3,6 +3,7 @@
 
 mod when_archiving_projects;
 mod when_deleting_projects;
+mod when_exit_codes;
 mod when_global_flags;
 mod when_local_sync;
 mod when_project_archive_command;

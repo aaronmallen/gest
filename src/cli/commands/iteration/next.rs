@@ -41,7 +41,7 @@ impl Command {
     let iteration = repo::iteration::find_required_by_id(&conn, id.clone()).await?;
 
     if iteration.status() != IterationStatus::Active {
-      return Err(Error::Argument("iteration is not active".into()));
+      return Err(Error::InvalidState("iteration is not active".into()));
     }
 
     let rows = repo::iteration::tasks_with_phase(&conn, &id).await?;
@@ -97,7 +97,7 @@ impl Command {
     });
 
     let Some(next) = candidates.first() else {
-      return Err(Error::NotAvailable("no available tasks".into()));
+      return Err(Error::NoTasksAvailable);
     };
 
     let task_id: Id = next

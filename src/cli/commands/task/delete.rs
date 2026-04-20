@@ -43,7 +43,7 @@ impl Command {
     let iteration_ids = iteration_memberships(&conn, task.id()).await?;
     if !iteration_ids.is_empty() && !self.force {
       let shorts: Vec<String> = iteration_ids.iter().map(|i| i.short()).collect();
-      return Err(Error::Argument(format!(
+      return Err(Error::InvalidState(format!(
         "task {} is a member of {} iteration(s): {}. Use --force to remove from all iterations and delete.",
         task.id().short(),
         iteration_ids.len(),
@@ -107,9 +107,9 @@ async fn iteration_memberships(conn: &libsql::Connection, task_id: &Id) -> Resul
   let mut out = Vec::new();
   while let Some(row) = rows.next().await.map_err(crate::store::Error::from)? {
     let id_str: String = row.get(0).map_err(crate::store::Error::from)?;
-    let id: Id = id_str
-      .parse()
-      .map_err(|e: String| Error::Argument(format!("invalid iteration id in iteration_tasks: {e}")))?;
+    let id: Id = id_str.parse().map_err(|e: String| {
+      crate::store::Error::InvalidValue(format!("invalid iteration id in iteration_tasks: {e}"))
+    })?;
     out.push(id);
   }
   Ok(out)

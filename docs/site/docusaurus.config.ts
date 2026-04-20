@@ -82,7 +82,8 @@ const config: Config = {
           routeBasePath: '/docs',
           lastVersion: 'current',
           versions: {
-            current: { label: '0.5', path: '0.5' },
+            current: { label: '0.6', path: '0.6' },
+            '0.5': { label: '0.5', path: '0.5' },
             '0.4': { label: '0.4', path: '0.4' },
             '0.3': { label: '0.3', path: '0.3' },
           },
@@ -98,6 +99,7 @@ const config: Config = {
           ignorePatterns: [
             '/docs/0.3/**',
             '/docs/0.4/**',
+            '/docs/0.5/**',
             '/docs/**/changelog',
           ],
           filename: 'sitemap.xml',

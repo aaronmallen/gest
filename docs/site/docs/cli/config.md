@@ -17,6 +17,18 @@ gest config <COMMAND> [OPTIONS]
 | [`set`](#config-set)   | Persist a configuration value         |
 | [`show`](#config-show) | Display the merged configuration      |
 
+## Exit Codes
+
+| Code | When                                                                           |
+|------|--------------------------------------------------------------------------------|
+| 0    | Success                                                                        |
+| 64   | Bad flags or missing arguments                                                 |
+| 66   | `config get <key>` where the dotted path does not exist                        |
+| 74   | Could not read or write the config file                                        |
+| 78   | Config TOML is syntactically invalid, or XDG directories could not be resolved |
+
+See [Exit Codes](./exit-codes.md) for the full contract.
+
 ---
 
 ## config get

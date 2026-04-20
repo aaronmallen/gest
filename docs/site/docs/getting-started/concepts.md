@@ -241,5 +241,5 @@ see [Configuration](../configuration/index.md) for details.
 
 If you are coming from gest v0.4.x where data lived in per-entity-type directories under
 `.gest/`, run `gest migrate --from v0.4` to import your existing `.gest/` tree into the new
-SQLite database. See the [v0.4 → v0.5 migration guide](../migration/v0-4-to-v0-5.md) for a
+SQLite database. See the [v0.4 → v0.5 migration guide](/docs/0.5/migration/v0-4-to-v0-5) for a
 step-by-step walkthrough, or [gest migrate](../cli/migrate.md) for the short CLI reference.

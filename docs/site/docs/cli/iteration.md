@@ -39,6 +39,23 @@ gest iteration <COMMAND> [OPTIONS]
 | [`untag`](#iteration-untag)       |         | Remove tags from an iteration                        |
 | [`update`](#iteration-update)     | `edit`  | Update an iteration's fields                         |
 
+## Exit Codes
+
+| Code | When                                                                         |
+|------|------------------------------------------------------------------------------|
+| 0    | Success                                                                      |
+| 64   | Bad flags, malformed NDJSON batch input, or bad relationship spec            |
+| 65   | Could not serialize to or deserialize from JSON/TOML                         |
+| 66   | Iteration, task, or metadata key did not resolve                             |
+| 69   | State conflict (e.g. `advance` on a terminal iteration, `next` on inactive)  |
+| 70   | Editor launch, non-zero editor exit, or empty required body                  |
+| 74   | Store I/O error                                                              |
+| 75   | `iteration next`: no unblocked tasks available in the active phase           |
+| 78   | Not a gest project (run `gest init`)                                         |
+
+See [Exit Codes](./exit-codes.md) for the full contract. `iteration next` has
+a narrower subcommand-specific table in its section below.
+
 ---
 
 ## iteration add
@@ -504,11 +521,16 @@ gest iteration next [OPTIONS] <ID>
 
 ### Exit Codes
 
-| Code | Meaning                                        |
-|------|------------------------------------------------|
-| 0    | Task found (and claimed if `--claim` was used) |
-| 1    | Error (invalid ID, missing `--agent`, etc.)    |
-| 2    | No available tasks in the active phase         |
+Gest follows the BSD [`sysexits.h`](https://man.openbsd.org/sysexits.3)
+convention. `iteration next` returns one of:
+
+| Code | Name             | Meaning                                            |
+|------|------------------|----------------------------------------------------|
+| 0    | —                | Task found (and claimed if `--claim` was used)     |
+| 64   | `EX_USAGE`       | Bad flags (e.g. `--agent` without `--claim`)       |
+| 66   | `EX_NOINPUT`     | Iteration ID did not resolve                       |
+| 69   | `EX_UNAVAILABLE` | Iteration is not active                            |
+| 75   | `EX_TEMPFAIL`    | No unblocked tasks are available in active phase   |
 
 ### Examples
 

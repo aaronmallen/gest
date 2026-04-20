@@ -26,7 +26,7 @@ impl Command {
     let id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Artifacts, &self.id).await?;
     let before_artifact = repo::artifact::find_by_id(&conn, id.clone())
       .await?
-      .ok_or(Error::UninitializedProject)?;
+      .ok_or_else(|| Error::NotFound(format!("artifact not found: {}", self.id)))?;
     let before = serde_json::to_value(&before_artifact)?;
     let tx = repo::transaction::begin(&conn, project_id, "artifact archive").await?;
     let artifact = repo::artifact::archive(&conn, &id).await?;

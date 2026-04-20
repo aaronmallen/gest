@@ -375,7 +375,8 @@ cargo run -- iteration next <id> -q                       # print only the short
 cargo run -- iteration next <id> --json                   # structured JSON
 ```
 
-Exits with code 2 when no tasks remain (distinguishes "idle" from "error").
+Exits with code **75** (`EX_TEMPFAIL`) when no tasks remain — an idle signal, not an error. Every
+other failure maps to a specific sysexits code (see the [Exit Codes](#exit-codes) section below).
 
 Options: `--claim` (set task to in-progress), `--agent <name>` (set assigned_to).
 
@@ -505,3 +506,34 @@ cargo run -- iteration graph $iter_id
 
 Use `cargo run -- task list --json` and inspect the `links` array for entries referencing the
 artifact ID, or use `cargo run -- search "<spec title>"` to find related entities.
+
+## Exit Codes
+
+Gest follows the BSD `sysexits.h` convention. Every CLI failure maps to one of these codes, so
+scripts and agents can branch on `$?` alone without parsing stderr:
+
+| Code | Name            | Meaning                                         |
+|------|-----------------|-------------------------------------------------|
+| 0    | —               | Success                                         |
+| 64   | `EX_USAGE`      | Command-line usage error                        |
+| 65   | `EX_DATAERR`    | User-supplied data was malformed                |
+| 66   | `EX_NOINPUT`    | Referenced entity was not found                 |
+| 69   | `EX_UNAVAILABLE`| Resource not in the required state              |
+| 70   | `EX_SOFTWARE`   | Internal software error                         |
+| 74   | `EX_IOERR`      | Filesystem or database I/O error                |
+| 75   | `EX_TEMPFAIL`   | Try again later (e.g., `iteration next` idle)   |
+| 78   | `EX_CONFIG`     | Configuration or setup error                    |
+
+The authoritative contract lives in ADR `prsooyor` (_Exit Code Contract for the gest CLI_).
+
+Typical scripting pattern for `iteration next`:
+
+```sh
+cargo run -- iteration next <id> --claim --agent my-agent --json
+status=$?
+if [ $status -eq 75 ]; then
+  echo "no work available -- idle"
+elif [ $status -ne 0 ]; then
+  echo "error"
+fi
+```

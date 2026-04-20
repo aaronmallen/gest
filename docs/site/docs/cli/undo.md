@@ -46,6 +46,18 @@ Undo the last 3 commands:
 gest undo 3
 ```
 
+## Exit Codes
+
+| Code | When                                                  |
+|------|-------------------------------------------------------|
+| 0    | Success                                               |
+| 64   | Bad flags or non-numeric `[STEPS]`                    |
+| 69   | Nothing to undo (no undoable transactions recorded)   |
+| 74   | Store I/O error while replaying the transaction log   |
+| 78   | Not a gest project (run `gest init`)                  |
+
+See [Exit Codes](./exit-codes.md) for the full contract.
+
 ## How it works
 
 Each mutating command runs inside a database transaction. For every row the command inserts,

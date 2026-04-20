@@ -26,14 +26,3 @@ gest self-update
 # Pin to a specific version
 gest self-update --target 0.3.0
 ```
-
-## Exit Codes
-
-| Code | When                                                     |
-|------|----------------------------------------------------------|
-| 0    | Success (or already on the requested version)            |
-| 64   | Bad flags or invalid `--target` version                  |
-| 74   | Could not download, verify, or install the new binary    |
-| 78   | Could not load user config                               |
-
-See [Exit Codes](./exit-codes.md) for the full contract.

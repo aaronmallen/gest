@@ -34,19 +34,6 @@ project.
 
 Running `gest project` without a subcommand shows the current project.
 
-## Exit Codes
-
-| Code | When                                                          |
-|------|---------------------------------------------------------------|
-| 0    | Success                                                       |
-| 64   | Bad flags or missing arguments                                |
-| 65   | Could not serialize the `Envelope<Project>` to JSON           |
-| 66   | Project id did not resolve, or `detach` found no workspace    |
-| 74   | Store I/O error                                               |
-| 78   | Could not load user config                                    |
-
-See [Exit Codes](./exit-codes.md) for the full contract.
-
 ---
 
 ## project archive

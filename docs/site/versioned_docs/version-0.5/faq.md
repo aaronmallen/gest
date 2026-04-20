@@ -92,7 +92,7 @@ Run `gest migrate --from v0.4`. It walks your existing `.gest/` directory, reads
 TOML/Markdown files, and imports everything into the new SQLite database. For a
 step-by-step walkthrough — pre-migration checklist, data mapping table,
 post-migration verification, and rollback — see the
-[v0.4 → v0.5 migration guide](/docs/0.5/migration/v0-4-to-v0-5). The short-form CLI
+[v0.4 → v0.5 migration guide](./migration/v0-4-to-v0-5.md). The short-form CLI
 reference lives at [gest migrate](./cli/migrate.md).
 
 ## What does the `.gest/` sync mirror look like?

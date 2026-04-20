@@ -35,21 +35,6 @@ gest task <COMMAND> [OPTIONS]
 | [`meta`](#task-meta)         |         | Read or write metadata fields                                       |
 | [`note`](#task-note)         |         | Manage notes on a task                                              |
 
-## Exit Codes
-
-| Code | When                                                               |
-|------|--------------------------------------------------------------------|
-| 0    | Success                                                            |
-| 64   | Bad flags, malformed NDJSON batch input, or bad relationship spec  |
-| 65   | Could not serialize to or deserialize from JSON/TOML               |
-| 66   | Task id, iteration id, or metadata key did not resolve             |
-| 69   | State conflict (e.g. `delete` of a task that is in iterations)     |
-| 70   | Editor launch, non-zero editor exit, or empty required body        |
-| 74   | Store I/O error                                                    |
-| 78   | Not a gest project (run `gest init`)                               |
-
-See [Exit Codes](./exit-codes.md) for the full contract.
-
 ---
 
 ## task block

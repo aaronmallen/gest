@@ -22,18 +22,6 @@ Running `gest tag` without a subcommand is equivalent to `gest tag list`.
 | [`remove`](#tag-remove) | Remove tags from any entity by ID prefix                 |
 | [`list`](#tag-list)     | List all unique tags, optionally filtered by entity type |
 
-## Exit Codes
-
-| Code | When                                                       |
-|------|------------------------------------------------------------|
-| 0    | Success                                                    |
-| 64   | Bad flags or missing arguments                             |
-| 66   | Entity id did not resolve, or was ambiguous across types   |
-| 74   | Store I/O error                                            |
-| 78   | Not a gest project (run `gest init`)                       |
-
-See [Exit Codes](./exit-codes.md) for the full contract.
-
 ---
 
 ## tag add

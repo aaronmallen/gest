@@ -66,18 +66,6 @@ Purge only orphan tombstone files:
 gest purge --tombstones --yes
 ```
 
-## Exit Codes
-
-| Code | When                                                   |
-|------|--------------------------------------------------------|
-| 0    | Success (including dry-run with no-op result)          |
-| 64   | Bad flags                                              |
-| 66   | A target project id did not resolve                    |
-| 74   | Store I/O error                                        |
-| 78   | Not a gest project (run `gest init`)                   |
-
-See [Exit Codes](./exit-codes.md) for the full contract.
-
 ## Notes
 
 - Archived-project deletions use the cascade delete path and are **not**

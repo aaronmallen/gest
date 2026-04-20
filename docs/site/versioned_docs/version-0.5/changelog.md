@@ -200,7 +200,7 @@ v0.5.0 is the storage rewrite. Entity data moves from flat TOML/Markdown files u
 single SQLite database (via libsql), and project identity becomes explicit so multiple worktrees of
 the same repo can share a live view of the same tasks, artifacts, and iterations. Existing v0.4.x
 projects import in one shot — see the
-[v0.4 → v0.5 migration guide](/docs/0.5/migration/v0-4-to-v0-5) for the full upgrade path, data mapping, and
+[v0.4 → v0.5 migration guide](./migration/v0-4-to-v0-5.md) for the full upgrade path, data mapping, and
 rollback procedure.
 
 ### SQLite-First Storage
@@ -300,7 +300,7 @@ slots they cascade from, and examples for overriding them in your `gest.toml`.
 - **Storage format changed to SQLite.** Existing v0.4.x projects must be imported with
   `gest migrate --from v0.4`. The migrator never touches the source files, so your old `.gest/` stays
   intact as a backup until you remove it yourself. Follow the
-  [migration guide](/docs/0.5/migration/v0-4-to-v0-5) for details.
+  [migration guide](./migration/v0-4-to-v0-5.md) for details.
 - **Artifact `kind` field removed.** Categorization is tag-driven now. The migrator converts
   `kind: "spec"` into a `spec` tag automatically.
 - **`artifact create` CLI reshaped.** The command takes a positional `[TITLE]` argument; the `--title`

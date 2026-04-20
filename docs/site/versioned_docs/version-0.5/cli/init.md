@@ -45,17 +45,6 @@ Initialize with a local `.gest/` sync mirror:
 gest init --local
 ```
 
-## Exit Codes
-
-| Code | When                                                |
-|------|-----------------------------------------------------|
-| 0    | Success                                             |
-| 64   | Bad flags                                           |
-| 74   | Could not create the database or `.gest/` mirror    |
-| 78   | Could not load user config or resolve `data_dir`    |
-
-See [Exit Codes](./exit-codes.md) for the full contract.
-
 ## See also
 
 - [Configuration](../configuration/index.md) — how `data_dir`, `storage.sync`, and the

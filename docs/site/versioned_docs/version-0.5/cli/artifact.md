@@ -30,20 +30,6 @@ gest artifact <COMMAND> [OPTIONS]
 | [`meta`](#artifact-meta)       |         | Read or write metadata fields             |
 | [`note`](#artifact-note)       |         | Manage notes attached to an artifact      |
 
-## Exit Codes
-
-| Code | When                                                                |
-|------|---------------------------------------------------------------------|
-| 0    | Success                                                             |
-| 64   | Bad flags, malformed NDJSON batch input, or missing required title  |
-| 65   | Could not serialize to or deserialize from JSON/TOML                |
-| 66   | Artifact id or metadata key did not resolve                         |
-| 70   | Editor launch, non-zero editor exit, or empty required body         |
-| 74   | Could not read a `--source` file, or store I/O error                |
-| 78   | Not a gest project (run `gest init`)                                |
-
-See [Exit Codes](./exit-codes.md) for the full contract.
-
 ---
 
 ## artifact archive

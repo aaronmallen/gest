@@ -32,6 +32,7 @@ const sidebars: SidebarsConfig = {
         'cli/generate',
         'cli/self-update',
         'cli/version',
+        'cli/exit-codes',
       ],
     },
     {
@@ -46,7 +47,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Migration',
       items: [
-        'migration/v0-4-to-v0-5',
+        'migration/v0-5-to-v0-6',
       ],
     },
     'why-gest',

@@ -201,31 +201,16 @@ gest iteration next <iteration-id> --claim --agent my-agent --json
 }
 ```
 
-#### Exit codes
+#### Exit code 2
 
-Gest follows the BSD [`sysexits.h`](https://man.openbsd.org/sysexits.3) convention so
-scripts and agents can branch on error category via `$?`:
-
-| Code | Name             | Meaning                              |
-|------|------------------|--------------------------------------|
-| 0    | —                | Success                              |
-| 64   | `EX_USAGE`       | Command-line usage error             |
-| 65   | `EX_DATAERR`     | User data format error               |
-| 66   | `EX_NOINPUT`     | Input entity not found               |
-| 69   | `EX_UNAVAILABLE` | Resource not in the required state   |
-| 70   | `EX_SOFTWARE`    | Internal software error              |
-| 74   | `EX_IOERR`       | Filesystem or database I/O error     |
-| 75   | `EX_TEMPFAIL`    | Try again later (valid empty result) |
-| 78   | `EX_CONFIG`      | Configuration or setup error         |
-
-`gest iteration next` uses **75** (`EX_TEMPFAIL`) when no unblocked tasks are
-available — distinct from real-error codes. This lets scripts distinguish
-"nothing to do" from "something broke":
+When no tasks are available, `gest iteration next` exits with code **2**
+instead of the usual 1 for errors. This lets scripts distinguish "nothing to
+do" from "something broke":
 
 ```sh
 gest iteration next <id> --claim --agent my-agent --json
 status=$?
-if [ $status -eq 75 ]; then
+if [ $status -eq 2 ]; then
   echo "No work available -- idle"
 elif [ $status -ne 0 ]; then
   echo "Error"
@@ -308,7 +293,7 @@ while true; do
   task=$(gest iteration next "$ITER_ID" --claim --agent worker-1 --json 2>/dev/null)
   status=$?
 
-  if [ $status -eq 75 ]; then
+  if [ $status -eq 2 ]; then
     # No tasks in this phase -- try advancing
     gest iteration advance "$ITER_ID" 2>/dev/null || break
     continue

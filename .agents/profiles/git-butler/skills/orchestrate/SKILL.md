@@ -71,7 +71,34 @@ For each phase:
    cargo run -- iteration next <iteration-id> --claim --agent implement-agent -q
    ```
 
-   Exit code **2** means no tasks are available (distinguishes idle from errors).
+   Exit code **75** (`EX_TEMPFAIL`) means no tasks are currently available — an idle signal, not an
+   error. Script `iteration next` with this in mind:
+
+   ```sh
+   cargo run -- iteration next <iteration-id> --claim --agent implement-agent --json
+   status=$?
+   if [ $status -eq 75 ]; then
+     echo "no work available -- idle"
+   elif [ $status -ne 0 ]; then
+     echo "error"
+   fi
+   ```
+
+   Gest follows the BSD `sysexits.h` convention. Every CLI failure maps to one of:
+
+   | Code | Name            | Meaning                                         |
+   |------|-----------------|-------------------------------------------------|
+   | 0    | —               | Success                                         |
+   | 64   | `EX_USAGE`      | Command-line usage error                        |
+   | 65   | `EX_DATAERR`    | User-supplied data was malformed                |
+   | 66   | `EX_NOINPUT`    | Referenced entity was not found                 |
+   | 69   | `EX_UNAVAILABLE`| Resource not in the required state              |
+   | 70   | `EX_SOFTWARE`   | Internal software error                         |
+   | 74   | `EX_IOERR`      | Filesystem or database I/O error                |
+   | 75   | `EX_TEMPFAIL`   | Try again later (e.g., no tasks available)      |
+   | 78   | `EX_CONFIG`     | Configuration or setup error                    |
+
+   See ADR `prsooyor` (_Exit Code Contract for the gest CLI_) for the authoritative contract.
 
 2. For each task in the phase (in priority order):
    - Run `/implement <task-id>` in the main workspace.

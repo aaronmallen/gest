@@ -158,26 +158,47 @@ impl Error {
   /// The process exit code associated with this error, per the sysexits.h
   /// mapping documented in ADR "Exit Code Contract for the gest CLI".
   ///
-  /// | Code | Name          | Variants                                         |
-  /// |------|---------------|--------------------------------------------------|
-  /// | 64   | EX_USAGE      | `Argument`                                       |
-  /// | 65   | EX_DATAERR    | `Serialize`, `TomlSerialize`                     |
-  /// | 66   | EX_NOINPUT    | `NotFound`, `MetaKeyNotFound`                    |
-  /// | 69   | EX_UNAVAILABLE| `InvalidState`                                   |
-  /// | 70   | EX_SOFTWARE   | `Editor`                                         |
-  /// | 74   | EX_IOERR      | `Io`, `Store`                                    |
-  /// | 75   | EX_TEMPFAIL   | `NoTasksAvailable`                               |
-  /// | 78   | EX_CONFIG     | `Config`, `UninitializedProject`                 |
+  /// The `Store` variant is unwrapped: the inner `store::Error` is inspected
+  /// so semantically distinct store failures (missing entity vs ambiguous
+  /// prefix vs filesystem I/O) surface as the matching sysexits code rather
+  /// than collapsing to a generic `EX_IOERR`.
+  ///
+  /// | Code | Name          | Variants                                                       |
+  /// |------|---------------|----------------------------------------------------------------|
+  /// | 64   | EX_USAGE      | `Argument`, `Store(InvalidPrefix)`                             |
+  /// | 65   | EX_DATAERR    | `Serialize`, `TomlSerialize`, `Store(Serialization \| Yaml)`   |
+  /// | 66   | EX_NOINPUT    | `NotFound`, `MetaKeyNotFound`, `Store(NotFound \| Ambiguous)`  |
+  /// | 69   | EX_UNAVAILABLE| `InvalidState`, `Store(NothingToUndo)`                         |
+  /// | 70   | EX_SOFTWARE   | `Editor`                                                       |
+  /// | 74   | EX_IOERR      | `Io`, `Store(Database \| InvalidValue \| Io)`                  |
+  /// | 75   | EX_TEMPFAIL   | `NoTasksAvailable`                                             |
+  /// | 78   | EX_CONFIG     | `Config`, `UninitializedProject`, `Store(Config)`              |
   pub fn exit_code(&self) -> ExitCode {
+    ExitCode::from(self.exit_code_u8())
+  }
+
+  /// The raw sysexits code as a `u8`. Exposed alongside [`Self::exit_code`]
+  /// so tests and callers can compare codes directly without round-tripping
+  /// through `ExitCode` (which does not implement `PartialEq`).
+  pub fn exit_code_u8(&self) -> u8 {
+    use crate::store::Error as StoreError;
     match self {
-      Self::Argument(_) => ExitCode::from(64),
-      Self::Serialize(_) | Self::TomlSerialize(_) => ExitCode::from(65),
-      Self::MetaKeyNotFound(_) | Self::NotFound(_) => ExitCode::from(66),
-      Self::InvalidState(_) => ExitCode::from(69),
-      Self::Editor(_) => ExitCode::from(70),
-      Self::Io(_) | Self::Store(_) => ExitCode::from(74),
-      Self::NoTasksAvailable => ExitCode::from(75),
-      Self::Config(_) | Self::UninitializedProject => ExitCode::from(78),
+      Self::Argument(_) => 64,
+      Self::Serialize(_) | Self::TomlSerialize(_) => 65,
+      Self::MetaKeyNotFound(_) | Self::NotFound(_) => 66,
+      Self::InvalidState(_) => 69,
+      Self::Editor(_) => 70,
+      Self::Io(_) => 74,
+      Self::Store(inner) => match inner {
+        StoreError::InvalidPrefix(_) => 64,
+        StoreError::Serialization(_) | StoreError::Yaml(_) => 65,
+        StoreError::Ambiguous(..) | StoreError::NotFound(_) => 66,
+        StoreError::NothingToUndo => 69,
+        StoreError::Config(_) => 78,
+        StoreError::Database(_) | StoreError::InvalidValue(_) | StoreError::Io(_) => 74,
+      },
+      Self::NoTasksAvailable => 75,
+      Self::Config(_) | Self::UninitializedProject => 78,
     }
   }
 }
@@ -443,16 +464,10 @@ mod tests {
   mod error_exit_code {
     use super::*;
 
-    /// `ExitCode` doesn't implement `PartialEq`; compare via `Debug`, which
-    /// renders as `ExitCode(unix_exit_status(N))` on Unix.
     fn assert_exit_code(err: Error, expected: u8) {
-      let actual = format!("{:?}", err.exit_code());
-      let expected_fmt = format!("{:?}", ExitCode::from(expected));
+      let actual = err.exit_code_u8();
 
-      assert_eq!(
-        actual, expected_fmt,
-        "variant {err:?} -> expected {expected}, got {actual}"
-      );
+      assert_eq!(actual, expected, "variant {err:?} -> expected {expected}, got {actual}");
     }
 
     #[test]
@@ -507,11 +522,50 @@ mod tests {
     }
 
     #[test]
-    fn it_maps_store_to_74() {
+    fn it_maps_store_io_to_74() {
       let io_err = std::io::Error::new(std::io::ErrorKind::Other, "db gone");
       let store_err = crate::store::Error::Io(io_err);
 
       assert_exit_code(Error::Store(store_err), 74);
+    }
+
+    #[test]
+    fn it_maps_store_invalid_value_to_74() {
+      assert_exit_code(Error::Store(crate::store::Error::InvalidValue("bad row".into())), 74);
+    }
+
+    #[test]
+    fn it_maps_store_invalid_prefix_to_64() {
+      assert_exit_code(Error::Store(crate::store::Error::InvalidPrefix("xx".into())), 64);
+    }
+
+    #[test]
+    fn it_maps_store_not_found_to_66() {
+      assert_exit_code(Error::Store(crate::store::Error::NotFound("task abc".into())), 66);
+    }
+
+    #[test]
+    fn it_maps_store_ambiguous_to_66() {
+      assert_exit_code(Error::Store(crate::store::Error::Ambiguous("abc".into(), 3)), 66);
+    }
+
+    #[test]
+    fn it_maps_store_nothing_to_undo_to_69() {
+      assert_exit_code(Error::Store(crate::store::Error::NothingToUndo), 69);
+    }
+
+    #[test]
+    fn it_maps_store_serialization_to_65() {
+      let json_err = serde_json::from_str::<serde_json::Value>("{not json").unwrap_err();
+
+      assert_exit_code(Error::Store(crate::store::Error::Serialization(json_err)), 65);
+    }
+
+    #[test]
+    fn it_maps_store_config_to_78() {
+      let cfg_err = crate::config::Error::XDGDirNotFound("config");
+
+      assert_exit_code(Error::Store(crate::store::Error::Config(cfg_err)), 78);
     }
 
     #[test]

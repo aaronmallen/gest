@@ -48,7 +48,7 @@ impl Command {
     let task_ref = self
       .task
       .as_ref()
-      .ok_or_else(|| Error::Editor("task argument is required when --batch is not used".into()))?;
+      .ok_or_else(|| Error::Argument("task argument is required when --batch is not used".into()))?;
 
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
@@ -108,7 +108,7 @@ impl Command {
       }
 
       let record: BatchRecord =
-        serde_json::from_str(trimmed).map_err(|e| Error::Editor(format!("invalid NDJSON: {e}")))?;
+        serde_json::from_str(trimmed).map_err(|e| Error::Argument(format!("invalid NDJSON: {e}")))?;
 
       let task_id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Tasks, &record.task).await?;
 

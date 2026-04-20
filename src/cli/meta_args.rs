@@ -23,20 +23,20 @@ pub fn build_metadata(base: Option<Value>, pairs: &[String], json_blobs: &[Strin
   for pair in pairs {
     let (key, raw) = pair
       .split_once('=')
-      .ok_or_else(|| Error::Editor(format!("invalid --metadata pair (expected key=value): {pair}")))?;
+      .ok_or_else(|| Error::Argument(format!("invalid --metadata pair (expected key=value): {pair}")))?;
     let value = meta::parse_scalar(raw);
     if !meta::set_path(&mut metadata, key, value) {
-      return Err(Error::Editor(format!("invalid --metadata key path: {key}")));
+      return Err(Error::Argument(format!("invalid --metadata key path: {key}")));
     }
   }
 
   for blob in json_blobs {
     let parsed: Value =
-      serde_json::from_str(blob).map_err(|e| Error::Editor(format!("invalid --metadata-json: {e}")))?;
+      serde_json::from_str(blob).map_err(|e| Error::Argument(format!("invalid --metadata-json: {e}")))?;
     let object = match parsed {
       Value::Object(map) => map,
       _ => {
-        return Err(Error::Editor("--metadata-json must be a JSON object".to_string()));
+        return Err(Error::Argument("--metadata-json must be a JSON object".to_string()));
       }
     };
     if let Some(existing) = metadata.as_object_mut() {

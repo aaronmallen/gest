@@ -2,7 +2,6 @@
 
 use std::{
   collections::HashMap,
-  io::{Error as IoError, ErrorKind},
   path::{Path, PathBuf},
 };
 
@@ -32,9 +31,9 @@ struct MigrationCounts {
 /// Run the v0.4 migration from flat-file `.gest/` directory into SQLite.
 pub async fn run(context: &AppContext, source: &Path) -> Result<(), Error> {
   if !source.is_dir() {
-    return Err(Error::Io(IoError::new(
-      ErrorKind::NotFound,
-      format!("source directory does not exist: {}", source.display()),
+    return Err(Error::NotFound(format!(
+      "source directory does not exist: {}",
+      source.display()
     )));
   }
 

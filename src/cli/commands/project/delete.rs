@@ -33,7 +33,7 @@ impl Command {
     let id = repo::resolve::resolve_id(&conn, Table::Projects, &self.id).await?;
     let project = repo::project::find_by_id(&conn, id.clone())
       .await?
-      .ok_or_else(|| Error::Argument(format!("project {} not found", id.short())))?;
+      .ok_or_else(|| Error::NotFound(format!("project {} not found", id.short())))?;
 
     let task_count = repo::project::count_owned(&conn, Table::Tasks, &id).await?;
     let iteration_count = repo::project::count_owned(&conn, Table::Iterations, &id).await?;

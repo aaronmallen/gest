@@ -144,7 +144,7 @@ impl Command {
           let all = repo::project::all(&conn, true).await?;
           all
             .first()
-            .ok_or_else(|| Error::Argument("no projects in store".into()))?
+            .ok_or_else(|| Error::NotFound("no projects in store".into()))?
             .id()
             .clone()
         }

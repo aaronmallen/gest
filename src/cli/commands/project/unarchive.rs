@@ -25,12 +25,12 @@ impl Command {
     let id = repo::resolve::resolve_id(&conn, Table::Projects, &self.id).await?;
     let project = repo::project::find_by_id(&conn, id)
       .await?
-      .ok_or_else(|| Error::Argument(format!("project {} not found", self.id)))?;
+      .ok_or_else(|| Error::NotFound(format!("project {} not found", self.id)))?;
 
     repo::project::unarchive(&conn, project.id()).await?;
     let restored = repo::project::find_by_id(&conn, project.id().clone())
       .await?
-      .ok_or_else(|| Error::Argument(format!("project {} not found after unarchive", project.id().short())))?;
+      .ok_or_else(|| Error::NotFound(format!("project {} not found after unarchive", project.id().short())))?;
 
     let envelope = Envelope {
       entity: &restored,

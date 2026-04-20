@@ -59,7 +59,7 @@ impl Command {
     let conn = context.store().connect().await?;
     let project = repo::project::find_by_id(&conn, project_id.clone())
       .await?
-      .ok_or(Error::UninitializedProject)?;
+      .ok_or_else(|| Error::NotFound(format!("project not found: {project_id}")))?;
 
     if self.json {
       let json = serde_json::to_string_pretty(&project)?;

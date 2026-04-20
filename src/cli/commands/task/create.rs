@@ -167,7 +167,7 @@ impl Command {
         continue;
       }
 
-      let new: New = serde_json::from_str(line).map_err(|e| Error::Editor(format!("invalid NDJSON: {e}")))?;
+      let new: New = serde_json::from_str(line).map_err(|e| Error::Argument(format!("invalid NDJSON: {e}")))?;
       let tx = repo::transaction::begin(conn, project_id, "task create").await?;
       let task = repo::task::create(conn, project_id, &new).await?;
       repo::transaction::record_semantic_event(
@@ -206,10 +206,10 @@ impl Command {
       // No title arg, stdin is piped — parse title from first heading
       let input = std::io::read_to_string(std::io::stdin()).unwrap_or_default();
       let title = extract_heading(&input)
-        .ok_or_else(|| Error::Editor("no title provided and no # heading found in stdin".into()))?;
+        .ok_or_else(|| Error::Argument("no title provided and no # heading found in stdin".into()))?;
       Ok((title, input))
     } else {
-      Err(Error::Editor("task title is required".into()))
+      Err(Error::Argument("task title is required".into()))
     }
   }
 }
@@ -217,7 +217,7 @@ impl Command {
 /// Parse a link spec in the format `rel:target` or just `target` (defaults to relates-to).
 fn parse_link_spec(spec: &str) -> Result<(RelationshipType, String), Error> {
   if let Some((rel_str, target)) = spec.split_once(':') {
-    let rel_type: RelationshipType = rel_str.parse().map_err(|e: String| Error::Editor(e))?;
+    let rel_type: RelationshipType = rel_str.parse().map_err(|e: String| Error::Argument(e))?;
     Ok((rel_type, target.to_string()))
   } else {
     Ok((RelationshipType::RelatesTo, spec.to_string()))

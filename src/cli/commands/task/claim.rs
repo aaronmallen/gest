@@ -36,7 +36,7 @@ impl Command {
     let id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Tasks, &self.id).await?;
     let before_task = repo::task::find_by_id(&conn, id.clone())
       .await?
-      .ok_or(Error::UninitializedProject)?;
+      .ok_or_else(|| Error::NotFound(format!("task not found: {}", self.id)))?;
     let before = serde_json::to_value(&before_task)?;
 
     let (author_name, author_email) = match &self.as_author {

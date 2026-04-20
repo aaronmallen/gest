@@ -28,7 +28,7 @@ impl Command {
     let id = repo::resolve::resolve_id(&conn, Table::Projects, &self.id).await?;
     let project = repo::project::find_by_id(&conn, id)
       .await?
-      .ok_or_else(|| Error::Argument(format!("project {} not found", self.id)))?;
+      .ok_or_else(|| Error::NotFound(format!("project {} not found", self.id)))?;
 
     let counts = repo::project::entity_counts(&conn, project.id()).await?;
 
@@ -50,7 +50,7 @@ impl Command {
     repo::project::archive(&conn, project.id()).await?;
     let archived = repo::project::find_by_id(&conn, project.id().clone())
       .await?
-      .ok_or_else(|| Error::Argument(format!("project {} not found after archive", project.id().short())))?;
+      .ok_or_else(|| Error::NotFound(format!("project {} not found after archive", project.id().short())))?;
 
     let envelope = Envelope {
       entity: &archived,

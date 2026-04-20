@@ -44,7 +44,7 @@ impl Command {
         let id = self
           .id
           .as_deref()
-          .ok_or_else(|| Error::MetaKeyNotFound("<id>".to_string()))?;
+          .ok_or_else(|| Error::Argument("<id> argument is required".to_string()))?;
         actions::meta::bare::<actions::Task>(context, id, &self.output).await
       }
     }

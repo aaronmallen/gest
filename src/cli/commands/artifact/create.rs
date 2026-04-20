@@ -151,7 +151,7 @@ impl Command {
       }
 
       let record: BatchRecord =
-        serde_json::from_str(trimmed).map_err(|e| Error::Editor(format!("invalid NDJSON: {e}")))?;
+        serde_json::from_str(trimmed).map_err(|e| Error::Argument(format!("invalid NDJSON: {e}")))?;
 
       let new = New {
         body: record.body.unwrap_or_default(),
@@ -226,10 +226,10 @@ impl Command {
       // No title arg, stdin is piped — parse title from first heading
       let input = std::io::read_to_string(std::io::stdin()).unwrap_or_default();
       let title = extract_heading(&input)
-        .ok_or_else(|| Error::Editor("no title provided and no # heading found in stdin".into()))?;
+        .ok_or_else(|| Error::Argument("no title provided and no # heading found in stdin".into()))?;
       Ok((title, input))
     } else {
-      Err(Error::Editor("artifact title is required".into()))
+      Err(Error::Argument("artifact title is required".into()))
     }
   }
 }

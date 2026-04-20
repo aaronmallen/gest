@@ -61,7 +61,7 @@ impl Command {
     let matched = match matches.as_slice() {
       [] => {
         let suffix = self.rel.map(|r| format!(" with rel-type {r}")).unwrap_or_default();
-        return Err(Error::Argument(format!(
+        return Err(Error::NotFound(format!(
           "no relationship found between {} and {}{}",
           source_id.short(),
           target_id.short(),

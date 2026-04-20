@@ -1,5 +1,3 @@
-use std::io::{Error as IoError, ErrorKind};
-
 use clap::Args;
 
 use crate::{AppContext, cli::Error, store::repo, ui::components::SuccessMessage};
@@ -18,7 +16,7 @@ impl Command {
     let detached = repo::project::detach_workspace(&conn, &cwd).await?;
 
     if !detached {
-      return Err(IoError::new(ErrorKind::NotFound, format!("no workspace found for {}", cwd.display())).into());
+      return Err(Error::NotFound(format!("no workspace found for {}", cwd.display())));
     }
 
     let message = SuccessMessage::new("detached workspace").field("path", cwd.display().to_string());

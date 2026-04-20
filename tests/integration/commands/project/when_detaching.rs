@@ -97,4 +97,10 @@ fn it_errors_on_unknown_project() {
     !output.status.success(),
     "detaching an unattached directory should exit non-zero"
   );
+  assert_eq!(
+    output.status.code(),
+    Some(66),
+    "detach with no workspace should exit with EX_NOINPUT (66), got: {:?}",
+    output.status.code()
+  );
 }

@@ -111,10 +111,6 @@ pub enum Error {
   /// A domain state-transition error: the target is not in a state that
   /// accepts the requested transition (e.g. "iteration is not active",
   /// "phase has non-terminal tasks", "refusing to save empty body").
-  //
-  // Constructors are added in phase 3 of the exit-code-taxonomy iteration;
-  // this variant exists now so `exit_code`'s match is exhaustive.
-  #[allow(dead_code)]
   #[error("{0}")]
   InvalidState(String),
   /// An I/O error (e.g. writing to the filesystem).
@@ -125,19 +121,10 @@ pub enum Error {
   MetaKeyNotFound(String),
   /// No tasks are available to claim (iteration `next` on an empty-but-valid
   /// iteration).
-  //
-  // The constructor for this variant is added in phase 3 of the
-  // exit-code-taxonomy iteration; it exists now so `exit_code`'s match is
-  // exhaustive.
-  #[allow(dead_code)]
   #[error("no available tasks")]
   NoTasksAvailable,
   /// A domain entity was not found (lookup returned `None` where the caller
   /// expected a row).
-  //
-  // Constructors are added in phase 3 of the exit-code-taxonomy iteration;
-  // this variant exists now so `exit_code`'s match is exhaustive.
-  #[allow(dead_code)]
   #[error("{0}")]
   NotFound(String),
   /// A serialization error (e.g. snapshotting entity state for transactions).

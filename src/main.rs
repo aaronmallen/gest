@@ -7,13 +7,13 @@ mod store;
 mod ui;
 mod web;
 
-use std::{fmt::Display, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, process::ExitCode, sync::Arc};
 
 use clap::Parser;
 use getset::Getters;
 
 use crate::{
-  cli::App,
+  cli::{App, Error},
   config::Settings,
   logging::LevelFilter,
   store::{Db, model::primitives::Id},
@@ -41,7 +41,20 @@ pub struct AppContext {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> ExitCode {
+  match run().await {
+    Ok(()) => ExitCode::SUCCESS,
+    Err(err) => {
+      eprintln!("{}", ErrorMessage::new(err.to_string()));
+      err.exit_code()
+    }
+  }
+}
+
+/// Drive the CLI from argv to result. All error paths funnel through `cli::Error`
+/// so [`main`] can compute a sysexits.h-compliant exit code via
+/// [`cli::Error::exit_code`].
+async fn run() -> Result<(), Error> {
   ui::init();
 
   let app = App::parse();
@@ -54,7 +67,7 @@ async fn main() {
 
   logging::init(verbosity.unwrap_or(LevelFilter::default()));
 
-  let settings = config::load().unwrap_or_else(die);
+  let settings = config::load()?;
   if verbosity.is_none() {
     log::set_max_level(settings.log().level().into());
   }
@@ -62,9 +75,9 @@ async fn main() {
 
   style::set_global(Theme::from_config(&settings));
 
-  let store = store::open(&settings).await.unwrap_or_else(die);
+  let store = store::open(&settings).await?;
   log::info!("store opened");
-  let (project_id, gest_dir) = resolve_project(&store).await;
+  let (project_id, gest_dir) = resolve_project(&store).await?;
 
   // Configure transparent sync in the store layer
   if settings.storage().sync_enabled()
@@ -73,7 +86,7 @@ async fn main() {
     store.configure_sync(pid.clone(), dir.clone());
   }
 
-  store.import_if_needed().await.unwrap_or_else(die);
+  store.import_if_needed().await?;
 
   let context = AppContext {
     gest_dir: gest_dir.clone(),
@@ -84,33 +97,26 @@ async fn main() {
   };
 
   log::info!("command dispatched");
-  if let Err(e) = app.call(&context).await {
-    let code = if matches!(e, cli::Error::NotAvailable(_)) { 2 } else { 1 };
-    eprintln!("{}", ErrorMessage::new(e.to_string()));
-    std::process::exit(code);
-  }
+  app.call(&context).await?;
 
-  store.export_if_needed().await.unwrap_or_else(die);
-}
-
-/// Print an error message to stderr and exit with code 1.
-fn die<T>(error: impl Display) -> T {
-  eprintln!("{}", ErrorMessage::new(error.to_string()));
-  std::process::exit(1);
+  store.export_if_needed().await?;
+  Ok(())
 }
 
 /// Resolve the current project ID and `.gest` directory from the working directory.
-async fn resolve_project(store: &Arc<Db>) -> (Option<Id>, Option<PathBuf>) {
+///
+/// Returns `(None, None)` when the current directory is not itself registered
+/// as a gest project (the common case for bootstrapping commands like `init`).
+async fn resolve_project(store: &Arc<Db>) -> Result<(Option<Id>, Option<PathBuf>), Error> {
   let Ok(cwd) = std::env::current_dir() else {
-    return (None, None);
+    return Ok((None, None));
   };
-  let conn = store.connect().await.unwrap_or_else(die);
-  match store::repo::project::find_by_path(&conn, &cwd).await {
-    Ok(Some(project)) => {
+  let conn = store.connect().await?;
+  match store::repo::project::find_by_path(&conn, &cwd).await? {
+    Some(project) => {
       let gest_dir = store::sync::find_gest_dir(project.root());
-      (Some(project.id().clone()), gest_dir)
+      Ok((Some(project.id().clone()), gest_dir))
     }
-    Ok(None) => (None, None),
-    Err(e) => die(e),
+    None => Ok((None, None)),
   }
 }

@@ -7,6 +7,8 @@ pub mod prompt;
 pub mod tag_arg;
 pub mod web_notify;
 
+use std::process::ExitCode;
+
 use clap::{ArgAction, CommandFactory, Parser, Subcommand};
 use getset::Getters;
 use yansi::Paint;
@@ -99,18 +101,52 @@ pub enum Error {
   /// A configuration loading or validation error.
   #[error(transparent)]
   Config(#[from] crate::config::Error),
-  /// An editor launch error.
+  /// An editor launch or editor-process failure.
+  ///
+  /// Reserved for true editor-invocation failures (spawn, non-zero exit, no
+  /// `$EDITOR`, etc.). Domain state-transition errors that were historically
+  /// routed through this variant should use [`Error::InvalidState`] instead.
   #[error("{0}")]
   Editor(String),
+  /// A domain state-transition error: the target is not in a state that
+  /// accepts the requested transition (e.g. "iteration is not active",
+  /// "phase has non-terminal tasks", "refusing to save empty body").
+  //
+  // Constructors are added in phase 3 of the exit-code-taxonomy iteration;
+  // this variant exists now so `exit_code`'s match is exhaustive.
+  #[allow(dead_code)]
+  #[error("{0}")]
+  InvalidState(String),
   /// An I/O error (e.g. writing to the filesystem).
   #[error(transparent)]
   Io(#[from] std::io::Error),
   /// A metadata key was not found on the entity.
   #[error("metadata key not found: {0}")]
   MetaKeyNotFound(String),
+  /// No tasks are available to claim (iteration `next` on an empty-but-valid
+  /// iteration).
+  //
+  // The constructor for this variant is added in phase 3 of the
+  // exit-code-taxonomy iteration; it exists now so `exit_code`'s match is
+  // exhaustive.
+  #[allow(dead_code)]
+  #[error("no available tasks")]
+  NoTasksAvailable,
   /// The requested resource is not available (e.g. no unblocked tasks).
+  ///
+  /// Retained during the transition from the pre-ADR taxonomy; new call
+  /// sites should use [`Error::NoTasksAvailable`] for the "empty result"
+  /// case or [`Error::NotFound`] for a missing entity.
   #[error("{0}")]
   NotAvailable(String),
+  /// A domain entity was not found (lookup returned `None` where the caller
+  /// expected a row).
+  //
+  // Constructors are added in phase 3 of the exit-code-taxonomy iteration;
+  // this variant exists now so `exit_code`'s match is exhaustive.
+  #[allow(dead_code)]
+  #[error("{0}")]
+  NotFound(String),
   /// A serialization error (e.g. snapshotting entity state for transactions).
   #[error(transparent)]
   Serialize(#[from] serde_json::Error),
@@ -123,6 +159,34 @@ pub enum Error {
   /// The current directory has not been initialized as a gest project.
   #[error("not a gest project (run `gest init` to initialize)")]
   UninitializedProject,
+}
+
+impl Error {
+  /// The process exit code associated with this error, per the sysexits.h
+  /// mapping documented in ADR "Exit Code Contract for the gest CLI".
+  ///
+  /// | Code | Name          | Variants                                         |
+  /// |------|---------------|--------------------------------------------------|
+  /// | 64   | EX_USAGE      | `Argument`                                       |
+  /// | 65   | EX_DATAERR    | `Serialize`, `TomlSerialize`                     |
+  /// | 66   | EX_NOINPUT    | `NotFound`, `MetaKeyNotFound`                    |
+  /// | 69   | EX_UNAVAILABLE| `InvalidState`                                   |
+  /// | 70   | EX_SOFTWARE   | `Editor`                                         |
+  /// | 74   | EX_IOERR      | `Io`, `Store`                                    |
+  /// | 75   | EX_TEMPFAIL   | `NoTasksAvailable`, `NotAvailable`               |
+  /// | 78   | EX_CONFIG     | `Config`, `UninitializedProject`                 |
+  pub fn exit_code(&self) -> ExitCode {
+    match self {
+      Self::Argument(_) => ExitCode::from(64),
+      Self::Serialize(_) | Self::TomlSerialize(_) => ExitCode::from(65),
+      Self::MetaKeyNotFound(_) | Self::NotFound(_) => ExitCode::from(66),
+      Self::InvalidState(_) => ExitCode::from(69),
+      Self::Editor(_) => ExitCode::from(70),
+      Self::Io(_) | Self::Store(_) => ExitCode::from(74),
+      Self::NoTasksAvailable | Self::NotAvailable(_) => ExitCode::from(75),
+      Self::Config(_) | Self::UninitializedProject => ExitCode::from(78),
+    }
+  }
 }
 
 /// Enum of all available subcommands.
@@ -380,6 +444,100 @@ mod tests {
       let app = App::try_parse_from(["gest", "version", "--no-pager"]).unwrap();
 
       assert!(*app.no_pager());
+    }
+  }
+
+  mod error_exit_code {
+    use super::*;
+
+    /// `ExitCode` doesn't implement `PartialEq`; compare via `Debug`, which
+    /// renders as `ExitCode(unix_exit_status(N))` on Unix.
+    fn assert_exit_code(err: Error, expected: u8) {
+      let actual = format!("{:?}", err.exit_code());
+      let expected_fmt = format!("{:?}", ExitCode::from(expected));
+
+      assert_eq!(
+        actual, expected_fmt,
+        "variant {err:?} -> expected {expected}, got {actual}"
+      );
+    }
+
+    #[test]
+    fn it_maps_argument_to_64() {
+      assert_exit_code(Error::Argument("bad flag".into()), 64);
+    }
+
+    #[test]
+    fn it_maps_config_to_78() {
+      let err = Error::Config(crate::config::Error::XDGDirNotFound("config"));
+
+      assert_exit_code(err, 78);
+    }
+
+    #[test]
+    fn it_maps_editor_to_70() {
+      assert_exit_code(Error::Editor("editor failed".into()), 70);
+    }
+
+    #[test]
+    fn it_maps_invalid_state_to_69() {
+      assert_exit_code(Error::InvalidState("iteration is not active".into()), 69);
+    }
+
+    #[test]
+    fn it_maps_io_to_74() {
+      let io_err = std::io::Error::new(std::io::ErrorKind::Other, "boom");
+
+      assert_exit_code(Error::Io(io_err), 74);
+    }
+
+    #[test]
+    fn it_maps_meta_key_not_found_to_66() {
+      assert_exit_code(Error::MetaKeyNotFound("foo.bar".into()), 66);
+    }
+
+    #[test]
+    fn it_maps_no_tasks_available_to_75() {
+      assert_exit_code(Error::NoTasksAvailable, 75);
+    }
+
+    #[test]
+    fn it_maps_not_available_to_75() {
+      assert_exit_code(Error::NotAvailable("no available tasks".into()), 75);
+    }
+
+    #[test]
+    fn it_maps_not_found_to_66() {
+      assert_exit_code(Error::NotFound("project not found".into()), 66);
+    }
+
+    #[test]
+    fn it_maps_serialize_to_65() {
+      let json_err = serde_json::from_str::<serde_json::Value>("{not json").unwrap_err();
+
+      assert_exit_code(Error::Serialize(json_err), 65);
+    }
+
+    #[test]
+    fn it_maps_store_to_74() {
+      let io_err = std::io::Error::new(std::io::ErrorKind::Other, "db gone");
+      let store_err = crate::store::Error::Io(io_err);
+
+      assert_exit_code(Error::Store(store_err), 74);
+    }
+
+    #[test]
+    fn it_maps_toml_serialize_to_65() {
+      // Force a toml::ser::Error by trying to serialize an unsupported top-level
+      // type (a bare integer, not a table).
+      let toml_err = toml::to_string(&42_i32).unwrap_err();
+
+      assert_exit_code(Error::TomlSerialize(toml_err), 65);
+    }
+
+    #[test]
+    fn it_maps_uninitialized_project_to_78() {
+      assert_exit_code(Error::UninitializedProject, 78);
     }
   }
 }

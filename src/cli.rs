@@ -132,13 +132,6 @@ pub enum Error {
   #[allow(dead_code)]
   #[error("no available tasks")]
   NoTasksAvailable,
-  /// The requested resource is not available (e.g. no unblocked tasks).
-  ///
-  /// Retained during the transition from the pre-ADR taxonomy; new call
-  /// sites should use [`Error::NoTasksAvailable`] for the "empty result"
-  /// case or [`Error::NotFound`] for a missing entity.
-  #[error("{0}")]
-  NotAvailable(String),
   /// A domain entity was not found (lookup returned `None` where the caller
   /// expected a row).
   //
@@ -173,7 +166,7 @@ impl Error {
   /// | 69   | EX_UNAVAILABLE| `InvalidState`                                   |
   /// | 70   | EX_SOFTWARE   | `Editor`                                         |
   /// | 74   | EX_IOERR      | `Io`, `Store`                                    |
-  /// | 75   | EX_TEMPFAIL   | `NoTasksAvailable`, `NotAvailable`               |
+  /// | 75   | EX_TEMPFAIL   | `NoTasksAvailable`                               |
   /// | 78   | EX_CONFIG     | `Config`, `UninitializedProject`                 |
   pub fn exit_code(&self) -> ExitCode {
     match self {
@@ -183,7 +176,7 @@ impl Error {
       Self::InvalidState(_) => ExitCode::from(69),
       Self::Editor(_) => ExitCode::from(70),
       Self::Io(_) | Self::Store(_) => ExitCode::from(74),
-      Self::NoTasksAvailable | Self::NotAvailable(_) => ExitCode::from(75),
+      Self::NoTasksAvailable => ExitCode::from(75),
       Self::Config(_) | Self::UninitializedProject => ExitCode::from(78),
     }
   }
@@ -499,11 +492,6 @@ mod tests {
     #[test]
     fn it_maps_no_tasks_available_to_75() {
       assert_exit_code(Error::NoTasksAvailable, 75);
-    }
-
-    #[test]
-    fn it_maps_not_available_to_75() {
-      assert_exit_code(Error::NotAvailable("no available tasks".into()), 75);
     }
 
     #[test]

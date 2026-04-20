@@ -33,7 +33,7 @@ impl Command {
     let iteration = repo::iteration::find_required_by_id(&conn, id.clone()).await?;
 
     if iteration.status().is_terminal() {
-      return Err(Error::Editor(format!(
+      return Err(Error::InvalidState(format!(
         "iteration {} is {}, not active",
         id.short(),
         iteration.status()
@@ -42,7 +42,7 @@ impl Command {
 
     let tasks = repo::iteration::tasks_with_phase(&conn, &id).await?;
     if tasks.is_empty() {
-      return Err(Error::Editor(format!("iteration {} has no tasks", id.short())));
+      return Err(Error::InvalidState(format!("iteration {} has no tasks", id.short())));
     }
 
     // Active phase = lowest phase number where any task has a non-terminal status
@@ -63,7 +63,7 @@ impl Command {
     match active_phase {
       None => {
         // All tasks in all phases are terminal
-        Err(Error::Editor(format!(
+        Err(Error::InvalidState(format!(
           "iteration {} is already complete: all tasks in all phases are terminal",
           id.short()
         )))
@@ -83,7 +83,7 @@ impl Command {
           .count();
 
         if non_terminal_count > 0 && !self.force {
-          return Err(Error::Editor(format!(
+          return Err(Error::InvalidState(format!(
             "phase {phase} has {non_terminal_count} non-terminal task(s); use --force to advance anyway"
           )));
         }
@@ -107,7 +107,7 @@ impl Command {
           }
           None => {
             if phase == max_phase {
-              return Err(Error::Editor(format!(
+              return Err(Error::InvalidState(format!(
                 "iteration {} is on the last phase ({phase}) with non-terminal tasks; \
                 complete remaining tasks to finish the iteration",
                 id.short()

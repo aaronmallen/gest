@@ -45,6 +45,36 @@ fn it_rejects_advance_when_tasks_incomplete() {
 }
 
 #[test]
+fn it_exits_with_ex_unavailable_when_iteration_not_active() {
+  let g = GestCmd::new();
+  let iter_id = g.create_iteration_with_phases("done sprint", &[&["only task"]]);
+
+  // Complete the only task so the iteration reaches a terminal status.
+  let claim = g
+    .cmd()
+    .args(["iteration", "next", &iter_id, "--claim", "--agent", "test", "-q"])
+    .output()
+    .expect("iteration next --claim failed");
+  assert!(claim.status.success());
+  let task_id = String::from_utf8_lossy(&claim.stdout).trim().to_string();
+  g.complete_task(&task_id);
+
+  let output = g
+    .cmd()
+    .args(["iteration", "advance", &iter_id])
+    .output()
+    .expect("iteration advance failed");
+
+  assert_eq!(
+    output.status.code(),
+    Some(69),
+    "advancing a non-active iteration should exit with EX_UNAVAILABLE (69), got {:?}: {}",
+    output.status.code(),
+    String::from_utf8_lossy(&output.stderr)
+  );
+}
+
+#[test]
 fn it_advances_past_last_phase() {
   let g = GestCmd::new();
   let iter_id = g.create_iteration_with_phases("final sprint", &[&["only task"]]);

@@ -30,15 +30,15 @@ fn it_returns_none_when_no_tasks() {
     .output()
     .expect("iteration next failed");
 
-  // Exit code 2 is documented as "no tasks available".
+  // Per ADR-0017 the "no available tasks" outcome is EX_TEMPFAIL (75).
   assert!(
     !output.status.success(),
     "iteration next on an empty iteration should not exit zero"
   );
   assert_eq!(
     output.status.code(),
-    Some(2),
-    "empty iteration next should exit with code 2, got: {:?}",
+    Some(75),
+    "empty iteration next should exit with EX_TEMPFAIL (75), got: {:?}",
     output.status.code()
   );
 }

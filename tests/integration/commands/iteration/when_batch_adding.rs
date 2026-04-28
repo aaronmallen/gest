@@ -152,6 +152,37 @@ fn it_rejects_batch_flag_combined_with_positional_task() {
 }
 
 #[test]
+fn it_prints_iteration_short_id_in_quiet_mode() {
+  let g = GestCmd::new();
+  let iter_id = g.create_iteration("quiet batch iteration");
+  let task_a = g.create_task("quiet batch task");
+
+  let input = ndjson(&[(&task_a, 1)]);
+
+  let output = g
+    .cmd()
+    .args(["iteration", "add", &iter_id, "--batch", "-q"])
+    .write_stdin(input)
+    .output()
+    .expect("iteration add --batch -q failed to run");
+
+  assert!(
+    output.status.success(),
+    "iteration add --batch -q should succeed: {}",
+    String::from_utf8_lossy(&output.stderr)
+  );
+  let stdout = String::from_utf8_lossy(&output.stdout);
+  let lines: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
+
+  assert_eq!(lines.len(), 1, "expected exactly one non-blank line, got: {stdout}");
+  assert!(
+    iter_id.starts_with(lines[0]),
+    "expected line to be a short prefix of the iteration ID {iter_id:?}, got: {:?}",
+    lines[0]
+  );
+}
+
+#[test]
 fn it_rolls_back_entire_batch_on_invalid_task_reference() {
   let g = GestCmd::new();
   let iter_id = g.create_iteration("rollback batch");

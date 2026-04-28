@@ -1,4 +1,5 @@
 mod when_adding_notes;
+mod when_batch_creating;
 mod when_blocking;
 mod when_cancelling;
 mod when_claiming;

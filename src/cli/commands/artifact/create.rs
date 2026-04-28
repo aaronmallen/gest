@@ -1,6 +1,7 @@
-use std::io::{BufRead, IsTerminal};
+use std::io::IsTerminal;
 
 use clap::Args;
+use libsql::Connection;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -8,9 +9,10 @@ use crate::{
   AppContext,
   cli::{Error, commands::helpers::extract_heading, meta_args, tag_arg},
   store::{
+    self,
     model::{
-      artifact::New,
-      primitives::{EntityType, RelationshipType},
+      artifact::{Model, New},
+      primitives::{EntityType, Id, RelationshipType},
     },
     repo,
   },
@@ -138,70 +140,36 @@ impl Command {
   async fn call_batch(&self, context: &AppContext) -> Result<(), Error> {
     let project_id = context.project_id().as_ref().ok_or(Error::UninitializedProject)?;
     let conn = context.store().connect().await?;
-    let tx = repo::transaction::begin(&conn, project_id, "artifact batch create").await?;
 
-    let stdin = std::io::stdin().lock();
-    let mut count = 0u32;
+    let input = std::io::read_to_string(std::io::stdin()).unwrap_or_default();
 
-    for line in stdin.lines() {
-      let line = line?;
-      let trimmed = line.trim();
-      if trimmed.is_empty() {
-        continue;
+    conn.execute("BEGIN", ()).await.map_err(store::Error::from)?;
+    let artifacts = match create_batch_records(project_id, &conn, &input).await {
+      Ok(artifacts) => {
+        conn.execute("COMMIT", ()).await.map_err(store::Error::from)?;
+        artifacts
       }
-
-      let record: BatchRecord =
-        serde_json::from_str(trimmed).map_err(|e| Error::Argument(format!("invalid NDJSON: {e}")))?;
-
-      let new = New {
-        body: record.body.unwrap_or_default(),
-        metadata: record.metadata,
-        title: record.title,
-      };
-
-      let artifact = repo::artifact::create(&conn, project_id, &new).await?;
-      repo::transaction::record_semantic_event(
-        &conn,
-        tx.id(),
-        "artifacts",
-        &artifact.id().to_string(),
-        "created",
-        None,
-        Some("created"),
-        None,
-        None,
-      )
-      .await?;
-
-      if let Some(tags) = &record.tags {
-        for label in tags {
-          let tag = repo::tag::attach(&conn, EntityType::Artifact, artifact.id(), label).await?;
-          repo::transaction::record_event(&conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None)
-            .await?;
-        }
+      Err(e) => {
+        let _ = conn.execute("ROLLBACK", ()).await;
+        return Err(e);
       }
+    };
 
-      if let Some(iteration_ref) = &record.iteration {
-        let iteration_id = repo::resolve::resolve_id(&conn, repo::resolve::Table::Iterations, iteration_ref).await?;
-        let rel = repo::relationship::create(
-          &conn,
-          RelationshipType::RelatesTo,
-          EntityType::Artifact,
-          artifact.id(),
-          EntityType::Iteration,
-          &iteration_id,
-        )
-        .await?;
-        repo::transaction::record_event(&conn, tx.id(), "relationships", &rel.id().to_string(), "created", None)
-          .await?;
-      }
-
-      count += 1;
-    }
-
+    let count = artifacts.len() as u32;
     log::info!("batch created {count} artifacts");
-    let message = SuccessMessage::new("batch created artifacts").field("count", count.to_string());
-    println!("{message}");
+
+    let envelope_input: Vec<_> = artifacts.iter().map(|a| (a.id().clone(), a)).collect();
+    let envelopes = Envelope::load_many(&conn, EntityType::Artifact, &envelope_input, true).await?;
+
+    self.output.print_envelopes_with_short_ids(
+      &envelopes,
+      || artifacts.iter().map(|a| a.id().short()).collect(),
+      || {
+        SuccessMessage::new("batch created artifacts")
+          .field("count", count.to_string())
+          .to_string()
+      },
+    )?;
     Ok(())
   }
 
@@ -232,4 +200,66 @@ impl Command {
       Err(Error::Argument("artifact title is required".into()))
     }
   }
+}
+
+/// Create every artifact described in the NDJSON `input`, applying tags and any iteration
+/// link; intended to run inside an explicit SQL transaction wrapper.
+async fn create_batch_records(project_id: &Id, conn: &Connection, input: &str) -> Result<Vec<Model>, Error> {
+  let tx = repo::transaction::begin(conn, project_id, "artifact batch create").await?;
+  let mut artifacts = Vec::new();
+
+  for line in input.lines() {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+      continue;
+    }
+
+    let record: BatchRecord =
+      serde_json::from_str(trimmed).map_err(|e| Error::Argument(format!("invalid NDJSON: {e}")))?;
+
+    let new = New {
+      body: record.body.unwrap_or_default(),
+      metadata: record.metadata,
+      title: record.title,
+    };
+
+    let artifact = repo::artifact::create(conn, project_id, &new).await?;
+    repo::transaction::record_semantic_event(
+      conn,
+      tx.id(),
+      "artifacts",
+      &artifact.id().to_string(),
+      "created",
+      None,
+      Some("created"),
+      None,
+      None,
+    )
+    .await?;
+
+    if let Some(tags) = &record.tags {
+      for label in tags {
+        let tag = repo::tag::attach(conn, EntityType::Artifact, artifact.id(), label).await?;
+        repo::transaction::record_event(conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
+      }
+    }
+
+    if let Some(iteration_ref) = &record.iteration {
+      let iteration_id = repo::resolve::resolve_id(conn, repo::resolve::Table::Iterations, iteration_ref).await?;
+      let rel = repo::relationship::create(
+        conn,
+        RelationshipType::RelatesTo,
+        EntityType::Artifact,
+        artifact.id(),
+        EntityType::Iteration,
+        &iteration_id,
+      )
+      .await?;
+      repo::transaction::record_event(conn, tx.id(), "relationships", &rel.id().to_string(), "created", None).await?;
+    }
+
+    artifacts.push(artifact);
+  }
+
+  Ok(artifacts)
 }

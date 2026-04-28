@@ -75,6 +75,28 @@ impl Flags {
     Ok(())
   }
 
+  /// Print a list of envelopes with quiet-mode short IDs. In JSON mode the
+  /// envelopes are serialized; in quiet mode each short ID is printed on its
+  /// own line; otherwise `normal` is called for the human-readable summary.
+  pub fn print_envelopes_with_short_ids<T: Serialize>(
+    &self,
+    envelopes: &[Envelope<'_, T>],
+    short_ids: impl FnOnce() -> Vec<String>,
+    normal: impl FnOnce() -> String,
+  ) -> Result<(), Error> {
+    if self.json {
+      let json = serde_json::to_string_pretty(envelopes)?;
+      println!("{json}");
+    } else if self.quiet {
+      for id in short_ids() {
+        println!("{id}");
+      }
+    } else {
+      println!("{}", normal());
+    }
+    Ok(())
+  }
+
   /// Print a collection of entities. In JSON mode the slice is serialized; in
   /// quiet mode each short ID is printed on its own line; otherwise `normal` is
   /// called to produce the human-readable output.

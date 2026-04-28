@@ -128,11 +128,12 @@ impl Command {
     }
 
     log::info!("batch added {count} tasks to iteration");
+    let short_id = iteration_id.short();
     let result = serde_json::json!({
       "iteration_id": iteration_id.to_string(),
       "count": count,
     });
-    self.output.print_entity(&result, "", || {
+    self.output.print_entity(&result, &short_id, || {
       SuccessMessage::new("batch added tasks to iteration")
         .field("count", count.to_string())
         .to_string()

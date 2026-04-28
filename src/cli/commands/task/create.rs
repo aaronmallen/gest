@@ -2,6 +2,8 @@ use std::io::IsTerminal;
 
 use clap::Args;
 use libsql::Connection;
+use serde::Deserialize;
+use serde_json::Value;
 
 use crate::{
   AppContext,
@@ -11,9 +13,10 @@ use crate::{
     meta_args, tag_arg,
   },
   store::{
+    self,
     model::{
       primitives::{AuthorType, EntityType, Id, RelationshipType, TaskStatus},
-      task::New,
+      task::{Model, New},
     },
     repo,
   },
@@ -64,6 +67,40 @@ pub struct Command {
   tag: Vec<String>,
   #[command(flatten)]
   output: json::Flags,
+}
+
+/// A single task record in NDJSON batch mode.
+#[derive(Debug, Deserialize)]
+struct BatchRecord {
+  /// Author name to assign to the task; resolved via `find_or_create`.
+  #[serde(default)]
+  assigned_to: Option<String>,
+  /// Task description body.
+  #[serde(default)]
+  description: Option<String>,
+  /// Iteration ID or prefix to attach the task to.
+  #[serde(default)]
+  iteration: Option<String>,
+  /// Link specs in the form `rel:target_id` (or just `target_id` for relates-to).
+  #[serde(default)]
+  links: Option<Vec<String>>,
+  /// Free-form metadata to merge into the task row.
+  #[serde(default)]
+  metadata: Option<Value>,
+  /// Phase override for the iteration link (auto-increments from max when absent).
+  #[serde(default)]
+  phase: Option<u32>,
+  /// Priority score; lower numbers rank first.
+  #[serde(default)]
+  priority: Option<u8>,
+  /// Initial lifecycle status.
+  #[serde(default)]
+  status: Option<TaskStatus>,
+  /// Tag labels to attach to the task.
+  #[serde(default)]
+  tags: Option<Vec<String>>,
+  /// Short human-readable title.
+  title: String,
 }
 
 impl Command {
@@ -159,35 +196,34 @@ impl Command {
 
   async fn batch_create(&self, _context: &AppContext, project_id: &Id, conn: &Connection) -> Result<(), Error> {
     let input = std::io::read_to_string(std::io::stdin()).unwrap_or_default();
-    let mut count = 0u64;
 
-    for line in input.lines() {
-      let line = line.trim();
-      if line.is_empty() {
-        continue;
+    conn.execute("BEGIN", ()).await.map_err(store::Error::from)?;
+    let tasks = match create_batch_records(project_id, conn, &input).await {
+      Ok(tasks) => {
+        conn.execute("COMMIT", ()).await.map_err(store::Error::from)?;
+        tasks
       }
+      Err(e) => {
+        let _ = conn.execute("ROLLBACK", ()).await;
+        return Err(e);
+      }
+    };
 
-      let new: New = serde_json::from_str(line).map_err(|e| Error::Argument(format!("invalid NDJSON: {e}")))?;
-      let tx = repo::transaction::begin(conn, project_id, "task create").await?;
-      let task = repo::task::create(conn, project_id, &new).await?;
-      repo::transaction::record_semantic_event(
-        conn,
-        tx.id(),
-        "tasks",
-        &task.id().to_string(),
-        "created",
-        None,
-        Some("created"),
-        None,
-        None,
-      )
-      .await?;
-      count += 1;
-    }
-
+    let count = tasks.len() as u64;
     log::info!("batch created {count} tasks");
-    let message = SuccessMessage::new("batch created").field("count", count.to_string());
-    println!("{message}");
+
+    let envelope_input: Vec<_> = tasks.iter().map(|t| (t.id().clone(), t)).collect();
+    let envelopes = Envelope::load_many(conn, EntityType::Task, &envelope_input, true).await?;
+
+    self.output.print_envelopes_with_short_ids(
+      &envelopes,
+      || tasks.iter().map(|t| t.id().short()).collect(),
+      || {
+        SuccessMessage::new("batch created")
+          .field("count", count.to_string())
+          .to_string()
+      },
+    )?;
     Ok(())
   }
 
@@ -212,6 +248,96 @@ impl Command {
       Err(Error::Argument("task title is required".into()))
     }
   }
+}
+
+/// Create every task described in the NDJSON `input`, applying tags, links, and iteration
+/// membership; intended to run inside an explicit SQL transaction wrapper.
+async fn create_batch_records(project_id: &Id, conn: &Connection, input: &str) -> Result<Vec<Model>, Error> {
+  let tx = repo::transaction::begin(conn, project_id, "task batch create").await?;
+  let mut tasks = Vec::new();
+
+  for line in input.lines() {
+    let line = line.trim();
+    if line.is_empty() {
+      continue;
+    }
+
+    let record: BatchRecord =
+      serde_json::from_str(line).map_err(|e| Error::Argument(format!("invalid NDJSON: {e}")))?;
+
+    let assigned_to = if let Some(name) = &record.assigned_to {
+      let author = repo::author::find_or_create(conn, name, None, AuthorType::Human).await?;
+      Some(author.id().clone())
+    } else {
+      None
+    };
+
+    let new = New {
+      assigned_to,
+      description: record.description.unwrap_or_default(),
+      metadata: record.metadata,
+      priority: record.priority,
+      status: record.status,
+      title: record.title,
+    };
+
+    let task = repo::task::create(conn, project_id, &new).await?;
+    repo::transaction::record_semantic_event(
+      conn,
+      tx.id(),
+      "tasks",
+      &task.id().to_string(),
+      "created",
+      None,
+      Some("created"),
+      None,
+      None,
+    )
+    .await?;
+
+    if let Some(tags) = &record.tags {
+      for label in tag_arg::normalize_tags(tags) {
+        let tag = repo::tag::attach(conn, EntityType::Task, task.id(), &label).await?;
+        repo::transaction::record_event(conn, tx.id(), "entity_tags", &tag.id().to_string(), "created", None).await?;
+      }
+    }
+
+    if let Some(links) = &record.links {
+      for link_spec in links {
+        let (rel_type, target_id) = parse_link_spec(link_spec)?;
+        let target_table = resolve_entity_table(conn, &target_id).await;
+        let target = repo::resolve::resolve_id(conn, target_table, &target_id).await?;
+        let target_type = table_to_entity_type(target_table);
+        let rel = repo::relationship::create(conn, rel_type, EntityType::Task, task.id(), target_type, &target).await?;
+        repo::transaction::record_event(conn, tx.id(), "relationships", &rel.id().to_string(), "created", None).await?;
+      }
+    }
+
+    if let Some(iter_ref) = &record.iteration {
+      let iter_id = repo::resolve::resolve_id(conn, repo::resolve::Table::Iterations, iter_ref).await?;
+      let phase = match record.phase {
+        Some(p) => p,
+        None => {
+          let max = repo::iteration::max_phase(conn, &iter_id).await?;
+          max.map(|m| m + 1).unwrap_or(1)
+        }
+      };
+      repo::iteration::add_task(conn, &iter_id, task.id(), phase).await?;
+      repo::transaction::record_event(
+        conn,
+        tx.id(),
+        "iteration_tasks",
+        &task.id().to_string(),
+        "created",
+        None,
+      )
+      .await?;
+    }
+
+    tasks.push(task);
+  }
+
+  Ok(tasks)
 }
 
 /// Parse a link spec in the format `rel:target` or just `target` (defaults to relates-to).
